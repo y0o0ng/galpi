@@ -749,6 +749,123 @@ view, not semantic model quality. Full-suite testing is not repeated for this
 prompt-only implementation change. `git diff --check` and handoff-body equality
 pass; no study fixtures or storage schema change.
 
+### Accepted development anchor contract — 2026-10-03
+
+Owner review of concrete anchor examples establishes the following development
+Builder contract. It preserves anchor = adjudication target = storage target;
+"storage target" identifies what could proceed through later gates, not an
+already approved or memory-worthy fact.
+
+1. One anchor identifies one user-centered state/question for adjudication; one
+   bundle follows that target throughout subsequent processing.
+2. Select a verbatim word, phrase or sentence from visible source evidence.
+   Do not invent a topic label absent from the source.
+3. The anchor need not contain a complete proposition or its eventual status.
+   `수영`, `주말 러닝` and `구매 결정` can identify targets whose tentative,
+   confirmed, suspended or resumed status is determined from the full evidence.
+4. Select enough source text to distinguish that target, not a minimum character
+   count or a mandatory full sentence. `구매 결정` can distinguish a decision
+   from preference within the same chair discussion; `집 알아보려고` is also
+   admissible when that phrase identifies the target.
+5. Independently adjudicable states require separate anchors/bundles, even in
+   one turn, and may share evidence. Suspension, fulfillment of a condition and
+   resumption of the same target can belong to one evidence bundle; each mention
+   does not mechanically create another target.
+6. Mark one representative source occurrence per bundle. There is no universal
+   first-mention or last-mention rule; do not additionally mark all repetitions.
+7. Selection does not resolve meaning, referents, user endorsement, final state
+   or WRITE eligibility. An unresolved source expression remains admissible;
+   other people's statements do not become the user's position through selection.
+8. **No minimum durability or storage value is required for anchor discovery.**
+   For `하늘 이쁘다`, selecting `하늘` and building its evidence bundle is allowed.
+   Whether that observation is worth remembering is Durability's decision.
+   Do not silently filter anchors because they look transient, trivial or unlikely
+   to be useful later. This does not require mechanically anchoring every noun.
+
+Owner clarification after the real-conversation anchor comparison:
+
+- Judge the anchor within its evidence bundle: it marks the focus around which
+  meaning is constructed. Length alone is not a quality verdict. Short and long
+  spans are both acceptable when they clearly distinguish the one target within
+  a faithful bundle; retain flexibility to select narrower spans when useful.
+- Anchor location is not restricted to USER turns. An ASSISTANT question may
+  contain the clearest representative expression, followed by the user's brief
+  confirmation. For example, `안암캠퍼스 기준` in the preceding question can mark
+  the housing-search focus instead of anchoring the subsequent `응`. Preserve
+  speaker attribution and confirmation context: anchoring assistant text does
+  not itself establish a user fact or endorsement.
+- Builder responsibility is to preserve the context needed to judge that
+  attribution, not to settle it. If the user's endorsement/scope remains unclear
+  in faithfully retained evidence, keep the candidate for Ambiguity to judge.
+  Do not require a predetermined confirmation phrase or reject the anchor merely
+  because the user's state is ambiguous. Evidence omission/distortion remains a
+  Builder defect; source-level ambiguity belongs to the next stage.
+- A user's conditional prediction about their future can be an independent
+  target, even when it also supports another target's reasoning. The possible
+  stay duration conditional on graduate-school attendance need not be excluded
+  as merely supporting evidence for the rent/deposit choice. Preserve both the
+  condition and uncertainty; do not turn it into confirmed attendance or a fixed
+  stay duration. Candidate eligibility does not adopt a new storage representation
+  or bypass Durability and the later representation/transition checks.
+
+**Required construction order:** read the conversation → fix one representative
+anchor → construct that anchor's evidence bundle → fix another anchor → construct
+its bundle, repeating within the same Builder task. Do not first produce an
+episode-wide list of anchors and then run a separate evidence-selection phase.
+This is the requested construction workflow, not separate model calls or a
+request to expose chain-of-thought. Return completed anchor/evidence pairs only,
+without invented target labels, interpretation essays or downstream judgments.
+The full declared episode remains available while constructing each bundle,
+including later clarifications/corrections; workflow order does not impose a
+prefix-only evidence cutoff. Preserve the fixed anchor while collecting its
+evidence. A single API response can follow this instruction, but its output alone
+cannot prove the model's internal construction order.
+
+This is the accepted design contract, not a claim that current model selection
+already satisfies it. Evidence granularity (whole turns versus sub-turn spans)
+is a separate implementation decision; the reviewed corpus examples do not all
+use whole-turn spans. No frozen P1-B6 data/labels or current Builder prompt/code
+is changed by this documentation step.
+
+#### Private paired construction probe — 2026-10-03
+
+Owner-authorized real-data comparison used a different fixed range from the
+previous housing-anchor comparison: `shared-main` messages **1708–1717**, ten
+messages. Pi export used `readonly:true`, `query_only=1`, one read transaction,
+`total_changes()` delta **0**, and matching before/after DB/WAL/SHM SHA256 values.
+Vault access, production writes, schema changes and service restarts were **0**.
+
+Private directory: `/private/tmp/galpi-bundle-pair-comparison-qndkzou5` (0700,
+artifacts 0600). Source SHA256:
+`31d43de9fb5b2f4060d75fcd5a3c3f670580052e30907e7324752dcc02267137`.
+The assistant froze **9 proposed anchor/bundle pairs** before the one-shot Luna
+call, without receiving Luna's results. They are development proposals, not HUMAN
+gold or an exhaustive reference set. Luna received the identical source episode
+and the accepted construction/ambiguity/durability boundaries, not the assistant
+selections. The prompt explicitly requests anchor → its bundle → next anchor →
+its bundle within one task, with no reasoning narrative or invented target label.
+This is an instruction, not proof of hidden model execution order.
+
+Luna (`gpt-6-luna`, medium/current_turn, max output 4096, store:false, tools absent,
+SDK/request maxRetries:0) returned **6 proposed bundles** in **1 completed call /
+0 retries**. Both selections pass the existing source-span/bundle constructor;
+semantic completeness remains NOT_VALIDATED. No source omission or difference
+is automatically classified as a defect, CLEAR/ESCALATE or WRITE/NO_WRITE. Raw
+source, responses, proposals and full rendered review views remain outside Git.
+
+Assistant bundle SHA256:
+`2b0faba5d9d3da3e7506bfb8b9c63a3ed12d0a05a5847c40e1746b1b1abec5b9`;
+Luna bundle SHA256:
+`065ef52b5843b58b4abe45b8e76b23ff0a2109929366ee0ed65364849c3e40d6`;
+pre-dispatch plan SHA256:
+`2c6d4ad97c7e75e2aca8c0a004c944be57f845e81227f57a2502cbafb30e4b42`.
+Review views: `assistant-review.md` and `luna-review.md` in the same private
+directory. The existing development Builder code/default prompt was not changed;
+the experimental prompt is privately frozen as `request.json`. Only source/output
+validation and `git diff --check` were run for this documentation/private probe;
+no new full-suite pass is claimed. Next is owner review of complete bundles,
+including target granularity and evidence sufficiency, before another prompt run.
+
 ### Existing development mechanics and initial probe
 
 `lib/memory-storage/bundle-builder.js` reads an explicitly selected inclusive message range in one session from a `readonly:true` / `query_only=ON` connection and a single SQLite read transaction. Ordering is the current conversation ordering `(created_at, id)`, including same-second ID tie-breaking. Both endpoints must exist in that session; other sessions and messages after the endpoint are excluded. No automatic session/topic segmentation, semantic search, DB migration, evidence registration or state write is performed. Message text is preserved verbatim, including multiline content, and roles remain explicit. Source timestamps are metadata, not adoption of §54.4.
