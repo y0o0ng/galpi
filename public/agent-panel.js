@@ -1386,6 +1386,34 @@
     return form;
   }
 
+  const UPLOAD_STATUS = { pending: '대기', uploading: '올리는 중', done: '완료', failed: '실패' };
+  const UPLOAD_PLATFORM = { youtube: '유튜브', instagram: '인스타그램' };
+
+  function reelsUploadLines(episode) {
+    return (Array.isArray(episode.uploads) ? episode.uploads : []).map(upload => {
+      const line = document.createElement('div');
+      line.className = 'reels-upload';
+      const label = document.createElement('small');
+      label.textContent = `${UPLOAD_PLATFORM[upload.platform] || upload.platform} · ${UPLOAD_STATUS[upload.status] || upload.status}`;
+      line.appendChild(label);
+      if (upload.status === 'done' && /^https:\/\/youtu\.be\//.test(upload.remoteUrl || '')) {
+        const link = document.createElement('a');
+        link.href = upload.remoteUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = '열기';
+        line.appendChild(link);
+      }
+      if (upload.status === 'failed') {
+        const error = document.createElement('small');
+        error.className = 'reels-error';
+        error.textContent = [upload.errorCode, upload.errorDetail].filter(Boolean).join(' · ') || '알 수 없는 오류';
+        line.append(error, button('다시 시도', () => reelsEpisodePost(episode, `uploads/${upload.platform}/retry`)));
+      }
+      return line;
+    });
+  }
+
   function makeReelsEpisodeCard() {
     const episode = state.reelsEpisode;
     if (!episode) return null;
@@ -1429,6 +1457,7 @@
       line.textContent = `지난 수정 ${last.outcome === 'ok' ? '성공' : '실패'}: ${last.note || ''}${last.outcome === 'ok' ? '' : ` (${[last.errorCode, last.errorDetail].filter(Boolean).join(' · ')})`}`;
       body.appendChild(line);
     }
+    if (episode.status === 'approved') body.append(...reelsUploadLines(episode));
     if (episode.status === 'ready') {
       const form = reelsReviseForm(episode);
       const actions = document.createElement('div');

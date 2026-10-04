@@ -359,6 +359,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 38, name: 'reels_run_retries' },
     { version: 39, name: 'reels_episodes' },
     { version: 40, name: 'reels_episode_revisions' },
+    { version: 41, name: 'reels_uploads' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(

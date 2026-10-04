@@ -75,6 +75,8 @@ const { createReelsWorker } = require('./lib/reels/worker');
 const { registerReelsRoutes } = require('./lib/reels/routes');
 const { createReelsEpisodes } = require('./lib/reels/episodes');
 const { createReelsProductionWorker } = require('./lib/reels/production-worker');
+const { createReelsUploads } = require('./lib/reels/uploads');
+const { createYoutubeUploader, resolvePrivacy: resolveYoutubePrivacy } = require('./lib/reels/youtube');
 const {
   buildReelsPushPayload,
   buildReelsSendOptions,
@@ -242,6 +244,10 @@ const NEWS_SURFACE_ENABLED = process.env.NEWS_SURFACE_ENABLED === 'true';
 const REELS_AGENT_ENABLED = process.env.REELS_AGENT_ENABLED === 'true';
 // 켜면 04:00~07:00 KST에 선택된 후보를 claude(Opus·Sonnet)로 끝까지 만든다(구독 한도를 쓴다). 후보 플래그와 따로다.
 const REELS_PRODUCTION_ENABLED = process.env.REELS_PRODUCTION_ENABLED === 'true';
+// XION Reels 3단계. 켜면 승인한 편이 유튜브 업로드 대기열에 들어간다(실제 구글 호출). 감사 전 프로젝트라 영상은 비공개로 잠긴다.
+const REELS_YOUTUBE_UPLOAD_ENABLED = process.env.REELS_YOUTUBE_UPLOAD_ENABLED === 'true';
+const REELS_YOUTUBE_PRIVACY = resolveYoutubePrivacy(process.env.REELS_YOUTUBE_PRIVACY);
+if (REELS_YOUTUBE_PRIVACY.warn) console.warn('REELS_YOUTUBE_PRIVACY 값이 올바르지 않아 private로 둡니다.');
 const REELS_CLAUDE_BIN = process.env.REELS_CLAUDE_BIN || '/home/pi/.local/bin/claude';
 // XION 홈 머리줄의 날씨. 기상청 단기예보 하나만 쓰고 판단은 결정론적 규칙이라
 // LLM을 부르지 않는다(설계 0절). 키는 브라우저로 절대 나가지 않는다.
@@ -1035,9 +1041,22 @@ const reelsWorker = REELS_AGENT_ENABLED
   : null;
 
 const reelsEpisodes = createReelsEpisodes(db);
+const reelsUploads = createReelsUploads(db);
+const reelsYoutubeUploader = REELS_YOUTUBE_UPLOAD_ENABLED
+  ? createYoutubeUploader({
+    credentials: {
+      clientId: process.env.REELS_YOUTUBE_CLIENT_ID,
+      clientSecret: process.env.REELS_YOUTUBE_CLIENT_SECRET,
+      refreshToken: process.env.REELS_YOUTUBE_REFRESH_TOKEN,
+    },
+    privacy: REELS_YOUTUBE_PRIVACY.privacy,
+  })
+  : null;
 const reelsProductionWorker = REELS_PRODUCTION_ENABLED
   ? createReelsProductionWorker({
     episodes: reelsEpisodes,
+    uploads: reelsUploads,
+    uploader: reelsYoutubeUploader,
     pushService: reelsPushService,
     pushDispatcher: reelsPushDispatcher,
     reelsDir: path.join(__dirname, 'reels'),
@@ -4738,8 +4757,10 @@ registerNewsRoutes({
 });
 
 registerReelsRoutes({
-  app, store: reelsStore, episodes: reelsEpisodes, onRevise: () => { void reelsProductionWorker?.tick(); },
-  config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, reelsDir: path.join(__dirname, 'reels') },
+  app, store: reelsStore, episodes: reelsEpisodes, uploads: reelsUploads,
+  onRevise: () => { void reelsProductionWorker?.tick(); },
+  onUpload: () => { void reelsProductionWorker?.tickUpload(); },
+  config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, youtubeUploadEnabled: REELS_YOUTUBE_UPLOAD_ENABLED, reelsDir: path.join(__dirname, 'reels') },
 });
 
 // 서버 상태도 DB도 없다. 요청 중에 좌표를 격자로 바꿔 기상청에 묻고 끝난다.
