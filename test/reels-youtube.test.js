@@ -347,7 +347,7 @@ test('썸네일: 켜져 있으면 업로드 뒤 커버를 thumbnails.set으로 �
     assert.equal(result.videoId, 'vid1');
     assert.equal(result.thumbnail, expected);
     const thumb = calls.find(c => c.url.includes('/thumbnails/set'));
-    assert.equal(thumb.url, 'https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=vid1');
+    assert.equal(thumb.url, 'https://www.googleapis.com/upload/youtube/v3/thumbnails/set?uploadType=media&videoId=vid1');
     assert.equal(thumb.init.headers['content-type'], 'image/png');
   }
   const off = createYoutubeUploader({ credentials: { clientId: 'c', clientSecret: 's', refreshToken: 'r' }, fetch: async (url) => (String(url).startsWith('https://oauth2') ? new Response(JSON.stringify({ access_token: 'a', expires_in: 3600 })) : String(url).includes('resumable') ? new Response(null, { headers: { location: 'https://u/s' } }) : new Response(JSON.stringify({ id: 'v' }))), readFile: async () => Buffer.from('x') });
