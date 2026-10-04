@@ -1050,6 +1050,7 @@ const reelsYoutubeUploader = REELS_YOUTUBE_UPLOAD_ENABLED
       refreshToken: process.env.REELS_YOUTUBE_REFRESH_TOKEN,
     },
     privacy: REELS_YOUTUBE_PRIVACY.privacy,
+    thumbnail: process.env.REELS_YOUTUBE_THUMBNAIL === 'true',
   })
   : null;
 const reelsProductionWorker = REELS_PRODUCTION_ENABLED

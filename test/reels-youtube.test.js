@@ -70,7 +70,7 @@ test('공개 범위: 허용값만, 그 밖은 private + warn', () => {
 test('재개 업로드 두 단계: 토큰 갱신, 세션 시작 헤더·body 필드, 파일 PUT', async () => {
   const fetch = happy();
   const result = await uploader(fetch, { privacy: 'unlisted' }).upload({ videoPath: '/x.mp4', caption: CAPTION });
-  assert.deepEqual(result, { videoId: 'vid123', titleTruncated: false });
+  assert.deepEqual(result, { videoId: 'vid123', titleTruncated: false, thumbnail: 'skipped' });
   assert.equal(fetch.calls.length, 3);
 
   const [token, start, put] = fetch.calls;
@@ -324,4 +324,27 @@ test('서버 연결·화면 계약: 플래그 기본 false, .env.example 이름�
   assert.match(lines, /\^https:\\\/\\\/youtu\\\.be\\\//); // 링크는 youtu.be 주소만
   assert.match(lines, /uploads\/\$\{upload\.platform\}\/retry/);
   assert.match(panel, /episode\.status === 'approved'\) body\.append\(\.\.\.reelsUploadLines/);
+});
+
+test('썸네일: 켜져 있으면 업로드 뒤 커버를 thumbnails.set으로 올리고, 실패해도 업로드는 성공이다', async () => {
+  for (const [status, expected] of [[200, 'set'], [403, 'REELS_YT_HTTP_403']]) {
+    const calls = [];
+    const fetch = async (url, init = {}) => {
+      calls.push({ url: String(url), init });
+      if (String(url).startsWith('https://oauth2.googleapis.com')) return new Response(JSON.stringify({ access_token: 'a', expires_in: 3600 }), { status: 200 });
+      if (String(url).includes('uploadType=resumable')) return new Response(null, { status: 200, headers: { location: 'https://upload.example/session' } });
+      if (String(url) === 'https://upload.example/session') return new Response(JSON.stringify({ id: 'vid1' }), { status: 200 });
+      if (String(url).includes('/thumbnails/set')) return new Response(status === 200 ? '{}' : JSON.stringify({ error: { errors: [{ reason: 'forbidden' }] } }), { status });
+      throw new Error(`unexpected ${url}`);
+    };
+    const uploader = createYoutubeUploader({ credentials: { clientId: 'c', clientSecret: 's', refreshToken: 'r' }, thumbnail: true, fetch, sleep: async () => {}, readFile: async () => Buffer.from('x') });
+    const result = await uploader.upload({ videoPath: '/v.mp4', caption: '제목\n설명', coverPath: '/c.png' });
+    assert.equal(result.videoId, 'vid1');
+    assert.equal(result.thumbnail, expected);
+    const thumb = calls.find(c => c.url.includes('/thumbnails/set'));
+    assert.equal(thumb.url, 'https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=vid1');
+    assert.equal(thumb.init.headers['content-type'], 'image/png');
+  }
+  const off = createYoutubeUploader({ credentials: { clientId: 'c', clientSecret: 's', refreshToken: 'r' }, fetch: async (url) => (String(url).startsWith('https://oauth2') ? new Response(JSON.stringify({ access_token: 'a', expires_in: 3600 })) : String(url).includes('resumable') ? new Response(null, { headers: { location: 'https://u/s' } }) : new Response(JSON.stringify({ id: 'v' }))), readFile: async () => Buffer.from('x') });
+  assert.equal((await off.upload({ videoPath: '/v', caption: 't', coverPath: '/c.png' })).thumbnail, 'skipped');
 });
