@@ -73,6 +73,8 @@ const { registerNewsRoutes } = require('./lib/news/routes');
 const { createReelsStore } = require('./lib/reels/store');
 const { createReelsWorker } = require('./lib/reels/worker');
 const { registerReelsRoutes } = require('./lib/reels/routes');
+const { createReelsEpisodes } = require('./lib/reels/episodes');
+const { createReelsProductionWorker } = require('./lib/reels/production-worker');
 const {
   buildReelsPushPayload,
   buildReelsSendOptions,
@@ -238,6 +240,8 @@ const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 const NEWS_SURFACE_ENABLED = process.env.NEWS_SURFACE_ENABLED === 'true';
 // XION Reels 1단계. 켜면 하루 1회 실제 수집과 claude(Opus) 호출이 나간다(설계 v0.2). Pi에서만 켠다.
 const REELS_AGENT_ENABLED = process.env.REELS_AGENT_ENABLED === 'true';
+// 켜면 04:00~07:00 KST에 선택된 후보를 claude(Opus·Sonnet)로 끝까지 만든다(구독 한도를 쓴다). 후보 플래그와 따로다.
+const REELS_PRODUCTION_ENABLED = process.env.REELS_PRODUCTION_ENABLED === 'true';
 const REELS_CLAUDE_BIN = process.env.REELS_CLAUDE_BIN || '/home/pi/.local/bin/claude';
 // XION 홈 머리줄의 날씨. 기상청 단기예보 하나만 쓰고 판단은 결정론적 규칙이라
 // LLM을 부르지 않는다(설계 0절). 키는 브라우저로 절대 나가지 않는다.
@@ -1001,7 +1005,7 @@ const newsPushDispatcher = newsPushService
   : null;
 
 const reelsStore = createReelsStore(db);
-const reelsPushService = REELS_AGENT_ENABLED && ASSISTANT_PUSH_CONFIG.enabled
+const reelsPushService = (REELS_AGENT_ENABLED || REELS_PRODUCTION_ENABLED) && ASSISTANT_PUSH_CONFIG.enabled
   ? createReelsPushService(db, { quietHours: () => mailStore.getMailSettings().quietHours })
   : null;
 const reelsPushDispatcher = reelsPushService
@@ -1027,6 +1031,18 @@ const reelsWorker = REELS_AGENT_ENABLED
     bin: REELS_CLAUDE_BIN,
     // 기사 제목이 로그에 남지 않게 오류 코드만 적는다.
     onError: error => console.error(`Reels 후보 오류: ${error?.code || error?.name || 'UNKNOWN'}${error?.detail ? ` · ${error.detail}` : ''}`),
+  })
+  : null;
+
+const reelsEpisodes = createReelsEpisodes(db);
+const reelsProductionWorker = REELS_PRODUCTION_ENABLED
+  ? createReelsProductionWorker({
+    episodes: reelsEpisodes,
+    pushService: reelsPushService,
+    pushDispatcher: reelsPushDispatcher,
+    reelsDir: path.join(__dirname, 'reels'),
+    bin: REELS_CLAUDE_BIN,
+    onError: error => console.error(`Reels 제작 오류: ${error?.code || error?.name || 'UNKNOWN'}${error?.detail ? ` · ${error.detail}` : ''}`),
   })
   : null;
 
@@ -4721,7 +4737,10 @@ registerNewsRoutes({
   },
 });
 
-registerReelsRoutes({ app, store: reelsStore, config: { enabled: REELS_AGENT_ENABLED } });
+registerReelsRoutes({
+  app, store: reelsStore, episodes: reelsEpisodes,
+  config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, reelsDir: path.join(__dirname, 'reels') },
+});
 
 // 서버 상태도 DB도 없다. 요청 중에 좌표를 격자로 바꿔 기상청에 묻고 끝난다.
 registerWeatherRoutes({
@@ -8459,6 +8478,10 @@ const httpServer = app.listen(PORT, HOST, () => {
     reelsWorker.start();
     console.log('   릴스:     후보 worker 실행 중 (하루 1회 19:00 KST)');
   }
+  if (reelsProductionWorker) {
+    reelsProductionWorker.start();
+    console.log('   릴스:     제작 worker 실행 중 (04:00~07:00 KST, 선택된 후보 1편)');
+  }
   if (reelsPushDispatcher) reelsPushDispatcher.start();
   if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
     console.log('   뉴스:     홈 노출 꺼짐 (문턱 미확정, NEWS_SURFACE_ENABLED)');
@@ -8531,6 +8554,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     newsAnalyzer?.stop();
     newsPushDispatcher?.stop();
     reelsWorker?.stop();
+    reelsProductionWorker?.stop();
     reelsPushDispatcher?.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;

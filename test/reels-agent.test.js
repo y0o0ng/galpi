@@ -325,6 +325,6 @@ test('서버 연결: 모든 라우트가 인증 뒤 /api/reels 아래에 있고 
   assert.ok([...routes.matchAll(/app\.(?:get|post)\(\s*[`']([^`']+)/g)].every(m => m[1].startsWith('/api/reels/')));
   assert.match(server, /const REELS_AGENT_ENABLED = process\.env\.REELS_AGENT_ENABLED === 'true'/);
   assert.match(server, /const reelsWorker = REELS_AGENT_ENABLED\s*\?\s*createReelsWorker/);
-  assert.match(server, /const reelsPushService = REELS_AGENT_ENABLED && /);
+  assert.match(server, /const reelsPushService = \(REELS_AGENT_ENABLED \|\| REELS_PRODUCTION_ENABLED\) && /);
   assert.match(fs.readFileSync(path.join(__dirname, '..', '.env.example'), 'utf8'), /^REELS_AGENT_ENABLED=false$/m);
 });
