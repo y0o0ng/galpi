@@ -4,7 +4,8 @@
 
 - 검토 결과: `{{review_path}}`. **`[MUST]` 항목만 고친다.** `[NICE]`는 손대지 않는다.
 - 제작 보고서: `{{report_path}}` (지금 상태). 규칙 정본은 `reels/px/reels-pixel-handoff.md`.
-- 경계는 제작 때와 같다: 이 편 폴더·이 편 결과물·보고서 밖에는 쓰지 않는다(공용 `reels/px/`는 읽기 전용), 패키지 설치·git 금지, 렌더는 `nice -n 19` 하나씩.
+- 경계는 제작 때와 같다: 이 편 폴더·이 편 결과물·보고서 밖에는 쓰지 않는다(공용 `reels/px/`는 읽기 전용), 패키지 설치·git 금지.
+- **셸은 권한 규칙이 허용하는 형태만 된다:** `{{repo}}/reels/.venv/bin/python <스크립트 절대 경로> …` 또는 `nice -n 19 {{repo}}/reels/.venv/bin/python <스크립트 절대 경로> …` 한 줄. `cd`·`&&`·`;`·파이프·리다이렉션·상대 경로 파이썬은 거절된다. 렌더는 `nice -n 19`로 한 번에 하나.
 
 ## 완료 조건
 1. `reels/media/{{out_name}}.mp4` 다시 렌더, lint 통과.

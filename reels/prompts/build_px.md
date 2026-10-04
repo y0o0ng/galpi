@@ -17,7 +17,7 @@
 ## 경계
 - 이 편 폴더(`reels/episodes/{{episode_dir}}/`), `reels/media/`의 이 편 결과물, 보고서 경로 밖에는 쓰지 않는다(앞 편 도트판이 바뀌지 않게).
 - Manim 트랙(동결) 파일(`reels/episodes/`의 `_px` 아닌 폴더, `reels/templates/`, `style.py`, `mascot.py`, 최상위 `timeline.py`, `sound.py`, `tts.py`, `render.sh`) 수정 금지. `reels/` 밖 금지. 패키지 설치·git 금지. 쓰는 곳 없는 함수 금지.
-- 렌더는 `nice -n 19`로 한 번에 하나, 파이썬은 `reels/.venv/bin/python`.
+- **셸은 권한 규칙이 허용하는 형태만 된다:** `{{repo}}/reels/.venv/bin/python <스크립트 절대 경로> …` 또는 `nice -n 19 {{repo}}/reels/.venv/bin/python <스크립트 절대 경로> …` 한 줄. `cd`·`&&`·`;`·파이프·리다이렉션·상대 경로 파이썬은 거절된다. 렌더는 `nice -n 19`로 한 번에 하나.
 
 ## 완료 조건
 1. `reels/media/{{out_name}}.mp4` lint 통과.

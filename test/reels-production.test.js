@@ -247,3 +247,12 @@ test('게시 문구: 검토 단계가 caption.txt를 꺼내고, 절이 없거나
     assert.equal(fs.existsSync(path.join(f.workDir, 'caption.txt')), false);
   }
 });
+
+test('거절된 도구 호출을 단계 기록에 짧게 남긴다', async () => {
+  const f = fixture();
+  const stdout = JSON.stringify({ result: 'ok', num_turns: 2, permission_denials: [
+    { tool_name: 'Bash', tool_input: { command: 'cd /x && python a.py' } },
+    { tool_name: 'Write', tool_input: { file_path: '/etc/passwd', content: 'nope' } }] });
+  const record = await run(f, fakeSpawn(() => {}, { stdout }));
+  assert.deepEqual(record.stages[0].denied, ['Bash: cd /x && python a.py', 'Write: /etc/passwd']);
+});
