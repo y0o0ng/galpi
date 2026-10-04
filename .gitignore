@@ -43,3 +43,4 @@ reels/.venv/
 reels/media/
 reels/px/fonts/*.ttf
 reels/work/
+reels/public-tmp/

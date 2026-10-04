@@ -1396,7 +1396,7 @@
       const label = document.createElement('small');
       label.textContent = `${UPLOAD_PLATFORM[upload.platform] || upload.platform} · ${UPLOAD_STATUS[upload.status] || upload.status}`;
       line.appendChild(label);
-      if (upload.status === 'done' && /^https:\/\/youtu\.be\//.test(upload.remoteUrl || '')) {
+      if (upload.status === 'done' && /^https:\/\/(youtu\.be|www\.instagram\.com)\//.test(upload.remoteUrl || '')) {
         const link = document.createElement('a');
         link.href = upload.remoteUrl;
         link.target = '_blank';

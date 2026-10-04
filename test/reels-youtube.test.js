@@ -273,7 +273,12 @@ test('승인 → pending(플래그 꺼짐이면 없음), retry 라우트 404/409
     });
     return { ctx, app, woke: () => woke };
   };
-  const post = (app, action, id) => app.call(`POST /api/reels/episodes/:id/${action}`, { params: { id: String(id) } });
+  const post = (app, action, id) => {
+    const retry = /^uploads\/(\w+)\/retry$/.exec(action); // 라우트는 :platform 하나로 일반화됐다
+    return retry
+      ? app.call('POST /api/reels/episodes/:id/uploads/:platform/retry', { params: { id: String(id), platform: retry[1] } })
+      : app.call(`POST /api/reels/episodes/:id/${action}`, { params: { id: String(id) } });
+  };
 
   const off = run(false);
   const offId = readyEpisode(off.ctx);
@@ -321,7 +326,7 @@ test('서버 연결·화면 계약: 플래그 기본 false, .env.example 이름�
   const lines = panel.slice(panel.indexOf('function reelsUploadLines'), panel.indexOf('function makeReelsEpisodeCard'));
   assert.doesNotMatch(lines, /innerHTML/);
   assert.match(lines, /label\.textContent/);
-  assert.match(lines, /\^https:\\\/\\\/youtu\\\.be\\\//); // 링크는 youtu.be 주소만
+  assert.match(lines, /\^https:\\\/\\\/\(youtu\\\.be\|www\\\.instagram\\\.com\)\\\//); // 링크는 youtu.be·instagram.com 주소만
   assert.match(lines, /uploads\/\$\{upload\.platform\}\/retry/);
   assert.match(panel, /episode\.status === 'approved'\) body\.append\(\.\.\.reelsUploadLines/);
 });

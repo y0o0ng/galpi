@@ -77,6 +77,7 @@ const { createReelsEpisodes } = require('./lib/reels/episodes');
 const { createReelsProductionWorker } = require('./lib/reels/production-worker');
 const { createReelsUploads } = require('./lib/reels/uploads');
 const { createYoutubeUploader, resolvePrivacy: resolveYoutubePrivacy } = require('./lib/reels/youtube');
+const { createInstagramUploader, createTokenStore: createInstagramTokenStore, DEFAULT_TOKEN_FILE: INSTAGRAM_TOKEN_FILE } = require('./lib/reels/instagram');
 const {
   buildReelsPushPayload,
   buildReelsSendOptions,
@@ -246,6 +247,7 @@ const REELS_AGENT_ENABLED = process.env.REELS_AGENT_ENABLED === 'true';
 const REELS_PRODUCTION_ENABLED = process.env.REELS_PRODUCTION_ENABLED === 'true';
 // XION Reels 3단계. 켜면 승인한 편이 유튜브 업로드 대기열에 들어간다(실제 구글 호출). 감사 전 프로젝트라 영상은 비공개로 잠긴다.
 const REELS_YOUTUBE_UPLOAD_ENABLED = process.env.REELS_YOUTUBE_UPLOAD_ENABLED === 'true';
+const REELS_INSTAGRAM_UPLOAD_ENABLED = process.env.REELS_INSTAGRAM_UPLOAD_ENABLED === 'true';
 const REELS_YOUTUBE_PRIVACY = resolveYoutubePrivacy(process.env.REELS_YOUTUBE_PRIVACY);
 if (REELS_YOUTUBE_PRIVACY.warn) console.warn('REELS_YOUTUBE_PRIVACY 값이 올바르지 않아 private로 둡니다.');
 const REELS_CLAUDE_BIN = process.env.REELS_CLAUDE_BIN || '/home/pi/.local/bin/claude';
@@ -1053,11 +1055,23 @@ const reelsYoutubeUploader = REELS_YOUTUBE_UPLOAD_ENABLED
     thumbnail: process.env.REELS_YOUTUBE_THUMBNAIL === 'true',
   })
   : null;
+const reelsInstagramUploader = REELS_INSTAGRAM_UPLOAD_ENABLED
+  ? createInstagramUploader({
+    userId: process.env.REELS_INSTAGRAM_USER_ID,
+    tokens: createInstagramTokenStore({
+      tokenFile: process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE,
+      envToken: process.env.REELS_INSTAGRAM_ACCESS_TOKEN,
+    }),
+    publicBaseUrl: process.env.REELS_PUBLIC_BASE_URL,
+    tmpRoot: path.join(__dirname, 'reels', 'public-tmp'),
+  })
+  : null;
 const reelsProductionWorker = REELS_PRODUCTION_ENABLED
   ? createReelsProductionWorker({
     episodes: reelsEpisodes,
     uploads: reelsUploads,
     uploader: reelsYoutubeUploader,
+    instagramUploader: reelsInstagramUploader,
     pushService: reelsPushService,
     pushDispatcher: reelsPushDispatcher,
     reelsDir: path.join(__dirname, 'reels'),
@@ -4761,7 +4775,7 @@ registerReelsRoutes({
   app, store: reelsStore, episodes: reelsEpisodes, uploads: reelsUploads,
   onRevise: () => { void reelsProductionWorker?.tick(); },
   onUpload: () => { void reelsProductionWorker?.tickUpload(); },
-  config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, youtubeUploadEnabled: REELS_YOUTUBE_UPLOAD_ENABLED, reelsDir: path.join(__dirname, 'reels') },
+  config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, youtubeUploadEnabled: REELS_YOUTUBE_UPLOAD_ENABLED, instagramUploadEnabled: REELS_INSTAGRAM_UPLOAD_ENABLED, reelsDir: path.join(__dirname, 'reels') },
 });
 
 // 서버 상태도 DB도 없다. 요청 중에 좌표를 격자로 바꿔 기상청에 묻고 끝난다.
