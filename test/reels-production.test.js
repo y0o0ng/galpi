@@ -279,3 +279,59 @@ test('중단 신호가 오면 claude 프로세스 그룹을 끄고 그 단계에
   assert.equal(spawn.count, 1);
   assert.deepEqual(killed, ['SIGTERM']);
 });
+
+// ---- 사람 의견 → 바로 수정 ----
+
+const { reviseEpisode } = require('../lib/reels/production');
+
+async function ready(f) {
+  await run(f, fakeSpawn(happy(f)));
+  fs.rmSync(path.join(f.workDir, 'visual_review.md'));
+}
+const revise = (f, spawn, extra = {}) => reviseEpisode({
+  card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, episodeDir: 'ep04_c7_px', note: '제목이 작아요', bin: '/fake/claude', spawn, ...extra,
+});
+
+test('수정: fix(사람 의견) → visual → MUST가 있으면 fix 한 번 더, 기록은 revision-<n>.json', async () => {
+  const f = fixture();
+  await ready(f);
+  const reviews = [];
+  const spawn = fakeSpawn((call, n) => {
+    if (n === 1) { reviews.push(fs.readFileSync(path.join(f.workDir, 'human_review_1.md'), 'utf8')); write(MP4(f.reelsDir)); }
+    if (n === 2) write(path.join(f.workDir, 'visual_review.md'), 'MUST 1 / NICE 0\n- x');
+    if (n === 3) write(MP4(f.reelsDir));
+  });
+  const record = await revise(f, spawn);
+  assert.equal(record.outcome, 'ok');
+  assert.deepEqual(record.stages.map(s => [s.stage, s.result]), [['fix', 'ok'], ['visual', 'ok'], ['fix', 'ok']]);
+  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--model')), ['sonnet', 'opus', 'sonnet']);
+  assert.equal(reviews[0], 'MUST 1 / NICE 0\n- [MUST] 사람 검토 의견: 제목이 작아요\n');
+  assert.ok(spawn.calls[0].stdin.includes(path.join(f.workDir, 'human_review_1.md')));
+  assert.ok(spawn.calls[2].stdin.includes(path.join(f.workDir, 'visual_review.md')));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.workDir, 'revision-1.json'), 'utf8')).outcome, 'ok');
+  assert.ok(fs.existsSync(path.join(f.workDir, 'production.json')));
+  await revise(f, fakeSpawn((call, n) => { if (n === 1) write(MP4(f.reelsDir)); if (n === 2) write(path.join(f.workDir, 'visual_review.md'), 'MUST 0 / NICE 0\n'); }));
+  assert.ok(fs.existsSync(path.join(f.workDir, 'human_review_2.md'))); // 번호는 앞 기록 다음
+});
+
+test('수정: 시각 검토 MUST가 0이면 두 번째 fix가 없다', async () => {
+  const f = fixture();
+  await ready(f);
+  const spawn = fakeSpawn((call, n) => {
+    if (n === 1) write(MP4(f.reelsDir));
+    if (n === 2) write(path.join(f.workDir, 'visual_review.md'), 'MUST 0 / NICE 2\n');
+  });
+  const record = await revise(f, spawn);
+  assert.equal(record.outcome, 'ok');
+  assert.equal(spawn.calls.length, 2);
+});
+
+test('수정: 첫 fix가 mp4를 못 만들면 거기서 실패하고 시각 검토를 돌리지 않는다', async () => {
+  const f = fixture();
+  await ready(f);
+  const spawn = fakeSpawn(() => {});
+  const record = await revise(f, spawn);
+  assert.equal(record.outcome, 'failed');
+  assert.equal(record.stages[0].code, 'REELS_NO_MP4');
+  assert.equal(spawn.calls.length, 1);
+});

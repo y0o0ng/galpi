@@ -688,3 +688,16 @@ test('모델 메뉴가 조상의 스택 컨텍스트에 갇힌 채 전체 화면
   // 메뉴 자체는 그대로 모바일에서 화면 하단에 고정된다.
   assert.match(css, /#chat-model-menu\s*{[^}]*position: fixed/s);
 });
+
+test('Reels episode card keeps model strings as text, revokes blobs, and hides when off', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  const start = panel.indexOf('function makeReelsEpisodeCard');
+  const card = panel.slice(panel.indexOf('// --- Reels 편 (검토 2)'), panel.indexOf('function agentSummaryHead'));
+  assert.ok(start > 0);
+  assert.doesNotMatch(card, /innerHTML/);
+  assert.match(card, /URL\.revokeObjectURL/);
+  assert.match(card, /\^https\?:/);
+  assert.match(panel, /\/api\/reels\/episodes\/latest/);
+  assert.match(panel, /state\.reelsEpisode = data\.episode \|\| null/);
+  assert.match(panel, /else releaseReelsMedia\(\)/);
+});

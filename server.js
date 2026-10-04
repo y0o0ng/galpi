@@ -4738,7 +4738,7 @@ registerNewsRoutes({
 });
 
 registerReelsRoutes({
-  app, store: reelsStore, episodes: reelsEpisodes,
+  app, store: reelsStore, episodes: reelsEpisodes, onRevise: () => { void reelsProductionWorker?.tick(); },
   config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, reelsDir: path.join(__dirname, 'reels') },
 });
 

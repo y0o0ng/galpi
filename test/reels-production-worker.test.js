@@ -387,3 +387,124 @@ test('factcheck --json: 인용마다 한 줄, 텍스트는 stderr, 옵션 없을
   assert.match(text.out, /^OK   1 /m);
   assert.match(text.out, /3 rows, 1 missing/);
 });
+
+// ---- 사람 의견 → 바로 수정 ----
+
+function fakeRevise({ fail = null } = {}) {
+  const revise = async args => {
+    revise.calls.push(args);
+    if (fail) return { outcome: 'failed', stages: [{ stage: 'fix', result: 'failed', code: fail, reason: '고치지 못함' }] };
+    return { outcome: 'ok', stages: [{ stage: 'fix', result: 'ok' }, { stage: 'visual', result: 'ok' }] };
+  };
+  revise.calls = [];
+  return revise;
+}
+
+function reviseApp(ctx, onRevise) {
+  const app = fakeApp();
+  registerReelsRoutes({ app, store: ctx.store, episodes: ctx.episodes, onRevise, config: { enabled: true, productionEnabled: true, reelsDir: ctx.reelsDir } });
+  return (id, note) => app.call('POST /api/reels/episodes/:id/revise', { params: { id: String(id) }, body: { note } });
+}
+
+test('revise 검증: 빈 의견·1000자 초과 400, ready 아님 409, 다른 편 producing이면 REELS_BUSY', async () => {
+  const ctx = setup();
+  const revise = reviseApp(ctx);
+  assert.equal(revise(1, 'x').status, 404);
+  const row = await readyEpisode(ctx);
+  assert.equal(revise(row.id, '   ').body.code, 'REELS_NOTE_INVALID');
+  assert.equal(revise(row.id, '가'.repeat(1001)).status, 400);
+  assert.equal(revise(row.id, undefined).status, 400);
+  assert.equal(revise('x', '의견').status, 400);
+
+  selectCandidate(ctx.store, '2026-10-04');
+  ctx.episodes.claimProduction(card => ({ episodeDir: `ep09_c${card.id}_px`, workDir: path.join(ctx.reelsDir, 'work', 'other') }), T);
+  const busy = revise(row.id, '자막이 작아요');
+  assert.deepEqual([busy.status, busy.body.code], [409, 'REELS_BUSY']);
+  assert.equal(ctx.episodes.getEpisode(row.id).status, 'ready');
+
+  ctx.db.prepare("UPDATE reels_episodes SET status = 'approved' WHERE id = ?").run(row.id);
+  assert.equal(revise(row.id, '의견').body.code, 'REELS_NOT_PENDING');
+  ctx.db.close();
+});
+
+test('수정 성공: 창 밖(낮)에도 돌고 ready + revisions 1건 + push 1건, 두 번째 수정이면 push가 또 1건', async () => {
+  const ctx = setup();
+  subscribe(ctx.db);
+  const push = createReelsPushService(ctx.db, { now: () => ctx.clock.now });
+  const revise = fakeRevise();
+  const w = worker(ctx, { revise, pushService: push });
+  const row = await readyEpisode(ctx);
+  const episodeDeliveries = () => ctx.db.prepare("SELECT COUNT(*) AS n FROM reels_push_deliveries WHERE kind = 'episode'").get().n;
+  assert.equal(episodeDeliveries(), 0); // readyEpisode의 worker에는 push가 없다
+
+  ctx.clock.now = T + 8 * HOUR; // 12:00 KST — 제작 창 밖
+  let woke = 0;
+  const api = reviseApp(ctx, () => { woke += 1; });
+  const res = api(row.id, '  제목 자막이 작아요  ');
+  assert.deepEqual([res.status, res.body], [200, { id: row.id, status: 'revising' }]);
+  assert.equal(woke, 1);
+  const app = fakeApp();
+  registerReelsRoutes({ app, store: ctx.store, episodes: ctx.episodes, config: { enabled: true, productionEnabled: true, reelsDir: ctx.reelsDir } });
+  let ep = app.call('GET /api/reels/episodes/latest').body.episode;
+  assert.deepEqual([ep.status, ep.revisionNote, ep.revisions], ['revising', '제목 자막이 작아요', []]);
+  assert.ok(ep.videoUrl);
+
+  await w.tick();
+  assert.equal(revise.calls.length, 1);
+  assert.equal(revise.calls[0].note, '제목 자막이 작아요');
+  assert.equal(revise.calls[0].n, 1);
+  ep = app.call('GET /api/reels/episodes/latest').body.episode;
+  assert.deepEqual([ep.status, ep.revisionNote], ['ready', null]);
+  assert.deepEqual(ep.revisions.map(r => [r.note, r.outcome, r.at]), [['제목 자막이 작아요', 'ok', T + 8 * HOUR]]);
+  assert.equal(episodeDeliveries(), 1);
+
+  api(row.id, '배경이 어두워요');
+  await w.tick();
+  assert.equal(revise.calls[1].n, 2);
+  assert.equal(app.call('GET /api/reels/episodes/latest').body.episode.revisions.length, 2);
+  assert.equal(episodeDeliveries(), 2);
+  assert.deepEqual(ctx.db.prepare("SELECT batch_id FROM reels_push_deliveries ORDER BY id").all().map(r => r.batch_id), [`${row.id}-r1`, `${row.id}-r2`]);
+
+  // payload는 revision 키에서도 편 id를 숫자로 보낸다.
+  assert.equal(JSON.parse(buildReelsPushPayload({ kind: 'episode', batchId: `${row.id}-r2` })).episodeId, row.id);
+  assert.equal(push.claim(ctx.clock.now).kind, 'episode'); // ready라 아직 보낼 가치가 있다
+  ctx.db.close();
+});
+
+test('수정 실패: ready로 돌아오고 outcome failed가 기록되며 영상 경로·캡션은 그대로다', async () => {
+  const ctx = setup();
+  const row = await readyEpisode(ctx);
+  reviseApp(ctx)(row.id, '장면 2를 고쳐요');
+  await worker(ctx, { revise: fakeRevise({ fail: 'REELS_NO_MP4' }) }).tick();
+  const after = ctx.episodes.getEpisode(row.id);
+  assert.equal(after.status, 'ready');
+  assert.equal(after.revision_note, null);
+  assert.equal(after.video_path, row.video_path);
+  assert.equal(after.caption, row.caption);
+  assert.deepEqual(JSON.parse(after.revisions_json).map(({ at, ...rest }) => rest), [
+    { note: '장면 2를 고쳐요', outcome: 'failed', errorCode: 'REELS_NO_MP4', errorDetail: '고치지 못함' },
+  ]);
+  // 러너가 던져도 마찬가지다.
+  reviseApp(ctx)(row.id, '다시');
+  await worker(ctx, { revise: async () => { throw Object.assign(new Error('x'), { code: 'REELS_CLAUDE_EXIT' }); } }).tick();
+  assert.equal(ctx.episodes.getEpisode(row.id).status, 'ready');
+  assert.equal(JSON.parse(ctx.episodes.getEpisode(row.id).revisions_json)[1].errorCode, 'REELS_CLAUDE_EXIT');
+  ctx.db.close();
+});
+
+test('수정 중 기동: failed가 아니라 ready + REELS_INTERRUPTED 수정 기록', async () => {
+  const ctx = setup();
+  const row = await readyEpisode(ctx);
+  reviseApp(ctx)(row.id, '의견');
+  const revise = fakeRevise();
+  const w = worker(ctx, { revise });
+  w.start(); // markInterrupted가 먼저 돌아 수정이 끊긴 것으로 처리된다
+  w.stop();
+  await w.tick();
+  const after = ctx.episodes.getEpisode(row.id);
+  assert.equal(after.status, 'ready');
+  assert.equal(after.attempts, 1);
+  assert.equal(revise.calls.length, 0);
+  assert.deepEqual(JSON.parse(after.revisions_json).map(r => [r.outcome, r.errorCode]), [['failed', 'REELS_INTERRUPTED']]);
+  ctx.db.close();
+});

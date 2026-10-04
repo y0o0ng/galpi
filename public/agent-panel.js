@@ -36,6 +36,8 @@
     mailPreferenceSaving: false,
     news: null,
     reels: null,
+    reelsEpisode: null,
+    reelsMedia: null,
     weatherEnabled: false,
     weather: null,
     weatherAt: 0,
@@ -1198,7 +1200,7 @@
     block.appendChild(agentSummaryHead('Reels 에이전트', '오늘의 영상 주제 후보 3개 중 하나를 골라.',
       batch ? REELS_STATUS[batch.status] : '후보 없음', refresh));
     if (!batch) {
-      block.appendChild(agentSummaryMessage('아직 후보가 없어. 하루 한 번 아침에 올라와.'));
+      block.appendChild(agentSummaryMessage('아직 후보가 없어. 하루 한 번 저녁 7시에 올라와.'));
       return block;
     }
     const open = batch.status === 'candidate' || batch.status === 'held';
@@ -1241,6 +1243,204 @@
       state.showToast(data.error || '처리하지 못했어.');
     }
     await refresh();
+  }
+
+  // --- Reels 편 (검토 2) ------------------------------------------------------
+  // 캡션·주장·인용·제목·의견·오류는 모델이 만든 비신뢰 문자열이라 전부 textContent로만 넣는다.
+  const EPISODE_STATUS = {
+    producing: '만드는 중', revising: '고치는 중', ready: '검토 대기', failed: '실패',
+    approved: '승인됨', discarded: '폐기됨',
+  };
+
+  function releaseReelsMedia() {
+    const media = state.reelsMedia;
+    state.reelsMedia = null;
+    if (!media) return;
+    [media.video, media.cover].forEach(url => url && URL.revokeObjectURL(url));
+  }
+
+  // 같은 편·같은 결과면 blob을 재사용한다. 수정이 끝나면 영상 URL은 같고 finishedAt만 바뀌므로 그걸 열쇠에 넣는다.
+  async function loadReelsMedia(episode) {
+    const key = `${episode.id}:${episode.finishedAt}`;
+    if (state.reelsMedia?.key !== key) {
+      releaseReelsMedia();
+      const media = { key, video: null, cover: null };
+      state.reelsMedia = media;
+      media.ready = Promise.all([['video', episode.videoUrl], ['cover', episode.coverUrl]].map(async ([key, url]) => {
+        if (!url) return;
+        const response = await state.apiFetch(url);
+        if (response.ok) media[key] = URL.createObjectURL(await response.blob());
+      })).catch(() => {});
+    }
+    await state.reelsMedia.ready;
+    return state.reelsMedia;
+  }
+
+  function svgIcon(kind) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('class', `reels-check ${kind}`);
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', kind === 'ok' ? 'M3.5 8.5l3 3 6-7' : kind === 'warn' ? 'M8 3.5v5.5M8 11.8v.4' : 'M4 8h8');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function reelsClaims(claims) {
+    const wrap = document.createElement('div');
+    wrap.className = 'reels-claims';
+    const list = document.createElement('ul');
+    list.hidden = true;
+    claims.forEach(item => {
+      const row = document.createElement('li');
+      const mark = svgIcon(item.found === true ? 'ok' : item.found === false ? 'warn' : 'none');
+      const body = document.createElement('div');
+      const claim = document.createElement('p');
+      claim.textContent = item.claim || '';
+      body.appendChild(claim);
+      if (item.source) {
+        const source = /^https?:\/\//i.test(item.url || '') ? document.createElement('a') : document.createElement('span');
+        source.className = 'reels-claim-source';
+        source.textContent = item.source;
+        if (source.tagName === 'A') {
+          source.href = item.url;
+          source.target = '_blank';
+          source.rel = 'noopener noreferrer';
+        }
+        body.appendChild(source);
+      }
+      if (item.quote) {
+        const quote = document.createElement('small');
+        quote.textContent = item.quote;
+        body.appendChild(quote);
+      }
+      row.append(mark, body);
+      list.appendChild(row);
+    });
+    const toggle = button(`사실 확인 ${claims.length}개`, () => {
+      list.hidden = !list.hidden;
+      toggle.setAttribute('aria-expanded', String(!list.hidden));
+    });
+    toggle.setAttribute('aria-expanded', 'false');
+    wrap.append(toggle, list);
+    return wrap;
+  }
+
+  function reelsVideoBlock(episode, folded) {
+    const holder = document.createElement('div');
+    holder.className = 'reels-video';
+    const mount = async () => {
+      const media = await loadReelsMedia(episode);
+      if (!media.video || !holder.isConnected) return;
+      const video = document.createElement('video');
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.src = media.video;
+      if (media.cover) video.poster = media.cover;
+      holder.replaceChildren(video);
+    };
+    if (!folded) {
+      void mount();
+      return holder;
+    }
+    holder.classList.add('folded');
+    const open = button('영상 펼치기', () => { open.remove(); void mount(); });
+    holder.appendChild(open);
+    return holder;
+  }
+
+  async function reelsEpisodePost(episode, action, body) {
+    const response = await state.apiFetch(`/api/reels/episodes/${episode.id}/${action}`, body
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : { method: 'POST' });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      state.showToast(data.error || '처리하지 못했어.');
+    }
+    await refresh();
+  }
+
+  function reelsReviseForm(episode) {
+    const form = document.createElement('div');
+    form.className = 'reels-revise';
+    form.hidden = true;
+    const area = document.createElement('textarea');
+    area.maxLength = 1000;
+    area.rows = 3;
+    area.placeholder = '어디를 어떻게 고칠지 적어줘';
+    const count = document.createElement('small');
+    count.textContent = '0/1000';
+    area.addEventListener('input', () => { count.textContent = `${area.value.length}/1000`; });
+    const send = button('보내기', () => {
+      if (!area.value.trim()) return;
+      send.disabled = true;
+      void reelsEpisodePost(episode, 'revise', { note: area.value.trim() });
+    }, true);
+    const cancel = button('취소', () => { form.hidden = true; });
+    const row = document.createElement('div');
+    row.className = 'agent-summary-actions';
+    row.append(send, cancel);
+    form.append(area, count, row);
+    return form;
+  }
+
+  function makeReelsEpisodeCard() {
+    const episode = state.reelsEpisode;
+    if (!episode) return null;
+    const block = document.createElement('section');
+    block.className = 'agents-operational-card reels-episode-card';
+    const desc = episode.status === 'revising' ? (episode.revisionNote || '') : (episode.title || '');
+    block.appendChild(agentSummaryHead('Reels 편', desc, EPISODE_STATUS[episode.status] || episode.status, refresh));
+    const body = document.createElement('div');
+    body.className = 'reels-episode-body';
+    block.appendChild(body);
+    if (episode.status === 'producing' || episode.status === 'revising') return block;
+    if (episode.status === 'failed') {
+      const error = document.createElement('p');
+      error.className = 'reels-error';
+      error.textContent = [episode.errorCode, episode.errorDetail].filter(Boolean).join(' · ') || '알 수 없는 오류';
+      const tries = document.createElement('small');
+      tries.textContent = `시도 ${Number(episode.attempts) || 0}/3`;
+      body.append(error, tries);
+      return block;
+    }
+    const decided = episode.status === 'approved' || episode.status === 'discarded';
+    body.appendChild(reelsVideoBlock(episode, decided));
+    if (episode.caption) {
+      const caption = document.createElement('div');
+      caption.className = 'reels-caption';
+      caption.textContent = episode.caption;
+      body.append(caption, button('캡션 복사', async () => {
+        try {
+          await navigator.clipboard.writeText(episode.caption);
+          state.showToast('캡션을 복사했어');
+        } catch {
+          state.showToast('복사하지 못했어');
+        }
+      }));
+    }
+    if (Array.isArray(episode.claims) && episode.claims.length) body.appendChild(reelsClaims(episode.claims));
+    const last = Array.isArray(episode.revisions) ? episode.revisions[episode.revisions.length - 1] : null;
+    if (last) {
+      const line = document.createElement('small');
+      line.className = 'reels-last-revision';
+      line.textContent = `지난 수정 ${last.outcome === 'ok' ? '성공' : '실패'}: ${last.note || ''}${last.outcome === 'ok' ? '' : ` (${[last.errorCode, last.errorDetail].filter(Boolean).join(' · ')})`}`;
+      body.appendChild(line);
+    }
+    if (episode.status === 'ready') {
+      const form = reelsReviseForm(episode);
+      const actions = document.createElement('div');
+      actions.className = 'agent-summary-actions reels-actions';
+      actions.append(
+        button('승인', () => reelsEpisodePost(episode, 'approve'), true),
+        button('수정 요청', () => { form.hidden = !form.hidden; if (!form.hidden) form.querySelector('textarea').focus(); }),
+        button('폐기', () => { if (confirm('이 편을 폐기할까?')) void reelsEpisodePost(episode, 'discard'); }),
+      );
+      body.append(actions, form);
+    }
+    return block;
   }
 
   function agentSummaryHead(titleText, description, statusText, onOpen, compactDescription = description) {
@@ -1301,6 +1501,9 @@
     state.container.replaceChildren();
     state.container.append(makeMailAgentCard(), makeScheduleAgentCard(), makeCodexAgentCard());
     if (state.reels) state.container.appendChild(makeReelsAgentCard());
+    const episodeCard = makeReelsEpisodeCard();
+    if (episodeCard) state.container.appendChild(episodeCard);
+    else releaseReelsMedia();
   }
 
   // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
@@ -1660,6 +1863,18 @@
     return true;
   }
 
+  // 503(제작 꺼짐)이나 실패는 오류가 아니라 카드를 안 그리는 것이다.
+  async function loadReelsEpisode() {
+    try {
+      const response = await state.apiFetch('/api/reels/episodes/latest');
+      const data = response.ok ? await response.json().catch(() => ({})) : {};
+      state.reelsEpisode = data.episode || null;
+    } catch {
+      state.reelsEpisode = null;
+    }
+    return true;
+  }
+
   // --- 날씨 -----------------------------------------------------------------
   //
   // **홈 렌더의 대기 대상이 아니다.** 위치 획득이 최대 5초라 `Promise.allSettled`
@@ -2016,6 +2231,7 @@
       loadMailSettings(),
       loadMailPreferences(),
       loadReelsLatest(),
+      loadReelsEpisode(),
     ]);
     state.scheduleError = scheduleResult.status === 'rejected'
       ? scheduleResult.reason.message

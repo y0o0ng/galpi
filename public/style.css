@@ -5966,3 +5966,25 @@ textarea:focus-visible {
 .reels-card-title { color: var(--ai-text); font-size: 14px; font-weight: 650; text-decoration: none; }
 .reels-card .schedule-agent-action { justify-self: start; min-height: 30px; padding: 0 10px; border-radius: 10px; font-size: 11px; }
 .reels-actions { margin: 0 18px 15px; }
+
+/* Reels 편 카드 */
+.reels-episode-body { display: grid; gap: 10px; margin: 13px 18px 15px; }
+.reels-episode-body small { color: var(--label); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.reels-episode-body .schedule-agent-action { justify-self: start; min-height: 30px; padding: 0 10px; border-radius: 10px; font-size: 11px; }
+.reels-episode-body .agent-summary-actions { margin: 0; }
+.reels-video video { display: block; width: 100%; max-height: 520px; aspect-ratio: 9 / 16; border-radius: 10px; background: #000; object-fit: contain; }
+.reels-caption { padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px; color: var(--ai-text); font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.reels-error { margin: 0; color: var(--danger); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.reels-claims { display: grid; gap: 8px; }
+.reels-claims ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.reels-claims li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; }
+.reels-claims li p { margin: 0; color: var(--ai-text); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.reels-claims li div { display: grid; gap: 2px; }
+.reels-claim-source { color: var(--label); font-size: 11px; overflow-wrap: anywhere; }
+a.reels-claim-source { text-decoration: underline; }
+.reels-check { width: 16px; height: 16px; fill: none; stroke: var(--label); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.reels-check.ok { stroke: var(--success); }
+.reels-check.warn { stroke: var(--danger); }
+.reels-revise { display: grid; gap: 6px; }
+.reels-revise textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 10px; background: transparent; color: var(--ai-text); font: 400 11px/1.5 var(--font); resize: vertical; }
+.reels-revise[hidden], .reels-claims ul[hidden] { display: none; }
