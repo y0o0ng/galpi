@@ -1414,6 +1414,28 @@
     });
   }
 
+  // 유튜브 쇼츠 썸네일은 API로 넣으면 회색으로 남아 스튜디오에서 직접 올린다. 그 파일을 폰에 바로 받게 한다.
+  // iPhone 홈 화면 앱은 a[download]가 잘 안 먹어서 공유 시트(이미지 저장)를 먼저 쓰고, 안 되면 내려받기로 넘어간다.
+  async function saveReelsCover(episode) {
+    try {
+      const response = await state.apiFetch(episode.coverUrl);
+      if (!response.ok) throw new Error('cover');
+      const file = new File([await response.blob()], `sionwhy-${episode.id}-cover.png`, { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (error) {
+      if (error?.name !== 'AbortError') state.showToast('커버를 받지 못했어');
+    }
+  }
+
   function makeReelsEpisodeCard() {
     const episode = state.reelsEpisode;
     if (!episode) return null;
@@ -1449,6 +1471,7 @@
         }
       }));
     }
+    if (episode.coverUrl) body.appendChild(button('커버 저장', () => saveReelsCover(episode)));
     if (Array.isArray(episode.claims) && episode.claims.length) body.appendChild(reelsClaims(episode.claims));
     const last = Array.isArray(episode.revisions) ? episode.revisions[episode.revisions.length - 1] : null;
     if (last) {
