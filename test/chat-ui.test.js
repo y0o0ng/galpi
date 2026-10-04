@@ -654,6 +654,9 @@ test('the service worker shows fixed text and never reads mail content', () => {
   assert.match(sw, /news_review:/);
   // Codex 업데이트 알림은 버전 형식을 확인한 뒤에만 문구에 넣는다.
   assert.match(sw, /codex_update:/);
+  // 릴스 알림 두 종류가 빠지면 기본값(일정 알림)으로 떠서 일정처럼 보인다(2026-10-04).
+  assert.match(sw, /reels_candidates:/);
+  assert.match(sw, /reels_episode:/);
   assert.match(sw, /\/\^\\d\+\\\.\\d\+\\\.\\d\+\$\/\.test\(payload\.codexVersion\)/);
   assert.match(sw, /XION 메일 알림/);
   assert.match(sw, /XION 일정 알림/);

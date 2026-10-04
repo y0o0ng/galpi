@@ -45,6 +45,19 @@ self.addEventListener('push', event => {
       fallbackUrl: '/',
       tag: () => 'codex-update',
     },
+    // 릴스: 주제 문구는 payload에 없다(서버 계약). 어떤 편인지는 앱에서 본다.
+    reels_candidates: {
+      heading: '시온 릴스',
+      body: '오늘의 영상 주제 후보가 왔어. 하나 골라줘.',
+      fallbackUrl: '/?panel=agents',
+      tag: () => `reels-candidates:${/^\d{4}-\d{2}-\d{2}$/.test(payload.batchId) ? payload.batchId : 'unknown'}`,
+    },
+    reels_episode: {
+      heading: '시온 릴스',
+      body: '새 영상이 준비됐어. 확인하고 승인해줘.',
+      fallbackUrl: '/?panel=agents',
+      tag: () => `reels-episode:${safeInt(payload.episodeId) ?? 'unknown'}`,
+    },
   };
   const kind = kinds[payload.type] || {
     heading: 'XION 일정 알림',
