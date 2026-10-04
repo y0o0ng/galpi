@@ -256,3 +256,26 @@ test('거절된 도구 호출을 단계 기록에 짧게 남긴다', async () =>
   const record = await run(f, fakeSpawn(() => {}, { stdout }));
   assert.deepEqual(record.stages[0].denied, ['Bash: cd /x && python a.py', 'Write: /etc/passwd']);
 });
+
+test('중단 신호가 오면 claude 프로세스 그룹을 끄고 그 단계에서 멈춘다', async () => {
+  const f = fixture();
+  const killed = [];
+  const spawn = (bin, args, options) => {
+    assert.equal(options.detached, true);
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+    child.stdin = Object.assign(new EventEmitter(), { end: () => {} });
+    child.kill = sig => killed.push(sig);                 // pid가 없으면 그룹 대신 자식에게 직접
+    spawn.count = (spawn.count || 0) + 1;
+    return child;                                          // 스스로는 끝나지 않는다
+  };
+  const controller = new AbortController();
+  const pending = produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake/claude', spawn, signal: controller.signal });
+  setImmediate(() => controller.abort());
+  const record = await pending;
+  assert.equal(record.outcome, 'failed');
+  assert.equal(record.stages.length, 1);
+  assert.equal(record.stages[0].code, 'REELS_ABORTED');
+  assert.equal(spawn.count, 1);
+  assert.deepEqual(killed, ['SIGTERM']);
+});
