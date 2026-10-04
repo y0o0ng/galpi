@@ -15,10 +15,10 @@ SCALE = 5
 SAFE_OFFSET = (12, 40)             # 4의 배수여야 배경 Bayer 위상이 맞는다
 EXT_W, EXT_H = 1080 // SCALE, 1920 // SCALE
 OUT_W, OUT_H = EXT_W * SCALE, EXT_H * SCALE
-READ_CPS = 5                       # 카드 시간 = 글자 수(공백 제외) / READ_CPS (글자당 0.2초; 2026-10-03 7에서 늦춤)
-MID_HOLD = 0.5                     # 문장 중간 카드의 멈춤 비율(5편부터)
+READ_CPS = 5                       # 카드 시간 = 글자 수(공백 제외) / READ_CPS (글자당 0.2초)
+MID_HOLD = 0.5                     # 문장 중간 카드의 멈춤 비율
 MIN_CARD = 1.5                     # 카드 한 장의 최소 시간(초) — 짧은 조각이 깜빡 지나가지 않게
-TYPE_CPS = 14                      # 카드 타자 속도(글자/초; 2026-10-03 12에서 올림, 5편부터); 카드 시간의 75%를 넘지 않게 압축
+TYPE_CPS = 14                      # 카드 타자 속도(글자/초); 카드 시간의 75%를 넘지 않게 압축
 PUNCT_PAUSE = 0.15                 # 문장 부호 뒤 쉼(초)
 LEAD, TAIL = 0.4, 0.5              # 장면 앞·뒤 여백(초)
 SCANLINE = 0.78
@@ -35,7 +35,7 @@ FONT = {k: ImageFont.truetype(str(D / "fonts" / f), s) for k, (f, s) in
 BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
 CARD_BOX = (10, 252, 170, 290)     # x0,y0,x1,y1 (포함)
 CARD_INNER_W = 148
-CARD_FONT, CARD_LINE_GAP, CARD_TOP = "label", 14, 8   # 자막 카드: 갈무리9 10px(2026-10-03 12px에서 줄임), 줄당 한글 14자
+CARD_FONT, CARD_LINE_GAP, CARD_TOP = "label", 14, 8   # 자막 카드: 갈무리9 10px, 줄당 한글 14자
 
 
 def background():
@@ -155,7 +155,7 @@ def _n(s):
 
 def card_secs(card):
     """읽기 시간. 문장 중간에서 끊긴 카드(끝이 쉼표·마침표가 아님)는 다 찍힌 뒤 멈춤을 MID_HOLD만큼만 둔다 —
-    다음 카드에 문장이 이어져서 오래 멈출 필요가 없다(2026-10-04 사용자, 5편부터)."""
+    다음 카드에 문장이 이어져서 오래 멈출 필요가 없다."""
     full = max(MIN_CARD, _n("".join(card)) / READ_CPS)
     if card[-1].rstrip()[-1:] in ",.?!":
         return full
