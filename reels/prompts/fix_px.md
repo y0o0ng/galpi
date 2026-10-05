@@ -7,6 +7,8 @@
 - 경계는 제작 때와 같다: 이 편 폴더·이 편 결과물·보고서 밖에는 쓰지 않는다(공용 `reels/px/`는 읽기 전용), 패키지 설치·git 금지.
 - **셸은 권한 규칙이 허용하는 형태만 된다:** `{{repo}}/reels/.venv/bin/python <스크립트 절대 경로> …` 또는 `nice -n 19 {{repo}}/reels/.venv/bin/python <스크립트 절대 경로> …` 한 줄. `cd`·`&&`·`;`·파이프·리다이렉션·상대 경로 파이썬은 거절된다. 렌더는 `nice -n 19`로 한 번에 하나.
 
+- 수정 중에도 엔진 계약을 지킨다: `narration.ko.json`의 `principle`(1~3줄, 줄마다 bold 2배 폭 180px 이내)·`principle_label`이 대본대로 있고, 엔딩 도장 장면을 편 코드에 그리지 않는다. 어긋나 있으면 MUST로 보고 고친다.
+
 ## 완료 조건
 1. `reels/media/{{out_name}}.mp4` 다시 렌더, lint 통과.
 2. MUST마다 고친 프레임을 `{{frames_dir}}`에 다시 뽑아 직접 확인.

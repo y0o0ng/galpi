@@ -190,8 +190,16 @@ def char_times(card, start, dur):
     return out
 
 
-def draw_card(img, card, typed):
-    x0, y0, x1, y1 = CARD_BOX
+CARD_POP = (0.6, 1.08, 1.0)        # 장면 첫 카드가 튀어나오는 크기(24fps 3프레임); 글자는 그 뒤부터 보인다
+CURSOR_W = 5                       # 타이핑 커서 폭(글자 폭의 절반)
+
+
+def draw_card(img, card, typed, scale=1.0, cursor=False):
+    """scale: 상자 크기 배율(가운데 기준; 1이 아니면 글자·커서는 안 그린다). cursor: 마지막 찍힌 글자 바로 뒤에 INK 블록 커서."""
+    cx0, cy0, cx1, cy1 = CARD_BOX
+    mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+    x0, x1 = round(mx - (mx - cx0) * scale), round(mx + (cx1 - mx) * scale)
+    y0, y1 = round(my - (my - cy0) * scale), round(my + (cy1 - my) * scale)
     d = ImageDraw.Draw(img)
 
     def shape(dx, dy, fill, line):                    # 모서리 한 점 깎은 상자
@@ -205,12 +213,20 @@ def draw_card(img, card, typed):
     shape(1, 1, SHADOW, None)
     shape(0, 0, CARD, None)
     shape(0, 0, None, INK)
+    if scale != 1.0:
+        return
     left, ty = typed, y0 + CARD_TOP
+    cur = None
     for ln in card:
         w = text_w(ln, CARD_FONT)
         text(img, ((W - w) // 2, ty), ln[:max(left, 0)], font=CARD_FONT)
+        if left >= 0 and (cur is None or left > 0):          # 커서는 마지막으로 글자가 찍힌 줄의 끝(아직 아무것도 안 찍혔으면 첫 줄 앞)
+            cur = ((W - w) // 2 + text_w(ln[:left], CARD_FONT), ty)
         left -= len(ln)
         ty += CARD_LINE_GAP
+    if cursor and cur:                                    # 상자 안(오른쪽 테두리 앞)을 넘지 않게
+        x = min(cur[0], x1 - 1 - CURSOR_W)
+        d.rectangle((x, cur[1] + 1, x + CURSOR_W - 1, cur[1] + 9), fill=INK)
 
 
 def to_output(img):
@@ -229,7 +245,8 @@ def ffmpeg_exe():
 
 
 def encode(frame_fn, n_frames, wav, out):
-    """frame_fn(i) -> 180x320 RGB 이미지. 프레임마다 lint를 돌리고, 실패가 있으면 영상을 쓰지 않는다.
+    """frame_fn(i) -> (캔버스 목록, 출력 배열 1080x1920). 캔버스는 그 프레임에 쓰인 180x320 원본 전부이고
+    프레임마다 전부 lint를 돌린다. 출력 배열은 5x5 블록 lint. 실패가 있으면 영상을 쓰지 않는다.
     반환: (고립 점 수의 최댓값, 합계)."""
     out = Path(out)
     tmp = out.with_suffix(".tmp.mp4")
@@ -241,9 +258,11 @@ def encode(frame_fn, n_frames, wav, out):
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     fails, iso = [], []
     for i in range(n_frames):
-        img = frame_fn(i)
-        bad, n_iso = lint.check_canvas(img, PALETTE, ignore=(BG, DITHER))
-        arr = to_output(img)
+        canvases, arr = frame_fn(i)
+        bad, n_iso = 0, 0
+        for img in canvases:
+            b, n = lint.check_canvas(img, PALETTE, ignore=(BG, DITHER))
+            bad, n_iso = bad + b, max(n_iso, n)
         if bad or not lint.check_output(arr, SCALE):
             fails.append((i, bad))
         iso.append(n_iso)

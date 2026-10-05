@@ -59,6 +59,9 @@ def sprite(mood):
     else:
         tall = mood == "surprised"
         for ex in (lx, rx):
+            if mood == "blink":                  # 눈 깜빡임: 감은 눈 = 가로 3도트 선(입은 base와 같다)
+                rect(ex, ey + 1, ex + 2, ey + 1, OUT)
+                continue
             rect(ex, ey - (1 if tall else 0), ex + 2, ey + 2, OUT)
             hx = ex + (2 if mood == "pointing" else 0)
             rect(hx, ey - (1 if tall else 0), hx, ey - (1 if tall else 0), WHITE)

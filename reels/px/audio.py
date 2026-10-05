@@ -8,6 +8,7 @@ from .bgm import song
 SR = 44100
 BGM_VOL, SFX_VOL, TYPE_VOL = 0.14, 0.11, 0.05   # 진폭(피크 기준). BGM > 효과음 ≥ 타자음은 RMS로 확인한다
 SFX_GAP = 2.0                                    # 효과음 최소 간격(초; 도트 트랙)
+SFX_EXEMPT = ("jingle", "stamp")                 # 엔딩 도장 장면 전용: SFX_GAP 규칙에서 빠진다(다른 소리에 밀려 사라지면 안 된다)
 
 
 def _sq(f, n, duty=0.5):
@@ -67,9 +68,40 @@ def _ticks(gap=0.25):
     return out * SFX_VOL
 
 
+def tone(f, dur, amp, fm=0.0):
+    """짧은 종소리: 사인(+약한 FM), 빠른 어택, 지수 감쇠."""
+    t = np.arange(int(dur * SR)) / SR
+    return amp * np.minimum(1, t / 0.008) * np.exp(-t * 7) * np.sin(2 * np.pi * f * t + fm * np.sin(2 * np.pi * f * 2 * t))
+
+
+def _jingle():
+    """완성 징글: F5-A5-C6을 0.11초 간격으로, 그 뒤 F6."""
+    out = np.zeros(int(0.95 * SR))
+    for k, f in enumerate((698.46, 880.0, 1046.5)):
+        i = int(k * 0.11 * SR)
+        x = tone(f, 0.35, 0.10, 0.6)
+        out[i:i + len(x)] += x
+    i = int(3 * 0.11 * SR)
+    x = tone(1396.9, 0.6, 0.07, 0.4)
+    out[i:i + len(x)] += x
+    return out
+
+
+def _stamp():
+    """도장 쾅: 내려가는 저음 + 짧은 노이즈."""
+    t = np.arange(int(0.35 * SR)) / SR
+    thud = np.sin(2 * np.pi * np.cumsum(110 * np.exp(-t * 12) + 45) / SR) * np.exp(-t * 11) * 0.45
+    return thud + np.random.default_rng(5).standard_normal(len(t)) * np.exp(-t * 60) * 0.06
+
+
 def sfx(kind):
     """사인파, 느린 어택·릴리즈. pop: 250→600Hz 상승, sparkle: 659Hz→880Hz 두 음, danger: 330Hz→247Hz 낮고 내려가는 두 음,
-    bubbles: 300~520Hz 짧은 방울 다섯 개, ticks: 262·330·392Hz 딸깍 세 번(0.25초 간격), ticks_slow: 같은 소리를 0.5초 간격으로."""
+    bubbles: 300~520Hz 짧은 방울 다섯 개, ticks: 262·330·392Hz 딸깍 세 번(0.25초 간격), ticks_slow: 같은 소리를 0.5초 간격으로.
+    jingle·stamp: 엔딩 도장 장면 전용(완성 징글 / 도장 쾅)."""
+    if kind == "jingle":
+        return _jingle()
+    if kind == "stamp":
+        return _stamp()
     if kind == "bubbles":
         return _bubbles()
     if kind == "ticks":
@@ -88,16 +120,18 @@ def sfx(kind):
 
 
 def place_sfx(events, secs):
-    """events: [(시각, 종류)]. 최소 간격 SFX_GAP 안의 것은 버린다."""
+    """events: [(시각, 종류)]. 최소 간격 SFX_GAP 안의 것은 버린다(SFX_EXEMPT 종류는 항상 넣고 간격 계산에도 안 쓴다)."""
     out, last = np.zeros(int(secs * SR)), -99
     kept = []
     for t, kind in sorted(events):
-        if t - last < SFX_GAP:
+        exempt = kind in SFX_EXEMPT
+        if t - last < SFX_GAP and not exempt:
             continue
         s = sfx(kind)
         i = int(t * SR)
         out[i:i + len(s)] += s[:len(out) - i]
-        last = t
+        if not exempt:
+            last = t
         kept.append((t, kind))
     return out, kept
 
