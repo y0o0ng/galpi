@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 
-const { claudeArgs, nextEpisode, produceEpisode, stageDefs, planPaths } = require('../lib/reels/production');
+const { cardMarkdown, claudeArgs, nextEpisode, produceEpisode, stageDefs, planPaths } = require('../lib/reels/production');
 
 const REAL_PROMPTS = path.join(__dirname, '..', 'reels', 'prompts');
 const CARD = { id: 7, title: 't', source_url: 'https://e.com/a', published_at: '2026-10-01', why: 'w', concept: 'c', bridge: 'b', template: '단계', hook_paradox: 'p', hook_term: 'h', hook_subtitle: 's', risk: 'r' };
@@ -334,4 +334,11 @@ test('수정: 첫 fix가 mp4를 못 만들면 거기서 실패하고 시각 검�
   assert.equal(record.outcome, 'failed');
   assert.equal(record.stages[0].code, 'REELS_NO_MP4');
   assert.equal(spawn.calls.length, 1);
+});
+
+test('cardMarkdown: 일상의 문은 값이 있을 때만 줄이 생기고 기존 행(빈 값)은 깨지지 않는다', () => {
+  const old = cardMarkdown({ ...CARD, everyday_door: '' });
+  assert.ok(!old.includes('일상의 문'));
+  assert.ok(cardMarkdown({ ...CARD, everyday_door: '앱이 버벅여요' }).includes('- 일상의 문: 앱이 버벅여요'));
+  assert.ok(cardMarkdown(CARD).includes('- 제목: t'));
 });

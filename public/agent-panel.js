@@ -1215,8 +1215,9 @@
       title.target = '_blank';
       title.rel = 'noopener noreferrer';
       title.textContent = card.title;
-      const lines = [card.why, `${card.concept}: ${card.bridge}`, `${card.template} · ${card.hookParadox} / ${card.hookTerm} / ${card.hookSubtitle}`, `위험·불확실: ${card.risk}`]
-        .map(text => {
+      const lines = [card.why, card.everydayDoor && `일상의 문: ${card.everydayDoor}`,
+        `${card.concept}: ${card.bridge}`, `${card.template} · ${card.hookParadox} / ${card.hookTerm} / ${card.hookSubtitle}`, `위험·불확실: ${card.risk}`]
+        .filter(Boolean).map(text => {
           const line = document.createElement('p');
           line.textContent = text;
           return line;

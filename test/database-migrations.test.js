@@ -360,6 +360,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 39, name: 'reels_episodes' },
     { version: 40, name: 'reels_episode_revisions' },
     { version: 41, name: 'reels_uploads' },
+    { version: 42, name: 'reels_candidate_everyday_door' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -1080,5 +1081,24 @@ test('schema v29 adds the narrow EvidenceRef address registry from v28', () => {
       (evidence_id, source_domain, source_key, locator, source_version, content_sha256)
     VALUES ('ev1_d', 'conversation_message', '1', NULL, '', ?)
   `).run('a'.repeat(64)), /NOT NULL/);
+  db.close();
+});
+
+test('schema v42 adds the reels candidate everyday_door column and keeps existing rows blank', () => {
+  const db = createLegacyDatabase();
+  migrateThrough(db, 41);
+  db.prepare(`
+    INSERT INTO reels_candidates (batch_id, position, title, source_url, published_at, collected_at, why, concept, bridge,
+      template, hook_paradox, hook_term, hook_subtitle, risk, created_at)
+    VALUES ('2026-10-03', 1, 't', 'https://e.com', '2026-10-01', 1, 'w', 'c', 'b', '단계', 'p', 'h', 's', 'r', 1)
+  `).run();
+  assert.deepEqual(runDatabaseMigrations(db).applied, [{ version: 42, name: 'reels_candidate_everyday_door' }]);
+  assert.deepEqual(runDatabaseMigrations(db).applied, []);
+  assert.deepEqual(
+    db.prepare('SELECT everyday_door AS a FROM reels_candidates').get(),
+    { a: '' },
+  );
+  db.prepare("UPDATE reels_candidates SET everyday_door = '오래 안 쓴 앱이 버벅여요'").run();
+  assert.equal(db.prepare('SELECT everyday_door AS q FROM reels_candidates').get().q, '오래 안 쓴 앱이 버벅여요');
   db.close();
 });

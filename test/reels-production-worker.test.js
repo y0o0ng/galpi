@@ -48,7 +48,7 @@ function selectCandidate(store, day = '2026-10-03') {
   store.claimRun(day);
   const card = n => ({
     title: `t${n}`, url: `https://e.com/${n}`, published_at: '2026-10-01', why: 'w', concept: `c${n}`, bridge: 'b',
-    template: '단계', hook_paradox: 'p', hook_term: 't', hook_subtitle: 's', risk: 'r',
+    template: '단계', hook_paradox: 'p', hook_term: 't', hook_subtitle: 's', risk: 'r', everyday_door: 'e',
   });
   store.saveBatch({ day, cards: [1, 2, 3].map(card), collectedAt: T });
   const cards = store.latestBatch().cards;

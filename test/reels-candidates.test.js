@@ -15,7 +15,7 @@ const ITEMS = ['a', 'b', 'c', 'd'].map(name => ({
 function card(name, extra = {}) {
   return {
     title: `title ${name}`, url: `https://example.com/${name}`, published_at: '2026-10-01',
-    why: 'w', concept: 'c', bridge: 'b', template: '단계', hook_paradox: 'p', hook_term: 't', hook_subtitle: 's', risk: 'r',
+    why: 'w', concept: 'c', bridge: 'b', template: '단계', hook_paradox: 'p', hook_term: 't', hook_subtitle: 's', risk: 'r', everyday_door: 'e',
     ...extra,
   };
 }
