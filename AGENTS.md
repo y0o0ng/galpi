@@ -186,7 +186,7 @@
 - **8편 재게시는 닫혔다**(유튜브 `VK7wpqCRMJM`, 인스타 수동, 옛 것은 Pi `/home/pi/ep08-old/`). **유튜브 업로드 행을 손으로 `failed`로 바꾸면 1시간 지난 실패 행 자동 재시도에 걸려 즉시 게시된다.** 손으로 올린 업로드는 카드의 `수동 게시함`(`failed` → `done`, `remote_id='manual'`)으로 닫는다. **7편 인스타(행 7)는 최신 카드에 안 나와 `failed`로 남아 있으니 재시도하지 않는다.**
 - **인스타 자동 게시:** 10-06 Meta가 비정상 활동으로 권한을 회수했고 복구 뒤에도 컨테이너가 원인 없는 `ERROR`였다. 10-07 사용자가 앱을 라이브로 게시한 직후 시험 컨테이너가 `FINISHED`가 됐다. 9편 자동 게시가 되면 해결로 본다. 경위는 메모리 `instagram-api-block-2026-10-06`.
 - **맥에서 파이프라인 시험할 때:** 러너가 환경변수를 PATH·HOME·LANG만 넘겨 맥 키체인 로그인이 안 된다 → `USER`를 붙이는 래퍼를 `CLAUDE_BIN`으로 준다. `--from`으로 이어 돌리면 CLI가 다음 편 번호를 새로 잡아 앞 단계 산출물을 못 찾는다 → `produceEpisode`에 `episodeDir`을 고정해 부른다. DB는 Pi 백업 사본을 읽기 전용으로 쓴다.
-- **카드 영상 저장·수동 게시, 템플릿 수확(`cardt`·`blinking`·`dotted_rect`·`cutaway`·`pointer(face=)`)은 2026-10-07 Pi 배포로 닫혔다.** 정본은 `reels/px/reels-pixel-handoff.md`·`reels/prompts/build_px.md`다. **다음:** 9편 빌드 보고서에서 공용 부품을 실제로 import했는지 확인. 릴스 카드 UI 정리는 추이 대시보드 작업 때 함께 한다(사용자가 Figma 작업 중). 가리키기 스프라이트는 눈동자 차이가 1~2px라 방향이 잘 안 보인다 — 다시 그릴지는 미정. 유튜브 Shorts 썸네일은 API로 안 되므로 커버 저장 → 스튜디오에서 수동.
+- **카드 영상 저장·수동 게시, 템플릿 수확(`cardt`·`blinking`·`dotted_rect`·`cutaway`·`pointer(face=)`)은 2026-10-07 Pi 배포로 닫혔다.** 정본은 `reels/px/reels-pixel-handoff.md`·`reels/prompts/build_px.md`다. **다음:** 9편 빌드 보고서에서 공용 부품을 실제로 import했는지 확인. 릴스 카드 UI 정리는 추이 대시보드 작업 때 함께 한다(사용자가 Figma 작업 중). 가리키기는 9편부터 보는 쪽으로 0.25 기운다(`POINT_LEAN`, 정본은 handoff). 유튜브 Shorts 썸네일은 API로 안 되므로 커버 저장 → 스튜디오에서 수동.
 
 ### 운영
 
