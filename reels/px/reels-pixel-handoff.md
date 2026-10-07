@@ -71,7 +71,7 @@
 
 ## 마스코트 "시온"
 
-- `px/sprite.py`(`px/ref/sprite_sheet.png`). 갈피 별 마크를 도트로, 볼터치 없음(중성적). 표정: 기본 · 놀람 · 가리키기 · 반짝임. 놀람·반짝임 동작은 템플릿에 있다(`HOOK_MASCOT`, `SPARKLE_MASCOT`). 가리키기는 아직 편마다 `tween`으로 들어왔다 나간다(1편 parts).
+- `px/sprite.py`(`px/ref/sprite_sheet.png`). 갈피 별 마크를 도트로, 볼터치 없음(중성적). 표정: 기본 · 놀람 · 가리키기 · 반짝임. 놀람·반짝임 동작은 템플릿에 있다(`HOOK_MASCOT`, `SPARKLE_MASCOT`). 가리키기는 `pointer`가 화면 밖에서 밀고 들어왔다 나간다. `face`(기본 `left`, 거울상)로 보는 쪽을 고르고 들어오는 쪽은 그 반대편이다. 스프라이트 눈동자 차이가 작아서 방향은 서는 자리로 드러내야 한다(6~8편 보고서에서 반복된 확신 없는 곳).
 - **역할이 있을 때만:** 훅(놀람), 핵심 지목(가리키기 — 지목 대상 쪽을 보게), 결론(반짝임). 다음 편 예고 없음.
 - 그림 가장자리·카드 테두리와 살짝 겹치는 건 괜찮다. **자막 카드 글자와 화면 라벨은 가리지 않는다.**
 - 회전시키지 않는다(계단이 깨진다). 방향이 필요하면 거울상(`flip`)이나 손으로 찍은 프레임.
@@ -105,7 +105,7 @@
 ## 툴킷
 
 - `px/engine.py` — 캔버스·팔레트·폰트·자막 카드·시간 계산·인코딩(+lint). 인코딩은 Pi 메모리 때문에 x264 스레드 1개.
-- `px/templates.py` — `Episode`(장면 실행기: 시간 계획·프레임·엔딩 도장·소리·렌더), `hook`·`compare`·`steps`·`flow`, `chip`·`kicker`·마스코트 동작. 새 배치는 처음 필요한 편이 만든다(단면도 확대는 아직 없다).
+- `px/templates.py` — `Episode`(장면 실행기: 시간 계획·프레임·엔딩 도장·소리·렌더), `hook`·`compare`·`steps`·`flow`, `chip`·`kicker`·마스코트 동작. `cardt`(문장 안 k번째 카드 시각)·`blinking`·`dotted_rect`·`cutaway`(단면도 확대, 5·8편에서 올림)·`pointer(face=)`. 새 배치는 처음 필요한 편이 만들고, 두 편 이상에 같은 코드가 생기면 사람이 맥에서 여기로 올린다(5~8편 편 폴더의 옛 복사본은 그대로 둔다).
 - `px/timeline.py` — `span`·`at`·`step`·`tween`과 감속곡선 `linear`·`ease_out`·`ease_in_out`·`back`·`bounce`.
 - `px/detail.py`(디테일 키트)·`px/draw.py`·`px/sprite_anim.py`(스프라이트 재생)·`px/lint.py`·`px/audio.py`·`px/bgm.py`·`px/sprite.py`.
 

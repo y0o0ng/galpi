@@ -406,6 +406,24 @@ test('승인 → 플래그별 pending, 인스타 retry 라우트, remoteUrl은 p
   assert.equal(platforms.length, 1);
 });
 
+test('수동 게시: failed만 done(manual)이 되고, 다시 시도·자동 재시도에 안 잡힌다', () => {
+  const ctx = setup();
+  const app = fakeApp();
+  registerReelsRoutes({ app, store: { latestBatch() {} }, episodes: ctx.episodes, uploads: ctx.uploads, config: { enabled: true, productionEnabled: true, reelsDir: '/r', youtubeUploadEnabled: true } });
+  const id = readyEpisode(ctx);
+  const manual = () => app.call('POST /api/reels/episodes/:id/uploads/:platform/manual', { params: { id: String(id), platform: 'youtube' } });
+  assert.equal(manual().status, 404); // 행 없음
+  app.call('POST /api/reels/episodes/:id/approve', { params: { id: String(id) } });
+  assert.equal(manual().status, 409); // failed 아님
+  ctx.uploads.finishFailed(ctx.uploads.claim(undefined, undefined, 'youtube').id, 'X', null);
+  assert.equal(manual().status, 200);
+  const upload = app.call('GET /api/reels/episodes/latest').body.episode.uploads[0];
+  assert.deepEqual([upload.status, upload.manual, upload.remoteUrl, upload.errorCode], ['done', true, null, null]);
+  assert.equal(ctx.uploads.claim(undefined, Date.now() / 1000 + 86400, 'youtube'), null);
+  assert.equal(app.call('POST /api/reels/episodes/:id/uploads/:platform/retry', { params: { id: String(id), platform: 'youtube' } }).status, 409);
+  ctx.db.close();
+});
+
 test('서버 연결·설정 계약: 플래그 기본 false, .env.example 이름만, gitignore, 화면 링크', () => {
   const root = path.join(__dirname, '..');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');

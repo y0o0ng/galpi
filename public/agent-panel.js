@@ -1395,7 +1395,7 @@
       const line = document.createElement('div');
       line.className = 'reels-upload';
       const label = document.createElement('small');
-      label.textContent = `${UPLOAD_PLATFORM[upload.platform] || upload.platform} · ${UPLOAD_STATUS[upload.status] || upload.status}`;
+      label.textContent = `${UPLOAD_PLATFORM[upload.platform] || upload.platform} · ${upload.manual ? '수동 게시' : (UPLOAD_STATUS[upload.status] || upload.status)}`;
       line.appendChild(label);
       if (upload.status === 'done' && /^https:\/\/(youtu\.be|www\.instagram\.com)\//.test(upload.remoteUrl || '')) {
         const link = document.createElement('a');
@@ -1409,19 +1409,29 @@
         const error = document.createElement('small');
         error.className = 'reels-error';
         error.textContent = [upload.errorCode, upload.errorDetail].filter(Boolean).join(' · ') || '알 수 없는 오류';
-        line.append(error, button('다시 시도', () => reelsEpisodePost(episode, `uploads/${upload.platform}/retry`)));
+        line.append(error,
+          button('다시 시도', () => reelsEpisodePost(episode, `uploads/${upload.platform}/retry`)),
+          // 손으로 올렸으면 완료로 돌려 다시 시도(중복 게시)를 막는다.
+          button('수동 게시함', () => {
+            if (confirm(`${UPLOAD_PLATFORM[upload.platform] || upload.platform}에 직접 올렸어? 완료로 표시하고 다시 시도를 없앤다.`)) reelsEpisodePost(episode, `uploads/${upload.platform}/manual`);
+          }));
       }
       return line;
     });
   }
 
-  // 유튜브 쇼츠 썸네일은 API로 넣으면 회색으로 남아 스튜디오에서 직접 올린다. 그 파일을 폰에 바로 받게 한다.
-  // iPhone 홈 화면 앱은 a[download]가 잘 안 먹어서 공유 시트(이미지 저장)를 먼저 쓰고, 안 되면 내려받기로 넘어간다.
-  async function saveReelsCover(episode) {
+  // 유튜브 쇼츠 썸네일은 API로 넣으면 회색으로 남아 스튜디오에서 직접 올린다. 영상은 자동 게시가 실패했을 때 손으로 올린다. 그 파일을 폰에 바로 받게 한다.
+  // iPhone 홈 화면 앱은 a[download]가 잘 안 먹어서 공유 시트(이미지·동영상 저장)를 먼저 쓰고, 안 되면 내려받기로 넘어간다.
+  const REELS_MEDIA = {
+    cover: { url: 'coverUrl', name: 'cover.png', type: 'image/png', fail: '커버를 받지 못했어' },
+    video: { url: 'videoUrl', name: 'video.mp4', type: 'video/mp4', fail: '영상을 받지 못했어' },
+  };
+  async function saveReelsMedia(episode, kind) {
+    const media = REELS_MEDIA[kind];
     try {
-      const response = await state.apiFetch(episode.coverUrl);
-      if (!response.ok) throw new Error('cover');
-      const file = new File([await response.blob()], `sionwhy-${episode.id}-cover.png`, { type: 'image/png' });
+      const response = await state.apiFetch(episode[media.url]);
+      if (!response.ok) throw new Error(kind);
+      const file = new File([await response.blob()], `sionwhy-${episode.id}-${media.name}`, { type: media.type });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file] });
         return;
@@ -1433,7 +1443,7 @@
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (error) {
-      if (error?.name !== 'AbortError') state.showToast('커버를 받지 못했어');
+      if (error?.name !== 'AbortError') state.showToast(media.fail);
     }
   }
 
@@ -1472,7 +1482,8 @@
         }
       }));
     }
-    if (episode.coverUrl) body.appendChild(button('커버 저장', () => saveReelsCover(episode)));
+    if (episode.videoUrl) body.appendChild(button('영상 저장', () => saveReelsMedia(episode, 'video')));
+    if (episode.coverUrl) body.appendChild(button('커버 저장', () => saveReelsMedia(episode, 'cover')));
     if (Array.isArray(episode.claims) && episode.claims.length) body.appendChild(reelsClaims(episode.claims));
     const last = Array.isArray(episode.revisions) ? episode.revisions[episode.revisions.length - 1] : null;
     if (last) {

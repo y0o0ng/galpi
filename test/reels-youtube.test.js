@@ -299,7 +299,7 @@ test('승인 → pending(플래그 꺼짐이면 없음), retry 라우트 404/409
   const row = ctx.uploads.claim();
   ctx.uploads.finishFailed(row.id, 'REELS_YT_HTTP_403', 'HTTP 403');
   assert.deepEqual(app.call('GET /api/reels/episodes/latest').body.episode.uploads, [{
-    platform: 'youtube', status: 'failed', attempts: 1, remoteUrl: null, errorCode: 'REELS_YT_HTTP_403', errorDetail: 'HTTP 403',
+    platform: 'youtube', status: 'failed', attempts: 1, remoteUrl: null, manual: false, errorCode: 'REELS_YT_HTTP_403', errorDetail: 'HTTP 403',
   }]);
   assert.equal(post(app, 'uploads/youtube/retry', id).status, 200);
   assert.equal(ctx.uploads.get(id, 'youtube').status, 'pending');

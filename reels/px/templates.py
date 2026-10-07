@@ -1,4 +1,4 @@
-"""도트 트랙 공통 부품: 장면 실행기(Episode), chip·kicker·마스코트, hook 배치. 편마다 다른 것은 인자로 받는다."""
+"""도트 트랙 공통 부품: 장면 실행기(Episode), chip·kicker·마스코트·pointer, hook 배치, cardt·blinking·dotted_rect·cutaway. 편마다 다른 것은 인자로 받는다."""
 import json
 import math
 import re
@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from px import audio, engine as E
 from px.sprite import sprite, sparkles
 from px.sprite_anim import Anim
-from px.timeline import step, tween
+from px.timeline import at, ease_out, span, step, tween
 
 ROOT = Path(__file__).parents[1]
 
@@ -417,11 +417,61 @@ def head(d, x, y, ax, ay, color):
             d.point((x + ax * a - ay * b, y + ay * a + ax * b), fill=color)
 
 
-POINT_MASCOT = MascotAnim([("pointing", False)], mode="once", flip=True, hop=False, pop=False)       # 거울상: 눈동자가 왼쪽
+POINT_MASCOT = {
+    "left": MascotAnim([("pointing", False)], mode="once", flip=True, hop=False, pop=False),    # 거울상: 눈동자가 왼쪽
+    "right": MascotAnim([("pointing", False)], mode="once", hop=False, pop=False),
+}
 
 
-def pointer(img, t, t_in, t_out, x, y, x_out=190):
-    """가리키기 마스코트: t_in에 오른쪽(x_out)에서 0.34초 들어와 x에 멈추고, t_out에 0.4초 동안 다시 나간다."""
+def pointer(img, t, t_in, t_out, x, y, x_out=None, face="left"):
+    """가리키기 마스코트: t_in에 x_out에서 0.34초 들어와 x에 멈추고, t_out에 0.4초 동안 다시 나간다.
+    face: 눈동자가 보는 쪽("left"면 대상의 오른쪽에, "right"면 왼쪽에 세운다). x_out 기본은 보는 쪽의 반대편 화면 밖."""
+    if x_out is None:
+        x_out = 190 if face == "left" else -25
     if t_in <= t < t_out + 0.4:
         px = tween(step(t), t_in, t_in + 0.34, x_out, x, rnd=True) if t < t_out else tween(step(t), t_out, t_out + 0.4, x, x_out, rnd=True)
-        POINT_MASCOT.paste(img, 0, (px, y), clock=t)
+        POINT_MASCOT[face].paste(img, 0, (px, y), clock=t)
+
+
+def cardt(T, i, k=0):
+    """i번째 문장의 k번째 카드가 시작하는 장면 시각."""
+    return at(T, i) + sum(E.card_secs(c) for c in E.split_cards(T.sents[i])[:k])
+
+
+def blinking(t, t0, secs=0.7):
+    """t0부터 secs 동안 12fps로 2프레임씩 켜졌다 꺼진다(켜짐이면 True)."""
+    return t0 <= t < t0 + secs and int((t - t0) * 12 + 1e-6) // 2 % 2 == 0
+
+
+def dotted_rect(d, box, col):
+    """1px 점선 사각(2px 켜고 2px 끔)."""
+    x0, y0, x1, y1 = box
+    for x in range(x0, x1 + 1):
+        if x % 4 < 2:
+            d.point((x, y0), fill=col)
+            d.point((x, y1), fill=col)
+    for y in range(y0, y1 + 1):
+        if y % 4 < 2:
+            d.point((x0, y), fill=col)
+            d.point((x1, y), fill=col)
+
+
+def cutaway(img, d, t, ta, outer, inner, box, t_zoom, stage, dur=0.6, keep_outer=False):
+    """단면도 확대. t < t_zoom: outer(img, d, t, ta)를 그리고 box는 t_zoom 0.6초 전부터 INK 점선으로 깜빡인다(점이면 생략).
+    t_zoom~+dur: box 테두리만 stage까지 ease_out으로 자란다(정수 좌표). 그 뒤: stage 테두리(LABEL)와 inner(img, d, t, ta, stage).
+    keep_outer면 확대 중·후에도 outer를 계속 그린다. inner는 별도 RGBA 캔버스에 그려 stage로 잘라 붙인다."""
+    if outer and (t < t_zoom or keep_outer):
+        outer(img, d, t, ta)
+    if t < t_zoom:
+        if (box[0] != box[2] or box[1] != box[3]) and t >= t_zoom - 0.6 and int((ta - (t_zoom - 0.6)) * 12) % 6 < 3:
+            dotted_rect(d, box, E.INK)
+    elif t < t_zoom + dur:
+        u = ease_out(span(ta, t_zoom, t_zoom + dur))
+        dotted_rect(d, tuple(round(a + (b - a) * u) for a, b in zip(box, stage)), E.INK)
+    else:
+        layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        inner(layer, ImageDraw.Draw(layer), t, ta, stage)
+        x0, y0, x1, y1 = stage
+        crop = layer.crop((x0 + 1, y0 + 1, x1, y1))
+        img.paste(crop, (x0 + 1, y0 + 1), crop)
+        d.rectangle(stage, outline=E.LABEL)
