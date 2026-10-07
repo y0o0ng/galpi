@@ -315,6 +315,54 @@ def hook(img, d, t, ta, T, title, words, art, extra_sfx=()):
         HOOK_MASCOT.paste(img, t - T_SPRITE, (131, 193))
 
 
+BAND_MAX_W = 168                     # 소주제 위 띠 글자 폭 한계(px): bold 한글 12px·공백 5px → 공백 없이 한글 14자
+
+
+def band(img, text):
+    """소주제 위 띠(선택): 한 소주제를 장면 2개 이상에 걸쳐 설명하는 구간에서만, 그 구간 장면마다 같은 글자로 부른다. 캔버스 맨 위에
+    bold 가운데 글자(y 9~21) + 아래 얇은 구분선(y=25)이라, 띠가 있는 장면은 그림·라벨을 y 27 아래에서 시작한다(없는 장면은 화면 전체를 쓴다).
+    폭이 BAND_MAX_W(168px)를 넘으면 실행이 멈춘다. 구간이 바뀌면 그냥 다른 글자로 부르면 된다."""
+    w = E.text_w(text, "bold")
+    assert w <= BAND_MAX_W, f"위 띠 글자가 너무 길다({w}px > {BAND_MAX_W}px): {text!r}"
+    E.text(img, ((E.W - w) // 2, 9), text, "bold", E.TEXT)
+    ImageDraw.Draw(img).line((4, 25, 175, 25), fill=E.LABEL)
+
+
+HUD_BOX = (4, 222, 175, 250)         # HUD 한 줄(선택): 자막 상자 CARD_BOX (10,252,170,290) 바로 위. HUD가 없는 장면은 화면 전체를 쓴다
+
+
+def _dot(d, x, y, color):
+    """상태 점 ●(4x4, 모서리 깎음)."""
+    d.rectangle((x + 1, y, x + 2, y + 3), fill=color)
+    d.rectangle((x, y + 1, x + 3, y + 2), fill=color)
+
+
+def hud(img, items, t=0.0, changed_at=None):
+    """HUD 한 줄(선택; 자막 상자 바로 위, 그 장면 그림은 y 221 위에서 끝나야 한다). items: [(이름, 값)] 또는 [(이름, 값, 색)] 1~3개 — 색이 있으면
+    값 앞에 ● 점과 그 색(상태 값; 예: INK 정상, DANGER 위험). 이름은 label LABEL, 값은 bold(상태는 그 색, 아니면 TEXT).
+    changed_at: 항목별 값이 바뀐 장면 시각(리스트 또는 {번호: 시각}) — 그 순간부터 0.3초 그 값만 반전한다. 열 폭은 172/개수(3개면 57px: 값은 한글 4자 안팎)."""
+    assert 1 <= len(items) <= 3, "HUD는 1~3개"
+    d = ImageDraw.Draw(img)
+    x0, y0, x1, y1 = HUD_BOX
+    d.rectangle(HUD_BOX, fill=E.CARD)
+    col_w = (x1 - x0 + 1) // len(items)
+    ch = dict(enumerate(changed_at)) if isinstance(changed_at, (list, tuple)) else (changed_at or {})
+    for k, item in enumerate(items):
+        name, value = item[0], item[1]
+        color = item[2] if len(item) > 2 else None
+        x = x0 + k * col_w + 4
+        E.text(img, (x, y0 + 3), name, "label", E.LABEL, shadow=False)
+        vx = x + (6 if color else 0)
+        w = E.text_w(value, "bold")
+        flash = ch.get(k) is not None and 0 <= t - ch[k] < 0.3
+        paint = color or E.TEXT
+        if flash:
+            d.rectangle((x - 2, y0 + 13, vx + w + 1, y0 + 26), fill=paint)
+        if color:
+            _dot(d, x, y0 + 17, E.BG if flash else color)
+        E.text(img, (vx, y0 + 14), value, "bold", E.BG if flash else paint, shadow=False)
+
+
 def compare(img, d, t, ta, rows, t1, t0=0.3):
     """위·아래로 쌓은 카드 두 장(이름 bold 왼쪽 위). rows: [(이름, 테두리색, art(img, d, t, ta, y0))], 첫 카드는 t0, 둘째는 t1에 뜬다."""
     for (name, col, art), y, t_on in zip(rows, (44, 150), (t0, t1)):
