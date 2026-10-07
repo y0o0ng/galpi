@@ -248,6 +248,14 @@ POP = [(.3, .3), (.7, .7), (1.15, 1.15), (1.1, .9), (.96, 1.04), (1, 1)]
 MASCOT_POS = []                                  # 이 프레임에 마지막으로 붙인 마스코트의 발밑 가운데(sparkle 반응이 읽는다)
 
 
+def leaned(img, k):
+    """행마다 정수 칸만큼 밀어 위쪽을 오른쪽으로 기울인다(발밑 줄 고정). 픽셀을 옮기기만 해 테두리·팔레트가 그대로다."""
+    out = Image.new("RGBA", (img.width + round(k * (img.height - 1)), img.height), (0, 0, 0, 0))
+    for y in range(img.height):
+        out.paste(img.crop((0, y, img.width, y + 1)), (round(k * (img.height - 1 - y)), y))
+    return out
+
+
 def squashed(img, sx, sy):
     """RGBA 스프라이트를 최근접으로 가로 sx·세로 sy배(도트 단위, 새 색 없음)."""
     return img.resize((max(1, round(img.width * sx)), max(1, round(img.height * sy))), Image.NEAREST)
@@ -265,9 +273,10 @@ def _blinking(clock):
 
 class MascotAnim(Anim):
     """시온 등장·표정 재생기. spec: [(표정, 반짝이 여부)] 프레임 목록(12fps, durs로 바꿈). hop: 앞 7칸을 뜀 동작으로, pop: 맨 앞에 나타나기 6칸을 붙인다(등장 애니메이션만; 밀고 들어오는 pointer는 pop=False).
-    base·pointing 표정은 가끔 눈을 감는다. paste는 마스코트 위치를 MASCOT_POS에 남긴다."""
+    base·pointing 표정은 가끔 눈을 감는다. paste는 마스코트 위치를 MASCOT_POS에 남긴다.
+    lean: 위쪽을 오른쪽으로 기울이는 정도(행당 칸, flip이면 왼쪽). pointer가 보는 쪽을 드러내는 데 쓴다."""
 
-    def __init__(self, spec, durs=None, mode="loop", flip=False, hop=True, pop=True):
+    def __init__(self, spec, durs=None, mode="loop", flip=False, hop=True, pop=True, lean=0.0):
         moods = [m for m, _ in spec]
         frames = [mascot_frame(m, sp) for m, sp in spec]
         durs = list(durs or [1 / E.FPS_ANIM] * len(spec))
@@ -279,6 +288,8 @@ class MascotAnim(Anim):
             frames, moods, durs = [frames[0]] * len(POP) + frames, [moods[0]] * len(POP) + moods, [1 / E.FPS_ANIM] * len(POP) + durs
             scales, offsets = list(POP) + scales, [(0, 0)] * len(POP) + offsets
         alts = [mascot_frame("blink") if m in ("base", "pointing") else None for m in moods]
+        if lean:
+            frames, alts = [leaned(f, lean) for f in frames], [a and leaned(a, lean) for a in alts]
         super().__init__(frames, durs=durs, mode=mode, flip=flip, offsets=offsets, scales=scales, alts=alts)
         self.moods = moods
 
@@ -417,9 +428,10 @@ def head(d, x, y, ax, ay, color):
             d.point((x + ax * a - ay * b, y + ay * a + ax * b), fill=color)
 
 
+POINT_LEAN = 0.25                                # 가리키기는 보는 쪽으로 기운다(눈동자 차이가 1~2px라 방향이 안 읽혀서; 9편부터)
 POINT_MASCOT = {
-    "left": MascotAnim([("pointing", False)], mode="once", flip=True, hop=False, pop=False),    # 거울상: 눈동자가 왼쪽
-    "right": MascotAnim([("pointing", False)], mode="once", hop=False, pop=False),
+    "left": MascotAnim([("pointing", False)], mode="once", flip=True, hop=False, pop=False, lean=POINT_LEAN),    # 거울상: 눈동자가 왼쪽
+    "right": MascotAnim([("pointing", False)], mode="once", hop=False, pop=False, lean=POINT_LEAN),
 }
 
 
