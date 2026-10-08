@@ -84,27 +84,35 @@ def _paint(out, d_fn):
     return img
 
 
-def _eye(d, ex, ey, brow, outer):
+def _eye(d, ex, ey, brow, outer, closed=False):
     """정면 눈: 흰자 9x7 위를 윗눈꺼풀 선이 덮고, 검은 눈동자 5x7이 위아래를 꽉 채운다(흰자는 양옆에만 — 사백안 방지).
-    outer: 눈꼬리 쪽(-1 왼쪽, 1 오른쪽) — 그쪽 눈꺼풀이 한 도트 더 길게 내려온다. 눈썹은 머리색."""
+    outer: 눈꼬리 쪽(-1 왼쪽, 1 오른쪽) — 그쪽 눈꺼풀이 한 도트 더 길게 내려온다. 눈썹은 머리색. closed: 감은 눈(가운데 줄 + 눈꼬리)."""
+    d.line((ex - 4, ey - 8, ex + 4, ey - 8), fill=brow)
+    d.point((ex + 5 * outer, ey - 7), fill=brow)
+    if closed:
+        d.line((ex - 4, ey, ex + 4, ey), fill=E.OUTLINE)
+        d.point((ex + 5 * outer, ey - 1), fill=E.OUTLINE)
+        return
     d.rectangle((ex - 4, ey - 3, ex + 4, ey + 3), fill=E.TEXT)
     d.line((ex - 4, ey - 4, ex + 4, ey - 4), fill=E.OUTLINE)
     d.point((ex + 5 * outer, ey - 3), fill=E.OUTLINE)
     d.rectangle((ex - 2, ey - 3, ex + 2, ey + 3), fill=E.OUTLINE)
     d.rectangle((ex - 2, ey - 3, ex - 1, ey - 2), fill=E.TEXT)
-    d.line((ex - 4, ey - 8, ex + 4, ey - 8), fill=brow)
-    d.point((ex + 5 * outer, ey - 7), fill=brow)
 
 
-def _eye_side(d, ex, ey, brow):
-    """옆 눈(왼쪽 보기): 눈동자 4x7이 앞쪽(왼쪽)에 붙고 흰자는 뒤쪽에만 보인다. 윗눈꺼풀 선과 눈썹."""
+def _eye_side(d, ex, ey, brow, closed=False):
+    """옆 눈(왼쪽 보기): 눈동자 4x7이 앞쪽(왼쪽)에 붙고 흰자는 뒤쪽에만 보인다. 윗눈꺼풀 선과 눈썹. closed: 감은 눈."""
+    d.line((ex - 3, ey - 8, ex + 4, ey - 8), fill=brow)
+    d.point((ex + 5, ey - 7), fill=brow)
+    if closed:
+        d.line((ex - 3, ey, ex + 4, ey), fill=E.OUTLINE)
+        d.point((ex + 4, ey - 1), fill=E.OUTLINE)
+        return
     d.rectangle((ex - 2, ey - 3, ex + 3, ey + 3), fill=E.TEXT)
     d.line((ex - 3, ey - 4, ex + 4, ey - 4), fill=E.OUTLINE)
     d.point((ex + 4, ey - 3), fill=E.OUTLINE)
     d.rectangle((ex - 2, ey - 3, ex + 1, ey + 3), fill=E.OUTLINE)
     d.rectangle((ex - 2, ey - 3, ex - 1, ey - 2), fill=E.TEXT)
-    d.line((ex - 3, ey - 8, ex + 4, ey - 8), fill=brow)
-    d.point((ex + 5, ey - 7), fill=brow)
 
 
 def _smile(d, x0, x1, y, col):
@@ -127,7 +135,7 @@ SIDE_ANCHORS = {"eye": (56, 78), "brain": (96, 50), "ear": (100, 87), "mouth": (
                 "throat": (72, 146), "chest": (60, 180), "back": (132, 70)}
 
 
-def _side(sc, hair, cloth):
+def _side(sc, hair, cloth, blink):
     skin, shade = sc["skin"]
     head, neck, body = _mask(SIDE_HEAD), _mask(SIDE_NECK), _mask(SIDE_BODY)
     hm, ear = head & _mask(SIDE_HAIR), _mask(SIDE_EAR)
@@ -142,7 +150,7 @@ def _side(sc, hair, cloth):
     out[_ring(head | neck | body)] = E.OUTLINE
 
     def face(d):
-        _eye_side(d, *SIDE_ANCHORS["eye"], sc["hair"][hair])
+        _eye_side(d, *SIDE_ANCHORS["eye"], sc["hair"][hair], blink)
         _smile(d, 47, 52, 111, E.OUTLINE)
         ax, ay = SIDE_ANCHORS["ear"]
         d.rectangle((ax, ay - 1, ax + 1, ay + 1), fill=shade)                # 귓구멍
@@ -161,7 +169,7 @@ FRONT_ANCHORS = {"eye_l": (64, 78), "eye_r": (86, 78), "brain": (75, 36), "nose"
                  "throat": (75, 136), "chest": (75, 178), "heart": (86, 178)}
 
 
-def _front(sc, hair, cloth):
+def _front(sc, hair, cloth, blink):
     skin, shade = sc["skin"]
     head, neck, body = _mask(FRONT_HEAD), _mask(FRONT_NECK), _mask(FRONT_BODY)
     hm, ears = _mask(FRONT_HAIR), _mask(*FRONT_EARS)
@@ -176,8 +184,8 @@ def _front(sc, hair, cloth):
     out[_ring(head | neck | body | hm | ears)] = E.OUTLINE
 
     def face(d):
-        _eye(d, *FRONT_ANCHORS["eye_l"], sc["hair"][hair], -1)
-        _eye(d, *FRONT_ANCHORS["eye_r"], sc["hair"][hair], 1)
+        _eye(d, *FRONT_ANCHORS["eye_l"], sc["hair"][hair], -1, blink)
+        _eye(d, *FRONT_ANCHORS["eye_r"], sc["hair"][hair], 1, blink)
         mx, my = FRONT_ANCHORS["mouth"]
         _smile(d, mx - 4, mx + 4, my, E.OUTLINE)
         d.line((60, 156, 75, 164), fill=E.OUTLINE)                           # 옷깃(둥근 목)
@@ -186,10 +194,10 @@ def _front(sc, hair, cloth):
 
 
 @lru_cache(None)
-def figure(view="side", hair="black", cloth="blue", flip=False, scheme="warm"):
-    """(RGBA 150x200, 앵커 {이름: (x, y)}). 장면에는 img.paste(fig, (x, y), fig)로 붙이고 앵커에 같은 (x, y)를 더한다."""
+def figure(view="side", hair="black", cloth="blue", flip=False, scheme="warm", blink=False):
+    """(RGBA 150x200, 앵커 {이름: (x, y)}). blink=True는 감은 눈 프레임. 장면에는 img.paste(fig, (x, y), fig)로 붙이고 앵커에 같은 (x, y)를 더한다."""
     sc = SCHEMES[scheme]
-    img, anchors = (_side(sc, hair, cloth), SIDE_ANCHORS) if view == "side" else (_front(sc, hair, cloth), FRONT_ANCHORS)
+    img, anchors = (_side(sc, hair, cloth, blink), SIDE_ANCHORS) if view == "side" else (_front(sc, hair, cloth, blink), FRONT_ANCHORS)
     if flip:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
         anchors = {k: (W - 1 - x, y) for k, (x, y) in anchors.items()}

@@ -107,7 +107,7 @@
 
 - `px/engine.py` — 캔버스·팔레트·폰트·자막 카드·시간 계산·인코딩(+lint). 인코딩은 Pi 메모리 때문에 x264 스레드 1개.
 - `px/templates.py` — `Episode`(장면 실행기: 시간 계획·프레임·엔딩 도장·소리·렌더), `hook`·`compare`·`steps`·`flow`, `chip`·`kicker`·마스코트 동작. `cardt`(문장 안 k번째 카드 시각)·`blinking`·`dotted_rect`·`cutaway`(단면도 확대, 5·8편에서 올림)·`pointer(face=)`. 새 배치는 처음 필요한 편이 만들고, 두 편 이상에 같은 코드가 생기면 사람이 맥에서 여기로 올린다(5~8편 편 폴더의 옛 복사본은 그대로 둔다).
-- `px/figure.py` — **사람은 직접 그리지 않고 이걸 쓴다**(9편 다각형 옆얼굴이 두 번 고쳐도 별로였다). `figure(view="side"|"front", hair, cloth, flip, scheme)` 반신상 150×200 + 앵커(옆: `eye`·`brain`·`ear`·`mouth`·`nose`·`throat`·`chest`·`back`, 앞: `eye_l`·`eye_r`·`brain`·`nose`·`mouth`·`throat`·`chest`·`heart`) — 머리 안에 그림을 얹거나 빛·흐름을 눈에 닿게 할 때 앵커에 붙인 위치를 더해 쓴다. `icon("woman"|"man"|"girl"|"boy", hair, cloth, flip, scheme)` 작은 얼굴 20×22 — 여러 사람·비교 카드용, 바닥 줄이 같아 아이가 작게 서고 키울 땐 정수배(2배 이상이 잘 읽힌다). 머리 `black`·`brown`·`gray`, 옷 `blue`·`mustard`·`plum`.
+- `px/figure.py` — **사람은 직접 그리지 않고 이걸 쓴다**(9편 다각형 옆얼굴이 두 번 고쳐도 별로였다). `figure(view="side"|"front", hair, cloth, flip, scheme, blink)` 반신상 150×200 + 앵커(`blink=True`는 감은 눈 — 사람이 화면에 오래 있으면 마스코트처럼 2.5~4초 간격으로 12fps 1칸 감긴다)(옆: `eye`·`brain`·`ear`·`mouth`·`nose`·`throat`·`chest`·`back`, 앞: `eye_l`·`eye_r`·`brain`·`nose`·`mouth`·`throat`·`chest`·`heart`) — 머리 안에 그림을 얹거나 빛·흐름을 눈에 닿게 할 때 앵커에 붙인 위치를 더해 쓴다. `icon("woman"|"man"|"girl"|"boy", hair, cloth, flip, scheme)` 작은 얼굴 20×22 — 여러 사람·비교 카드용, 바닥 줄이 같아 아이가 작게 서고 키울 땐 정수배(2배 이상이 잘 읽힌다). 머리 `black`·`brown`·`gray`, 옷 `blue`·`mustard`·`plum`.
 - `px/timeline.py` — `span`·`at`·`step`·`tween`과 감속곡선 `linear`·`ease_out`·`ease_in_out`·`back`·`bounce`.
 - `px/detail.py`(디테일 키트)·`px/draw.py`·`px/sprite_anim.py`(스프라이트 재생)·`px/lint.py`·`px/audio.py`·`px/bgm.py`·`px/sprite.py`.
 
