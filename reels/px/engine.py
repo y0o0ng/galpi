@@ -28,7 +28,9 @@ TEXT, LABEL, PURPLE, DANGER = "#F4F1E8", "#B9B3D6", "#9D7CFF", "#FF4D5E"
 CARD, OUTLINE, SHADOW = "#221C38", "#05080A", "#000000"
 
 SPRITE_COLORS = ("#4FA77C", "#C9F5DA")             # sprite.py의 명암 두 단계
-PALETTE = (BG, DITHER, INK, DEEP, TEXT, LABEL, PURPLE, DANGER, CARD, OUTLINE, SHADOW, *SPRITE_COLORS)
+PEOPLE_COLORS = ("#D9A88A", "#A87562", "#2E2438", "#6B4A3A", "#9A93A8", "#4E6A9C", "#C9A25A", "#8A5A7E",   # figure.py warm
+                 "#C9A08E", "#946A66", "#5E4438", "#8C8598", "#4A5E86", "#8A7A4E", "#7A5070")              # figure.py muted
+PALETTE = (BG, DITHER, INK, DEEP, TEXT, LABEL, PURPLE, DANGER, CARD, OUTLINE, SHADOW, *SPRITE_COLORS, *PEOPLE_COLORS)
 
 FONT = {k: ImageFont.truetype(str(D / "fonts" / f), s) for k, (f, s) in
         {"body": ("Galmuri11.ttf", 12), "bold": ("Galmuri11-Bold.ttf", 12), "label": ("Galmuri9.ttf", 10)}.items()}

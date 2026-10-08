@@ -28,6 +28,7 @@
 | 카드 바탕 | `#221C38` | `CARD` |
 | 외곽선·그림자 | `#05080A` / `#000000` | `OUTLINE` / `SHADOW` |
 
+- **사람 전용 색 `PEOPLE_COLORS`(예외):** 사람은 의미 색(INK·PURPLE·DANGER…)으로 칠하면 "주된 쪽·위험한 사람"처럼 읽혀서 피부·머리·옷 전용 색을 따로 둔다. `px/figure.py`의 사람 그림에만 쓰고 다른 그림에는 쓰지 않는다. 두 벌이다 — `warm`(사람이 장면의 주인공일 때), `muted`(도식 옆 조연일 때, 배경에 묻혀 도식을 안 가린다).
 - 질감: 배경 아래쪽 절반 Bayer 디더, 그림·글자 1px 그림자, 주사선은 출력 단계에서(5배 확대 뒤 각 도트 줄의 마지막 출력 줄을 약 78% 밝기로).
 - 폰트: 갈무리(SIL OFL 1.1, `reels/px/fonts/LICENSE-galmuri.txt`, `bash reels/px/fonts/fetch.sh`로 받음 — 저장소에 TTF 없음). 본문 `Galmuri11` 12px, 강조 `Galmuri11-Bold` 12px, 라벨·자막 `Galmuri9` 10px. 영문 큰 제목은 `Galmuri11-Bold` 2배(캔버스 180px에 11자까지 들어간다: `SPECULATIVE` 170px). 넘치면 1배 bold.
 - 화면 안 그림 글자는 영어·숫자·기호이고, **그 편 대본의 화면 글자 목록에 있는 것만** 쓴다. 한국어는 자막 카드와 훅 제목만. 화살표·연산자는 글자 대신 도트 도형.
@@ -106,6 +107,7 @@
 
 - `px/engine.py` — 캔버스·팔레트·폰트·자막 카드·시간 계산·인코딩(+lint). 인코딩은 Pi 메모리 때문에 x264 스레드 1개.
 - `px/templates.py` — `Episode`(장면 실행기: 시간 계획·프레임·엔딩 도장·소리·렌더), `hook`·`compare`·`steps`·`flow`, `chip`·`kicker`·마스코트 동작. `cardt`(문장 안 k번째 카드 시각)·`blinking`·`dotted_rect`·`cutaway`(단면도 확대, 5·8편에서 올림)·`pointer(face=)`. 새 배치는 처음 필요한 편이 만들고, 두 편 이상에 같은 코드가 생기면 사람이 맥에서 여기로 올린다(5~8편 편 폴더의 옛 복사본은 그대로 둔다).
+- `px/figure.py` — **사람은 직접 그리지 않고 이걸 쓴다**(9편 다각형 옆얼굴이 두 번 고쳐도 별로였다). `figure(view="side"|"front", hair, cloth, flip, scheme)` 반신상 150×200 + 앵커(옆: `eye`·`brain`·`ear`·`mouth`·`nose`·`throat`·`chest`·`back`, 앞: `eye_l`·`eye_r`·`brain`·`nose`·`mouth`·`throat`·`chest`·`heart`) — 머리 안에 그림을 얹거나 빛·흐름을 눈에 닿게 할 때 앵커에 붙인 위치를 더해 쓴다. `icon("woman"|"man"|"girl"|"boy", hair, cloth, flip, scheme)` 작은 얼굴 20×22 — 여러 사람·비교 카드용, 바닥 줄이 같아 아이가 작게 서고 키울 땐 정수배(2배 이상이 잘 읽힌다). 머리 `black`·`brown`·`gray`, 옷 `blue`·`mustard`·`plum`.
 - `px/timeline.py` — `span`·`at`·`step`·`tween`과 감속곡선 `linear`·`ease_out`·`ease_in_out`·`back`·`bounce`.
 - `px/detail.py`(디테일 키트)·`px/draw.py`·`px/sprite_anim.py`(스프라이트 재생)·`px/lint.py`·`px/audio.py`·`px/bgm.py`·`px/sprite.py`.
 
