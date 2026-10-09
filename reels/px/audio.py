@@ -138,9 +138,39 @@ def _crack():
     return out
 
 
+def _hit(wave, f, dur, decay):
+    """기계음 한 타: 삼각파 또는 사각파, 2ms 어택 뒤 지수 감쇠."""
+    n = int(dur * SR)
+    ph = (np.arange(n) * f / SR) % 1
+    w = 4 * np.abs(ph - 0.5) - 1 if wave == "tri" else np.where(ph < 0.5, 1.0, -1.0)
+    t = np.arange(n) / SR
+    return w * np.minimum(1, t / 0.002) * np.exp(-t * decay)
+
+
+def _switch(up):
+    """레버가 슥(사인 스윕 0.09초) 움직이고 삼각파 딸깍 두 겹이 걸린다. 올림 523Hz, 내림 330Hz."""
+    out = np.zeros(int(0.3 * SR))
+    f0, f1, fc = (180, 300, 523) if up else (300, 180, 330)
+    out[:int(0.09 * SR)] += _sweep(f0, f1, 0.09) * 0.3
+    for t, f, g in ((0.08, fc, 1.0), (0.10, fc * 0.75, 0.5)):
+        x = _hit("tri", f, 0.06, 60) * g
+        out[int(t * SR):int(t * SR) + len(x)] += x
+    return out
+
+
+def _ratchet():
+    """째깍째깍: 사각파 12ms 톱니 7개, 0.18초 간격, 624Hz·463Hz 교대. 1.2초."""
+    out = np.zeros(int(1.2 * SR))
+    for k in range(7):
+        x = _hit("square", (624, 463)[k % 2], 0.012, 300)
+        out[int(k * 0.18 * SR):int(k * 0.18 * SR) + len(x)] += x
+    return out
+
+
 # 2026-10 추가분: 사용자가 BGM 위에서 귀로 확정. 체감 크기는 pop과 같게(소리 구간 RMS) 맞춘다.
 LOUD = {"rise": lambda: _sweep(220, 440, 0.4), "fall": lambda: _sweep(440, 220, 0.4), "click": _click,
-        "thud": _thud, "zap": _zap, "radiate": _radiate, "crack": _crack}
+        "thud": _thud, "zap": _zap, "radiate": _radiate, "crack": _crack,
+        "switch_up": lambda: _switch(True), "switch_down": lambda: _switch(False), "ratchet": _ratchet}
 
 
 def sfx(kind):
@@ -148,7 +178,8 @@ def sfx(kind):
     bubbles: 300~520Hz 짧은 방울 다섯 개, ticks: 262·330·392Hz 딸깍 세 번(0.25초 간격), ticks_slow: 같은 소리를 0.5초 간격으로.
     rise/fall: 220↔440Hz 스윕 0.4초(값이 오름/내림), click: 392·262Hz 짧은 두 음(스위치), thud: 260→110Hz 하강+2배음(떨어져 부딪힘),
     zap: 440Hz에 30Hz 떨림(전기·신호), radiate: 196→175Hz 세 번 0.5초 간격(열·파동이 차례로 떠남, 5편),
-    crack: 349·294·233Hz 딱 세 번 0.09초 간격(갈라짐, 8편).
+    crack: 349·294·233Hz 딱 세 번 0.09초 간격(갈라짐, 8편), switch_up/switch_down: 레버 슥 + 삼각파 딸깍(스위치 올림/내림),
+    ratchet: 사각파 째깍 7번 0.18초 간격(기어·톱니, 1.2초).
     jingle·stamp: 엔딩 도장 장면 전용(완성 징글 / 도장 쾅)."""
     if kind in LOUD:
         x = LOUD[kind]()
