@@ -94,10 +94,65 @@ def _stamp():
     return thud + np.random.default_rng(5).standard_normal(len(t)) * np.exp(-t * 60) * 0.06
 
 
+def _sweep(f0, f1, dur):
+    t = np.arange(int(dur * SR)) / SR
+    return np.sin(2 * np.pi * np.cumsum(f0 + (f1 - f0) * t / dur) / SR) * np.hanning(len(t))
+
+
+def _click():
+    n = int(0.04 * SR)
+    out = np.zeros(int(0.12 * SR))
+    out[:n] += np.sin(2 * np.pi * 392 * np.arange(n) / SR) * np.hanning(n)
+    i = int(0.06 * SR)
+    out[i:i + n] += np.sin(2 * np.pi * 262 * np.arange(n) / SR) * np.hanning(n) * 0.8
+    return out
+
+
+def _thud():
+    t = np.arange(int(0.3 * SR)) / SR
+    ph = 2 * np.pi * np.cumsum(110 + 150 * np.exp(-t * 20)) / SR
+    return (np.sin(ph) + 0.5 * np.sin(2 * ph)) * np.exp(-t * 10) * np.minimum(1, t / 0.005)
+
+
+def _zap():
+    t = np.arange(int(0.3 * SR)) / SR
+    return np.sin(2 * np.pi * 440 * t + 6 * np.sin(2 * np.pi * 30 * t)) * np.hanning(len(t))
+
+
+def _radiate():
+    n = int(0.35 * SR)
+    t = np.arange(n) / SR
+    one = np.sin(2 * np.pi * np.cumsum(196 - 21 * t / 0.35) / SR) * np.hanning(n)
+    out = np.zeros(int(1.4 * SR))
+    for k, g in enumerate((1.0, 0.75, 0.5)):
+        out[int(0.5 * k * SR):int(0.5 * k * SR) + n] += one * g
+    return out
+
+
+def _crack():
+    n = int(0.05 * SR)
+    out = np.zeros(int(0.3 * SR))
+    for k, (f, g) in enumerate(((349, 1.0), (294, 0.85), (233, 0.7))):
+        i = int(0.09 * k * SR)
+        out[i:i + n] += np.sin(2 * np.pi * f * np.arange(n) / SR) * np.hanning(n) * g
+    return out
+
+
+# 2026-10 추가분: 사용자가 BGM 위에서 귀로 확정. 체감 크기는 pop과 같게(소리 구간 RMS) 맞춘다.
+LOUD = {"rise": lambda: _sweep(220, 440, 0.4), "fall": lambda: _sweep(440, 220, 0.4), "click": _click,
+        "thud": _thud, "zap": _zap, "radiate": _radiate, "crack": _crack}
+
+
 def sfx(kind):
     """사인파, 느린 어택·릴리즈. pop: 250→600Hz 상승, sparkle: 659Hz→880Hz 두 음, danger: 330Hz→247Hz 낮고 내려가는 두 음,
     bubbles: 300~520Hz 짧은 방울 다섯 개, ticks: 262·330·392Hz 딸깍 세 번(0.25초 간격), ticks_slow: 같은 소리를 0.5초 간격으로.
+    rise/fall: 220↔440Hz 스윕 0.4초(값이 오름/내림), click: 392·262Hz 짧은 두 음(스위치), thud: 260→110Hz 하강+2배음(떨어져 부딪힘),
+    zap: 440Hz에 30Hz 떨림(전기·신호), radiate: 196→175Hz 세 번 0.5초 간격(열·파동이 차례로 떠남, 5편),
+    crack: 349·294·233Hz 딱 세 번 0.09초 간격(갈라짐, 8편).
     jingle·stamp: 엔딩 도장 장면 전용(완성 징글 / 도장 쾅)."""
+    if kind in LOUD:
+        x = LOUD[kind]()
+        return x * 10 ** ((rms_db(sfx("pop"), True) - rms_db(x, True)) / 20)
     if kind == "jingle":
         return _jingle()
     if kind == "stamp":
