@@ -3,7 +3,7 @@ import wave
 
 import numpy as np
 
-from .bgm import song
+from .bgm import SONGS, song
 
 SR = 44100
 BGM_VOL, SFX_VOL, TYPE_VOL = 0.14, 0.11, 0.05   # 진폭(피크 기준). BGM > 효과음 ≥ 타자음은 RMS로 확인한다
@@ -24,9 +24,10 @@ def _env(n, a=0.005, r=0.03):
     return e
 
 
-def bgm(secs):
-    """코드로 합성한 16비트 키치 곡(bgm.py)을 피크 BGM_VOL로."""
-    return song(secs) * BGM_VOL
+def bgm(secs, name="bright", end_at=None):
+    """코드로 합성한 16비트 곡(bgm.py)을 bright와 같은 체감 크기로, 피크는 BGM_VOL을 넘지 않게."""
+    x = song(secs, name, end_at) * SONGS[name]["level"]
+    return x / max(1, np.abs(x).max()) * BGM_VOL
 
 
 def typing(times, secs):

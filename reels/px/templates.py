@@ -50,6 +50,8 @@ class Episode:
         self.scenes = [Scene(k, self.nar["scenes"][k], self.mins[k]) for k in ids]
         self.draw, self.out = draw, out
         self.ending = None
+        self.bgm = self.nar.get("bgm", "bright")
+        assert self.bgm in audio.SONGS, f"bgm은 {list(audio.SONGS)} 중 하나: {self.bgm!r}"
         if "principle" in self.nar:
             self.ending = Scene("_ending", [], END_LEN)
             self.mins["_ending"] = END_LEN
@@ -175,12 +177,13 @@ class Episode:
             for card, start, dur in T.plan:
                 chars = [c for ln in card for c in ln]
                 typed += [off + ct for ct, c in zip(E.char_times(card, start, dur), chars) if c not in " ,.?!"]
-        bgm = audio.bgm(self.total)
-        if self.ending:                                  # 엔딩 도장 장면: 세 줄 타이핑 소리, BGM 1 → 0.35 선형
+        bgm = audio.bgm(self.total, self.bgm, self.starts[-1] if self.ending else None)
+        if self.ending:                                  # 엔딩 도장 장면: 세 줄 타이핑 소리, BGM 1 → 0.35 선형(곡의 끝이 있는 곡은 이미 끝나 있다)
             off, chars = self.starts[-1], "".join(self.nar["principle"])
             typed += [off + (k + 1) * T_TYPED / len(chars) for k, c in enumerate(chars) if c != " "]
             i0 = int(off * audio.SR)
-            bgm[i0:] *= np.linspace(1, 0.35, len(bgm) - i0)
+            if not audio.SONGS[self.bgm].get("finale"):
+                bgm[i0:] *= np.linspace(1, 0.35, len(bgm) - i0)
         sfx, kept, events = self._sfx_plan()
         return bgm, audio.typing(typed, self.total), sfx, kept, events
 

@@ -8,7 +8,7 @@
 3. `reels/px/templates.py`와 앞 편 도트판 `scene.py`·`art.py` — 구조 기준
 
 ## 만들 것
-`reels/episodes/{{episode_dir}}/` — `narration.ko.json`(훅 제목·부제와 장면별 문장, 대본 표의 글자 그대로. 대본의 `오늘의 원리`를 **`"principle": [줄1, 줄2, 줄3]`와 `"principle_label"`(영문 라벨, 대본에 있을 때만)로 그대로 옮긴다**), `scenes.json`(장면 순서와 연출에 필요한 최소 길이), `art.py`(이 편 그림), `scene.py`(`Episode` 실행기, 연출은 `at(T, 문장번호, 비율)`로 문장에 묶는다). 출력 `reels/media/{{out_name}}.mp4`.
+`reels/episodes/{{episode_dir}}/` — `narration.ko.json`(훅 제목·부제와 장면별 문장, 대본 표의 글자 그대로. 대본의 `오늘의 원리`를 **`"principle": [줄1, 줄2, 줄3]`와 `"principle_label"`(영문 라벨, 대본에 있을 때만)로 그대로 옮긴다**. 대본의 배경음악은 `"bgm": "bright"|"calm"|"tense"`로 옮긴다), `scenes.json`(장면 순서와 연출에 필요한 최소 길이), `art.py`(이 편 그림), `scene.py`(`Episode` 실행기, 연출은 `at(T, 문장번호, 비율)`로 문장에 묶는다). 출력 `reels/media/{{out_name}}.mp4`.
 
 - **HUD(선택):** 대본에 HUD가 있는 장면에만 `templates.hud(img, items, t, changed_at)`로 자막 상자 바로 위에 그린다(값·바뀌는 시각은 대본 그대로, 그 장면 그림은 y 221 위에서 끝낸다). 대본에 없는 장면에는 넣지 않는다 — HUD가 없는 장면은 화면 전체를 쓴다.
 - **소주제 위 띠(선택):** 대본 표에 `위 띠: …`가 있는 장면의 장면 함수에서만 `templates.band(img, "글자")`를 부른다(글자는 대본 그대로, 구간 장면마다 같게). 띠가 있는 장면은 그림·라벨을 y 27 아래에서 시작하고, 없는 장면은 화면 전체를 쓴다. 훅·엔딩 도장에는 부르지 않는다.
