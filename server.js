@@ -73,6 +73,7 @@ const { registerNewsRoutes } = require('./lib/news/routes');
 const { createReelsStore } = require('./lib/reels/store');
 const { createReelsWorker } = require('./lib/reels/worker');
 const { registerReelsRoutes } = require('./lib/reels/routes');
+const { createInstagramInsightsService } = require('./lib/reels/instagram-insights');
 const { createReelsEpisodes } = require('./lib/reels/episodes');
 const { createReelsProductionWorker } = require('./lib/reels/production-worker');
 const { createReelsUploads } = require('./lib/reels/uploads');
@@ -1055,13 +1056,15 @@ const reelsYoutubeUploader = REELS_YOUTUBE_UPLOAD_ENABLED
     thumbnail: process.env.REELS_YOUTUBE_THUMBNAIL === 'true',
   })
   : null;
+const reelsInstagramTokens = createInstagramTokenStore({
+  tokenFile: process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE,
+  envToken: process.env.REELS_INSTAGRAM_ACCESS_TOKEN,
+});
+const reelsInstagramInsights = createInstagramInsightsService({ userId: process.env.REELS_INSTAGRAM_USER_ID, tokens: reelsInstagramTokens });
 const reelsInstagramUploader = REELS_INSTAGRAM_UPLOAD_ENABLED
   ? createInstagramUploader({
     userId: process.env.REELS_INSTAGRAM_USER_ID,
-    tokens: createInstagramTokenStore({
-      tokenFile: process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE,
-      envToken: process.env.REELS_INSTAGRAM_ACCESS_TOKEN,
-    }),
+    tokens: reelsInstagramTokens,
     cloudflaredBin: process.env.REELS_CLOUDFLARED_BIN || undefined,
     tmpRoot: path.join(__dirname, 'reels', 'public-tmp'),
   })
@@ -4772,7 +4775,7 @@ registerNewsRoutes({
 });
 
 registerReelsRoutes({
-  app, store: reelsStore, episodes: reelsEpisodes, uploads: reelsUploads,
+  app, store: reelsStore, episodes: reelsEpisodes, uploads: reelsUploads, instagramInsights: reelsInstagramInsights,
   onRevise: () => { void reelsProductionWorker?.tick(); },
   onUpload: () => { void reelsProductionWorker?.tickUpload(); },
   config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, youtubeUploadEnabled: REELS_YOUTUBE_UPLOAD_ENABLED, instagramUploadEnabled: REELS_INSTAGRAM_UPLOAD_ENABLED, reelsDir: path.join(__dirname, 'reels') },

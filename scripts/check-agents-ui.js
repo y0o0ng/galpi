@@ -31,8 +31,8 @@ async function main() {
     await page.goto(url);
     await page.addScriptTag({ url: `${url}/task-panel.js` });
     await page.addScriptTag({ url: `${url}/agent-panel.js` });
-    await page.evaluate(() => {
-      const day = '2026-10-10';
+    await page.evaluate(async () => {
+      const day = new Date(Date.now() - 10 * 3600000).toISOString().slice(0, 10);
       const days = Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${String(i + 5).padStart(2, '0')}`, count: i === 5 ? 2 : 0, isToday: i === 5 }));
       window.fixture = {
         '/api/tasks/summary': { today: day, calendarCenter: day, counts: { overdue: 1, today: 2, upcoming: 5, inbox: 3 }, calendar: [{ days }, { days }, { days }], preview: [{ title: '테스트 마감', bucket: 'overdue' }], nextReminder: null },
@@ -45,8 +45,21 @@ async function main() {
         '/api/reels/latest': { batch: { batchId: day, status: 'candidate', cards: [{ id: 7, title: '<img onerror=alert(1)> fixture 후보', concept: 'test', why: 'fixture reason' }] } },
         '/api/reels/episodes/latest': { episode: null },
         '/api/tasks': { tasks: [], counts: {} },
+        '/api/reels/instagram/insights': { status: 'disconnected', points: [] },
       };
-      window.mediaBlob = new Blob(['fixture video'], { type: 'video/mp4' });
+      const canvas = document.createElement('canvas'); canvas.width = 80; canvas.height = 120;
+      const stream = canvas.captureStream(20);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks = [];
+      recorder.ondataavailable = event => chunks.push(event.data);
+      await new Promise(resolve => {
+        const ctx = canvas.getContext('2d');
+        const drawing = setInterval(() => { ctx.fillStyle = '#2F6B57'; ctx.fillRect(0, 0, 80, 120); ctx.fillStyle = 'white'; ctx.fillRect(Date.now() % 50, 45, 20, 20); }, 50);
+        recorder.onstop = () => { clearInterval(drawing); resolve(); };
+        recorder.start(); setTimeout(() => recorder.stop(), 800);
+      });
+      stream.getTracks().forEach(track => track.stop());
+      window.mediaBlob = new Blob(chunks, { type: 'video/webm' });
       window.calls = [];
       window.revokedMedia = [];
       const revoke = URL.revokeObjectURL.bind(URL);
@@ -56,6 +69,7 @@ async function main() {
       const apiFetch = async (route, options = {}) => {
         const base = route.split('?')[0];
         window.calls.push({ route, ...options });
+        if (base === '/api/reels/instagram/insights' && window.insightsGate) await window.insightsGate;
         if (base === '/api/reels/episodes/9/video') return new Response(window.mediaBlob);
         if (base.startsWith('/api/cards/') && !window.fixture[base]) return new Response('{}', { status: 404 });
         if (window.apiFailures[base]) return new Response(JSON.stringify({ error: 'fixture unavailable' }), { status: 503 });
@@ -115,6 +129,42 @@ async function main() {
         await back();
       }
     }
+    await page.evaluate(() => {
+      window.insightsGate = new Promise(resolve => { window.resolveInsights = resolve; });
+      window.pendingInsightsRefresh = window.AgentPanel.refresh();
+    });
+    await page.locator('.agents-dashboard').waitFor();
+    assert.equal(await page.locator('.agent-rail-entry').count(), 5);
+    await page.evaluate(() => { window.resolveInsights(); window.insightsGate = null; });
+    await page.evaluate(() => window.pendingInsightsRefresh);
+    await page.evaluate(() => {
+      window.fixture['/api/reels/instagram/insights'] = { status: 'ready', basis: 'meta_day', scope: 'account_reels', metric: 'views', fetchedAt: 1791600000, points: [
+        { startAt: 1791266400, endAt: 1791352800, views: 1234 },
+        { startAt: 1791352800, endAt: 1791439200, views: null },
+        { startAt: 1791439200, endAt: 1791525600, views: 0 },
+      ] };
+    });
+    await refresh();
+    assert.equal(await page.locator('.instagram-insights rect').count(), 2);
+    assert.equal(await page.getByText('미제공', { exact: true }).count(), 2);
+    await page.locator('.instagram-insights summary').click();
+    assert.equal(await page.locator('.instagram-insights tbody tr').count(), 3);
+    await snapshotAll('instagram-ready');
+    await page.evaluate(() => { window.apiFailures['/api/reels/instagram/insights'] = true; });
+    await refresh();
+    await page.getByText('지금 조회하지 못해 마지막 조회 결과를 표시해.').waitFor();
+    assert.equal(await page.locator('.instagram-insights rect').count(), 2);
+    await snapshotAll('instagram-stale');
+    await page.evaluate(() => { delete window.apiFailures['/api/reels/instagram/insights']; });
+    await page.evaluate(() => {
+      const values = [2618, 4865, 1318, 707, 802, 2480, 1530];
+      window.fixture['/api/reels/instagram/insights'] = { status: 'ready', basis: 'meta_day', scope: 'account_reels', metric: 'views', fetchedAt: 1791633069,
+        points: values.map((views, i) => ({ startAt: 1791010800 + i * 86400, endAt: 1791097200 + i * 86400, views })) };
+    });
+    await refresh();
+    assert.equal(await page.locator('.instagram-insights rect').count(), 7);
+    await snapshotAll('instagram-seven-days');
+
     await page.locator('.agent-rail-entry').filter({ hasText: '일정 에이전트' }).click();
     await page.getByRole('button', { name: '전체 일정', exact: true }).click();
     await page.locator('#agent-task-content .task-view-tabs').waitFor();
@@ -160,6 +210,7 @@ async function main() {
     await page.locator('.agent-rail-entry').filter({ hasText: 'Reels · Shorts' }).click();
     await page.locator('.reels-stage[aria-current="step"]').waitFor();
     assert.equal(await page.locator('.reels-stage').count(), 4);
+    assert.equal(await page.locator('details.reels-stage').count(), 0);
     assert.equal(await page.locator('.reels-stage img[onerror]').count(), 0);
     await snapshotAll('reels-candidates');
     await page.getByRole('button', { name: '이걸로' }).click();
@@ -167,16 +218,30 @@ async function main() {
     for (const status of ['producing', 'revising', 'failed', 'ready', 'approved']) {
       await page.evaluate(status => {
         window.fixture['/api/reels/latest'].batch.status = 'selected';
-        window.fixture['/api/reels/episodes/latest'].episode = { id: 9, candidateId: 7, status, title: 'Fixture episode', caption: '<script>fixture</script>', videoUrl: status === 'ready' || status === 'approved' ? '/api/reels/episodes/9/video' : null, claims: [], revisions: [], attempts: 1, errorCode: status === 'failed' ? 'FIXTURE_FAILURE' : null, uploads: status === 'approved' ? [{ platform: 'youtube', status: 'failed', errorCode: 'FIXTURE_UPLOAD' }, { platform: 'instagram', status: 'done', remoteUrl: 'https://www.instagram.com/reel/fixture/' }] : [] };
+        window.fixture['/api/reels/episodes/latest'].episode = { id: 9, candidateId: 7, batchId: window.fixture['/api/reels/latest'].batch.batchId, status, title: 'Fixture episode', caption: '<script>fixture</script>', videoUrl: status === 'ready' || status === 'approved' ? '/api/reels/episodes/9/video' : null, claims: [], revisions: [], attempts: 1, errorCode: status === 'failed' ? 'FIXTURE_FAILURE' : null, uploads: status === 'approved' ? [{ platform: 'youtube', status: 'failed', errorCode: 'FIXTURE_UPLOAD' }, { platform: 'instagram', status: 'done', remoteUrl: 'https://www.instagram.com/reel/fixture/' }] : [] };
       }, status);
       await refresh();
       const step = await page.locator('.reels-stage[aria-current="step"]').getAttribute('data-step');
+      assert.equal(await page.locator('.reels-stage:not(.active) .reels-episode-card').count(), 0);
+      assert.equal(await page.locator('.reels-stage .reels-check').count(), Number(step) - 1);
       assert.equal(step, ['producing', 'revising', 'failed'].includes(status) ? '2' : status === 'ready' ? '3' : '4');
       assert.equal(await page.getByRole('button', { name: '승인', exact: true }).count(), status === 'ready' ? 1 : 0);
       await snapshotAll(`reels-${status}`);
       if (status === 'ready') {
         await page.waitForFunction(() => document.querySelector('.reels-video video')?.src.startsWith('blob:'));
         assert.equal(await page.getByRole('button', { name: '영상 저장', exact: true }).count(), 1);
+        await page.evaluate(async () => {
+          window.playingReel = document.querySelector('.reels-video video');
+          window.playingReel.muted = true; window.playingReel.loop = true;
+          await window.playingReel.play();
+        });
+        for (let i = 0; i < 3; i++) await refresh();
+        assert.equal(await page.evaluate(() => document.querySelector('.reels-video video') === window.playingReel && !window.playingReel.paused), true, 'polling must preserve playing video');
+        await page.evaluate(() => { window.fixture['/api/reels/episodes/latest'].episode.caption = 'Updated fixture caption'; });
+        await refresh();
+        assert.equal(await page.evaluate(() => document.querySelector('.reels-video video') === window.playingReel && !window.playingReel.paused), true, 'metadata updates must preserve playing video');
+        await page.getByText('Updated fixture caption', { exact: true }).waitFor();
+
         await page.getByRole('button', { name: '수정 요청', exact: true }).click();
         assert.equal(await page.locator('.reels-revise textarea').isVisible(), true);
         await page.getByRole('button', { name: '승인', exact: true }).click();
@@ -193,6 +258,18 @@ async function main() {
     await refresh();
     assert.equal(await page.locator('.agent-rail-entry').count(), 5);
     await page.screenshot({ path: path.join(output, 'phone-dark-source-error.png'), fullPage: true });
+    await page.locator('.agent-rail-entry').filter({ hasText: 'Reels · Shorts' }).click();
+    await page.evaluate(() => {
+      window.fixture['/api/reels/latest'].batch.batchId = '2000-01-01';
+      window.fixture['/api/reels/episodes/latest'].episode.batchId = '2000-01-01';
+    });
+    await refresh();
+    assert.equal(await page.locator('.reels-stage .reels-check').count(), 0);
+    assert.equal(await page.locator('.reels-stage[aria-current="step"]').getAttribute('data-step'), '1');
+    await page.getByText('오늘 주제 후보를 기다리는 중이야.').waitFor();
+    await snapshotAll('reels-new-cycle');
+    await page.getByRole('button', { name: 'Agents로 돌아가기' }).click();
+    await page.locator('.agents-dashboard').waitFor();
     await page.evaluate(() => {
       window.fixture['/api/cards/latest'] = { batch: null };
       window.fixture['/api/cards/jobs/latest'] = { job: { id: 12, status: 'ready', title: 'Fixture card job', images: [], claims: [], caption: 'Fixture caption', finishedAt: 123 } };

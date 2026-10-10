@@ -88,3 +88,19 @@ test('native calendar swipe loads the previous week from schedule detail', () =>
   settle({ isConnected: true, clientWidth: 300, scrollLeft: 0 });
   assert.deepEqual(calls, ['2026-10-03']);
 });
+
+
+test('Reels resets at 19:00 KST and never completes steps from another daily batch', () => {
+  const state = { reels: { batch: { batchId: '2026-10-09', status: 'selected' } }, reelsEpisode: { batchId: '2026-10-09', status: 'approved' } };
+  const cycle = helper('reelsCycle', 'function renderReelsDetail', { state, Date });
+  assert.equal(cycle(Date.parse('2026-10-10T18:59:59+09:00')).active, 4);
+  const reset = cycle(Date.parse('2026-10-10T19:00:00+09:00'));
+  assert.equal(reset.id, '2026-10-10');
+  assert.equal(reset.active, 1); assert.equal(reset.episode, null); assert.equal(reset.batch, null);
+  state.reels.batch = { batchId: '2026-10-10', status: 'selected' };
+  assert.equal(cycle(Date.parse('2026-10-11T09:00:00+09:00')).active, 2);
+  state.reelsEpisode = { batchId: '2026-10-10', status: 'ready' };
+  assert.equal(cycle(Date.parse('2026-10-11T09:00:00+09:00')).active, 3);
+  state.reelsEpisode.batchId = undefined;
+  assert.equal(cycle(Date.parse('2026-10-11T09:00:00+09:00')).episode, null);
+});

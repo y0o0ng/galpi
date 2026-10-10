@@ -11,6 +11,9 @@
     showToast: null,
     container: null,
     requestId: 0,
+    instagramInsights: null,
+    instagramInsightsError: '',
+    instagramInsightsLoading: false,
     mode: 'summary',
     summary: null,
     reminders: [],
@@ -38,6 +41,7 @@
     reels: null,
     reelsError: '',
     reelsEpisodeError: '',
+    reelsRenderedKey: null,
     returnAgent: null,
     cards: null,
     cardJob: null,
@@ -1357,6 +1361,7 @@
     if (!episode) return null;
     const block = document.createElement('section');
     block.className = 'agents-operational-card reels-episode-card';
+    block.dataset.mediaKey = `${episode.id}:${episode.finishedAt}:${episode.status}`;
     const desc = episode.status === 'revising' ? (episode.revisionNote || '') : (episode.title || '');
     block.appendChild(agentSummaryHead('Reels 편', desc, EPISODE_STATUS[episode.status] || episode.status, refresh));
     const body = document.createElement('div');
@@ -1459,6 +1464,72 @@
     return wrapper;
   }
 
+  function makeInstagramChart() {
+    const section = document.createElement('section');
+    section.className = 'instagram-insights';
+    const title = document.createElement('h4');
+    title.textContent = 'Instagram Reels 조회수';
+    section.append(title, detailText('계정 전체 Reels · Meta 집계일 기준 · 종료일 표시'));
+    const data = state.instagramInsights;
+    if (!data || data.status === 'disconnected') {
+      section.appendChild(detailText(state.instagramInsightsError || (state.instagramInsightsLoading ? '인스타 조회수를 불러오는 중이야.' : '데이터 미연결')));
+      return section;
+    }
+    if (state.instagramInsightsError || data.status === 'stale') section.appendChild(detailText('지금 조회하지 못해 마지막 조회 결과를 표시해.', 'danger'));
+    const points = data.points || [];
+    if (!points.some(point => point.views !== null)) {
+      section.appendChild(detailText('인스타가 아직 일별 Reels 조회수를 반환하지 않았어.'));
+      return section;
+    }
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 560 240');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', '최근 Meta 집계일별 Instagram Reels 조회수. 정확한 구간과 값은 아래 일별 데이터에서 확인할 수 있어.');
+    const draw = (tag, attrs, text) => {
+      const node = document.createElementNS(svg.namespaceURI, tag);
+      Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+      if (text !== undefined) node.textContent = text;
+      svg.appendChild(node);
+    };
+    const max = Math.max(1, ...points.map(point => point.views || 0));
+    const width = 480 / points.length;
+    draw('line', { x1: 40, y1: 196, x2: 520, y2: 196, stroke: 'var(--hairline)' });
+    points.forEach((point, index) => {
+      const x = 40 + width * (index + .5);
+      const height = point.views === null ? 0 : point.views / max * 145;
+      if (point.views !== null) draw('rect', { x: x - width * .28, y: 196 - height, width: width * .56, height, rx: 3, fill: 'var(--brand)' });
+      draw('text', { x, y: 184 - height, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'));
+      draw('text', { x, y: 221, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, new Date(point.endAt * 1000).toISOString().slice(5, 10).replace('-', '/'));
+    });
+    section.appendChild(svg);
+    const details = document.createElement('details');
+    const summary = document.createElement('summary'); summary.textContent = '일별 데이터';
+    const table = document.createElement('table');
+    const head = document.createElement('tr');
+    ['집계 구간 (UTC)', '조회수'].forEach(label => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = label; head.appendChild(th); });
+    const thead = document.createElement('thead'); thead.appendChild(head); table.appendChild(thead);
+    const body = document.createElement('tbody');
+    const format = at => new Date(at * 1000).toISOString().slice(5, 16).replace('T', ' ');
+    points.forEach(point => {
+      const row = document.createElement('tr');
+      [`${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR')].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
+      body.appendChild(row);
+    });
+    table.appendChild(body); details.append(summary, table); section.appendChild(details);
+    section.appendChild(detailText(`조회 시각: ${new Date(data.fetchedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
+    return section;
+  }
+
+  async function loadInstagramInsights() {
+    state.instagramInsightsLoading = true;
+    try {
+      const response = await state.apiFetch('/api/reels/instagram/insights');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '인스타 성과를 불러오지 못했어.');
+      state.instagramInsights = data;
+    } finally { state.instagramInsightsLoading = false; }
+  }
+
   function renderSummary() {
     releaseReelsMedia();
     releaseCardMedia();
@@ -1467,10 +1538,7 @@
     layout.className = 'agents-dashboard';
     const board = detailCard('데이터 시각화', detailText('Instagram Reels · YouTube Shorts · 기타 소스'));
     board.classList.add('agents-data-board');
-    const empty = document.createElement('div');
-    empty.className = 'agents-data-empty';
-    empty.append(detailText('데이터 미연결'), detailText('YouTube Shorts · Instagram Reels 조회수·성과 추세'));
-    board.append(empty, detailText('성과 데이터 연결 후 표시돼.'));
+    board.append(makeInstagramChart(), detailText('YouTube Shorts · 데이터 미연결'));
     const rail = document.createElement('nav');
     rail.className = 'agents-status-rail';
     rail.setAttribute('aria-label', '에이전트 현황');
@@ -1479,12 +1547,12 @@
     heading.className = 'agents-status-heading';
     const content = document.createElement('div');
     content.className = 'agent-content-rail';
-    const episode = state.reelsEpisode;
+    const { episode, batch } = reelsCycle();
     const reelsStatus = state.reelsError || state.reelsEpisodeError ? '확인 필요'
       : episode ? EPISODE_STATUS[episode.status] || '확인 필요'
-      : state.reels?.batch ? REELS_STATUS[state.reels.batch.status] : state.reels ? '후보 없음' : '꺼짐';
+      : batch ? REELS_STATUS[batch.status] : state.reels ? '후보 없음' : '꺼짐';
     content.append(makeAgentRow({ title: 'Reels · Shorts', status: reelsStatus,
-      tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' ? 'danger' : episode?.status === 'ready' || state.reels?.batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
+      tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' ? 'danger' : episode?.status === 'ready' || batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
       makeAgentRow({ title: '카드 뉴스',
         status: state.cardJob ? ({ queued: '제작 대기', producing: '만드는 중', ready: '승인 대기', failed: '실행 중단', blocked: '수정 필요', approved: '승인됨', discarded: '폐기됨' }[state.cardJob.status] || '확인 필요')
           : state.cards?.batch ? REELS_STATUS[state.cards.batch.status] || '확인 필요' : '미연결',
@@ -1498,8 +1566,21 @@
     }
   }
 
+  // 후보 batchId의 KST 날짜를 기준으로 19시부터 다음 날 19시까지 한 사이클이다.
+  function reelsCycle(now = Date.now()) {
+    const id = new Date(now - 10 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const batch = state.reels?.batch?.batchId === id ? state.reels.batch : null;
+    const episode = state.reelsEpisode?.batchId === id ? state.reelsEpisode : null;
+    const active = !episode ? (batch?.status === 'selected' ? 2 : 1) : episode.status === 'discarded' ? 1
+      : ['producing', 'revising', 'failed'].includes(episode.status) ? 2 : episode.status === 'ready' ? 3 : episode.status === 'approved' ? 4 : 1;
+    return { id, batch, episode, active };
+  }
+
   function renderReelsDetail() {
-    state.container.replaceChildren();
+    const previous = state.container.querySelector('.reels-workspace');
+    const cycle = new Date(Date.now() - 10 * 3600000).toISOString().slice(0, 10);
+    const key = JSON.stringify([cycle, state.reels, state.reelsEpisode, state.reelsError, state.reelsEpisodeError, state.cards, state.cardJob]);
+    if (previous && state.reelsRenderedKey === key) return;
     const workspace = document.createElement('section');
     workspace.className = 'agent-detail-workspace reels-workspace';
     workspace.appendChild(makeDetailHead('Reels · Shorts', 'Agents로 돌아가기'));
@@ -1511,30 +1592,27 @@
     const columns = detailColumns([], [cards]);
     columns.classList.add('reels-workflow-columns');
     const stages = columns.firstElementChild;
-    const episode = state.reelsEpisode;
-    const active = ['candidate', 'held'].includes(state.reels?.batch?.status) || !episode || episode.status === 'discarded' ? 1
-      : ['producing', 'revising', 'failed'].includes(episode.status) ? 2 : episode.status === 'ready' ? 3 : 4;
+    const { batch, episode, active } = reelsCycle();
     ['주제 선정', '영상 제작', '영상 검토', '게시'].forEach((label, index) => {
       const step = index + 1;
-      const stage = document.createElement('details');
+      const stage = document.createElement('section');
       stage.className = 'agent-detail-card reels-stage';
       stage.dataset.step = step;
-      stage.open = step === active;
-      const heading = document.createElement('summary');
+      const heading = document.createElement('h3');
       heading.textContent = `0${step} / ${label}`;
       stage.appendChild(heading);
       if (step === active) {
         stage.classList.add('active');
         stage.setAttribute('aria-current', 'step');
       }
-      if (step === 1) {
+      if (step === active && step === 1) {
         if (state.reelsError) stage.appendChild(detailText(state.reelsError, 'danger'));
-        if (state.reels) stage.appendChild(makeReelsAgentCard());
-        else stage.appendChild(detailText('주제 후보 미연결'));
-      } else if (episode && ((step === 2 && ['producing', 'revising', 'failed'].includes(episode.status))
+        if (batch) stage.appendChild(makeReelsAgentCard());
+        else stage.appendChild(detailText(state.reels ? '오늘 주제 후보를 기다리는 중이야.' : '주제 후보 미연결'));
+      } else if (step === active && episode && ((step === 2 && ['producing', 'revising', 'failed'].includes(episode.status))
         || (step === 3 && ['ready', 'discarded'].includes(episode.status)) || (step === 4 && episode.status === 'approved'))) {
         stage.appendChild(makeReelsEpisodeCard());
-      } else {
+      } else if (step === active) {
         stage.appendChild(detailText(state.reelsEpisodeError || '아직 이 단계의 영상이 없어.'));
       }
       if (step < active) heading.appendChild(svgIcon('ok'));
@@ -1543,7 +1621,23 @@
     });
     if (state.reelsEpisodeError) workspace.appendChild(detailCard('영상 상태 확인 필요', detailText(state.reelsEpisodeError, 'danger')));
     workspace.appendChild(columns);
-    state.container.appendChild(workspace);
+    const oldCard = previous?.querySelector('.reels-episode-card');
+    const newCard = workspace.querySelector('.reels-episode-card');
+    const video = oldCard?.querySelector('.reels-video');
+    if (video && newCard && oldCard.dataset.mediaKey === newCard.dataset.mediaKey) {
+      // 영상 DOM을 분리하면 브라우저가 재생을 멈춘다. 같은 결과는 플레이어 밖만 갱신한다.
+      oldCard.firstElementChild.replaceWith(newCard.firstElementChild);
+      const body = oldCard.querySelector('.reels-episode-body');
+      [...body.children].forEach(child => { if (child !== video) child.remove(); });
+      [...newCard.querySelector('.reels-episode-body').children].forEach(child => {
+        if (!child.classList.contains('reels-video')) body.appendChild(child);
+      });
+      const selector = '.reels-workflow-columns > .agent-detail-column:last-child';
+      previous.querySelector(selector).replaceChildren(...workspace.querySelector(selector).children);
+    } else {
+      state.container.replaceChildren(workspace);
+    }
+    state.reelsRenderedKey = key;
   }
 
   // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
@@ -2257,6 +2351,7 @@
       return;
     }
     renderLoading();
+    const performance = Promise.allSettled([loadInstagramInsights()]);
     // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
     const [scheduleResult, codexResult, mailResult, , , reelsResult, episodeResult] = await Promise.allSettled([
       state.enabled ? loadAgentData() : Promise.resolve(false),
@@ -2279,8 +2374,10 @@
       : '';
     state.reelsError = reelsResult.status === 'rejected' ? reelsResult.reason.message : '';
     state.reelsEpisodeError = episodeResult.status === 'rejected' ? episodeResult.reason.message : '';
-    if (state.mode !== 'summary') return;
-    renderSummary();
+    if (state.mode === 'summary') renderSummary();
+    const [instagramResult] = await performance;
+    state.instagramInsightsError = instagramResult.status === 'rejected' ? instagramResult.reason.message : '';
+    if (state.mode === 'summary') renderSummary();
   }
 
   function show() {
@@ -2310,6 +2407,14 @@
     state.pushState = pushClient.getState();
     state.showToast = showToast;
     state.container = container;
+    let cycleId = reelsCycle().id;
+    setInterval(() => {
+      const next = reelsCycle().id;
+      if (next === cycleId) return;
+      cycleId = next;
+      releaseReelsMedia();
+      if (['summary', 'reels'].includes(state.mode) && state.container.offsetParent !== null) void refresh();
+    }, 1000);
     state.initialized = true;
   }
 

@@ -6038,8 +6038,8 @@ a.reels-claim-source { text-decoration: underline; }
 .agent-detail-card .schedule-agent-calendar-head h3 { display: none; }
 .reels-workflow-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 58px; }
 .reels-stage { position: relative; padding: 12px 18px; }
-.reels-stage > h3 { margin: 0; padding: 0; border: 0; font-size: 13px; }
-.reels-stage > .reels-check { position: absolute; right: 18px; top: 12px; }
+.reels-stage > h3 { position: relative; padding-right: 24px; margin: 0; border: 0; font-size: 13px; }
+.reels-stage > h3 .reels-check { position: absolute; right: 0; top: 0; }
 .reels-stage.active { padding-top: 18px; }
 .reels-stage :is(.reels-agent-card, .reels-episode-card) { border: 0; background: transparent; }
 .reels-stage .agent-summary-head { min-height: 0; padding: 14px 0; margin: 0; }
@@ -6090,11 +6090,7 @@ a.reels-claim-source { text-decoration: underline; }
 [data-theme="dark"] .agent-rail-status.danger { background: rgba(255, 59, 48, .15); }
 [data-theme="dark"] .agent-rail-status.warn { background: rgba(255, 159, 10, .15); color: #ff9f0a; }
 
-.reels-stage > summary { position: relative; cursor: pointer; padding-right: 26px; min-height: 20px; font-size: 13px; font-weight: 650; color: var(--ai-text); }
-.reels-stage > summary .reels-check { position: absolute; right: 0; top: 0; }
-.reels-stage > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-.agent-rail-status.off img { opacity: .5; }
-@media (max-width: 600px) { .reels-stage > summary { min-height: 44px; display: flex; align-items: center; } }
+
 
 #home-agents #agent-panel-content { padding: 0; overflow: visible; }
 .agent-detail-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -6121,3 +6117,14 @@ a.reels-claim-source { text-decoration: underline; }
 .cards-agent-card .schedule-agent-action { min-height: 44px; }
 
 .cards-agent-card .reels-episode-body { min-width: 0; }
+
+.instagram-insights { flex: 1; min-width: 0; padding: 24px 0; }
+.instagram-insights h4 { margin: 0 0 8px; font-size: 15px; }
+.instagram-insights p { font-size: 12px; line-height: 1.6; }
+.instagram-insights svg { display: block; width: 100%; margin: 28px 0 14px; }
+.instagram-insights summary { cursor: pointer; min-height: 44px; line-height: 44px; font-size: 12px; }
+.instagram-insights table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.instagram-insights :is(th, td) { text-align: left; padding: 9px 0; border-bottom: 1px solid var(--hairline); }
+.instagram-insights :is(th, td):last-child { text-align: right; }
+
+@media (max-width: 900px) { .instagram-insights svg text { font-size: 18px; } }
