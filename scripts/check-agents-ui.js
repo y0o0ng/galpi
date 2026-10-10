@@ -31,7 +31,7 @@ async function main() {
     await page.goto(url);
     await page.addScriptTag({ url: `${url}/task-panel.js` });
     await page.addScriptTag({ url: `${url}/agent-panel.js` });
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const day = new Date(Date.now() - 10 * 3600000).toISOString().slice(0, 10);
       const days = Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${String(i + 5).padStart(2, '0')}`, count: i === 5 ? 2 : 0, isToday: i === 5 }));
       window.fixture = {
@@ -47,7 +47,19 @@ async function main() {
         '/api/tasks': { tasks: [], counts: {} },
         '/api/reels/instagram/insights': { status: 'disconnected', points: [] },
       };
-      window.mediaBlob = new Blob(['fixture video'], { type: 'video/mp4' });
+      const canvas = document.createElement('canvas'); canvas.width = 80; canvas.height = 120;
+      const stream = canvas.captureStream(20);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks = [];
+      recorder.ondataavailable = event => chunks.push(event.data);
+      await new Promise(resolve => {
+        const ctx = canvas.getContext('2d');
+        const drawing = setInterval(() => { ctx.fillStyle = '#2F6B57'; ctx.fillRect(0, 0, 80, 120); ctx.fillStyle = 'white'; ctx.fillRect(Date.now() % 50, 45, 20, 20); }, 50);
+        recorder.onstop = () => { clearInterval(drawing); resolve(); };
+        recorder.start(); setTimeout(() => recorder.stop(), 800);
+      });
+      stream.getTracks().forEach(track => track.stop());
+      window.mediaBlob = new Blob(chunks, { type: 'video/webm' });
       window.calls = [];
       window.revokedMedia = [];
       const revoke = URL.revokeObjectURL.bind(URL);
@@ -218,6 +230,18 @@ async function main() {
       if (status === 'ready') {
         await page.waitForFunction(() => document.querySelector('.reels-video video')?.src.startsWith('blob:'));
         assert.equal(await page.getByRole('button', { name: '영상 저장', exact: true }).count(), 1);
+        await page.evaluate(async () => {
+          window.playingReel = document.querySelector('.reels-video video');
+          window.playingReel.muted = true; window.playingReel.loop = true;
+          await window.playingReel.play();
+        });
+        for (let i = 0; i < 3; i++) await refresh();
+        assert.equal(await page.evaluate(() => document.querySelector('.reels-video video') === window.playingReel && !window.playingReel.paused), true, 'polling must preserve playing video');
+        await page.evaluate(() => { window.fixture['/api/reels/episodes/latest'].episode.caption = 'Updated fixture caption'; });
+        await refresh();
+        assert.equal(await page.evaluate(() => document.querySelector('.reels-video video') === window.playingReel && !window.playingReel.paused), true, 'metadata updates must preserve playing video');
+        await page.getByText('Updated fixture caption', { exact: true }).waitFor();
+
         await page.getByRole('button', { name: '수정 요청', exact: true }).click();
         assert.equal(await page.locator('.reels-revise textarea').isVisible(), true);
         await page.getByRole('button', { name: '승인', exact: true }).click();

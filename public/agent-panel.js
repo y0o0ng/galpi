@@ -41,6 +41,7 @@
     reels: null,
     reelsError: '',
     reelsEpisodeError: '',
+    reelsRenderedKey: null,
     returnAgent: null,
     cards: null,
     cardJob: null,
@@ -1360,6 +1361,7 @@
     if (!episode) return null;
     const block = document.createElement('section');
     block.className = 'agents-operational-card reels-episode-card';
+    block.dataset.mediaKey = `${episode.id}:${episode.finishedAt}:${episode.status}`;
     const desc = episode.status === 'revising' ? (episode.revisionNote || '') : (episode.title || '');
     block.appendChild(agentSummaryHead('Reels 편', desc, EPISODE_STATUS[episode.status] || episode.status, refresh));
     const body = document.createElement('div');
@@ -1575,7 +1577,10 @@
   }
 
   function renderReelsDetail() {
-    state.container.replaceChildren();
+    const previous = state.container.querySelector('.reels-workspace');
+    const cycle = new Date(Date.now() - 10 * 3600000).toISOString().slice(0, 10);
+    const key = JSON.stringify([cycle, state.reels, state.reelsEpisode, state.reelsError, state.reelsEpisodeError, state.cards, state.cardJob]);
+    if (previous && state.reelsRenderedKey === key) return;
     const workspace = document.createElement('section');
     workspace.className = 'agent-detail-workspace reels-workspace';
     workspace.appendChild(makeDetailHead('Reels · Shorts', 'Agents로 돌아가기'));
@@ -1616,7 +1621,23 @@
     });
     if (state.reelsEpisodeError) workspace.appendChild(detailCard('영상 상태 확인 필요', detailText(state.reelsEpisodeError, 'danger')));
     workspace.appendChild(columns);
-    state.container.appendChild(workspace);
+    const oldCard = previous?.querySelector('.reels-episode-card');
+    const newCard = workspace.querySelector('.reels-episode-card');
+    const video = oldCard?.querySelector('.reels-video');
+    if (video && newCard && oldCard.dataset.mediaKey === newCard.dataset.mediaKey) {
+      // 영상 DOM을 분리하면 브라우저가 재생을 멈춘다. 같은 결과는 플레이어 밖만 갱신한다.
+      oldCard.firstElementChild.replaceWith(newCard.firstElementChild);
+      const body = oldCard.querySelector('.reels-episode-body');
+      [...body.children].forEach(child => { if (child !== video) child.remove(); });
+      [...newCard.querySelector('.reels-episode-body').children].forEach(child => {
+        if (!child.classList.contains('reels-video')) body.appendChild(child);
+      });
+      const selector = '.reels-workflow-columns > .agent-detail-column:last-child';
+      previous.querySelector(selector).replaceChildren(...workspace.querySelector(selector).children);
+    } else {
+      state.container.replaceChildren(workspace);
+    }
+    state.reelsRenderedKey = key;
   }
 
   // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
