@@ -17,13 +17,13 @@ function fixture(t) {
     calls.push({ url: new URL(url), options });
     if (url.includes('oauth2')) return { ok: true, json: async () => ({ access_token: 'PRIVATE_ACCESS', expires_in: 3600 }) };
     if (state.fail) return { ok: false, status: 403, json: async () => ({ error: { message: 'PRIVATE_SECRET provider body' } }) };
-    return { ok: true, json: async () => url.includes('/channels?') ? { items: state.multiple ? [{ id: 'UC_A' }, { id: 'UC_B' }] : [{ id: state.channel, statistics: { subscriberCount: state.total, hiddenSubscriberCount: state.hidden } }] } : report([['2026-10-07', 'VIDEO_ON_DEMAND', 999], ['2026-10-08', 'SHORTS', 123], ['2026-10-09', 'SHORTS', 0]]) };
+    return { ok: true, json: async () => url.includes('/channels?') ? { items: state.multiple ? [{ id: 'UC_A' }, { id: 'UC_B' }] : [{ id: state.channel, statistics: { subscriberCount: state.total, hiddenSubscriberCount: state.hidden } }] } : report([['2026-10-07', 'VIDEO_ON_DEMAND', 999], ['2026-10-08', 'shorts', 123], ['2026-10-09', 'SHORTS', 0]]) };
   };
   const create = () => createYoutubeInsightsService({ credentials, subscriberDir: dir, fetch, now: () => state.now });
   return { service: create(), create, state, calls, dir };
 }
 test('only Shorts rows count; gaps, zero and delayed latest day remain distinct', () => {
-  const points = reportPoints(report([['2026-10-07','VIDEO_ON_DEMAND',999], ['2026-10-08','SHORTS',0], ['2026-10-09','SHORTS',42]]), '2026-10-01', '2026-10-10');
+  const points = reportPoints(report([['2026-10-07','VIDEO_ON_DEMAND',999], ['2026-10-08','SHORTS',0], ['2026-10-09','shorts',42]]), '2026-10-01', '2026-10-10');
   assert.equal(points.length, 7); assert.equal(points.at(-1).day, '2026-10-09'); assert.equal(points.at(-1).views,42); assert.equal(points.at(-2).views,0); assert.equal(points.at(-3).views,null);
   assert.deepEqual(reportPoints({ columnHeaders: headers }, '2026-10-01','2026-10-10'), []);
   for (const rows of [null,[['2026-02-30','SHORTS',1]],[['2026-10-09','SHORTS','1']],[['2026-10-09','SHORTS',-1]],[['2026-10-09','SHORTS',1],['2026-10-09','SHORTS',2]],[['2026-10-11','SHORTS',1]]]) assert.throws(()=>reportPoints(report(rows),'2026-10-01','2026-10-10'), /BAD_RESPONSE/);
