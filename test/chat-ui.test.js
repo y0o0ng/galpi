@@ -460,8 +460,8 @@ test('focused notifications inspect existing categories and provider counts', ()
 test('Agents uses a data board and status rail with no invented performance', () => {
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
   const summary = panel.slice(panel.indexOf('function renderSummary()'), panel.indexOf('function renderReelsDetail()'));
-  assert.match(summary, /makeInstagramChart/);
-  assert.match(panel, /YouTube Shorts · 데이터 미연결/);
+  assert.match(summary, /makePerformanceChart\('instagram'\)/);
+  assert.match(summary, /makePerformanceChart\('youtube'\)/);
   assert.match(summary, /카드 뉴스/);
   assert.match(summary, /미연결/);
   assert.doesNotMatch(summary, /makeCalendar\(|makeScheduleBlock\(|makeReelsEpisodeCard\(/);
