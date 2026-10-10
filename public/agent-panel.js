@@ -1479,12 +1479,12 @@
     heading.className = 'agents-status-heading';
     const content = document.createElement('div');
     content.className = 'agent-content-rail';
-    const episode = state.reelsEpisode;
+    const { episode, batch } = reelsCycle();
     const reelsStatus = state.reelsError || state.reelsEpisodeError ? '확인 필요'
       : episode ? EPISODE_STATUS[episode.status] || '확인 필요'
-      : state.reels?.batch ? REELS_STATUS[state.reels.batch.status] : state.reels ? '후보 없음' : '꺼짐';
+      : batch ? REELS_STATUS[batch.status] : state.reels ? '후보 없음' : '꺼짐';
     content.append(makeAgentRow({ title: 'Reels · Shorts', status: reelsStatus,
-      tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' ? 'danger' : episode?.status === 'ready' || state.reels?.batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
+      tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' ? 'danger' : episode?.status === 'ready' || batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
       makeAgentRow({ title: '카드 뉴스',
         status: state.cardJob ? ({ queued: '제작 대기', producing: '만드는 중', ready: '승인 대기', failed: '실행 중단', blocked: '수정 필요', approved: '승인됨', discarded: '폐기됨' }[state.cardJob.status] || '확인 필요')
           : state.cards?.batch ? REELS_STATUS[state.cards.batch.status] || '확인 필요' : '미연결',
@@ -1496,6 +1496,16 @@
       [...rail.querySelectorAll('button')].find(item => item.querySelector('.agent-rail-title')?.textContent === state.returnAgent)?.focus();
       state.returnAgent = null;
     }
+  }
+
+  // 후보 batchId의 KST 날짜를 기준으로 19시부터 다음 날 19시까지 한 사이클이다.
+  function reelsCycle(now = Date.now()) {
+    const id = new Date(now - 10 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const batch = state.reels?.batch?.batchId === id ? state.reels.batch : null;
+    const episode = state.reelsEpisode?.batchId === id ? state.reelsEpisode : null;
+    const active = !episode ? (batch?.status === 'selected' ? 2 : 1) : episode.status === 'discarded' ? 1
+      : ['producing', 'revising', 'failed'].includes(episode.status) ? 2 : episode.status === 'ready' ? 3 : episode.status === 'approved' ? 4 : 1;
+    return { id, batch, episode, active };
   }
 
   function renderReelsDetail() {
@@ -1511,30 +1521,27 @@
     const columns = detailColumns([], [cards]);
     columns.classList.add('reels-workflow-columns');
     const stages = columns.firstElementChild;
-    const episode = state.reelsEpisode;
-    const active = ['candidate', 'held'].includes(state.reels?.batch?.status) || !episode || episode.status === 'discarded' ? 1
-      : ['producing', 'revising', 'failed'].includes(episode.status) ? 2 : episode.status === 'ready' ? 3 : 4;
+    const { batch, episode, active } = reelsCycle();
     ['주제 선정', '영상 제작', '영상 검토', '게시'].forEach((label, index) => {
       const step = index + 1;
-      const stage = document.createElement('details');
+      const stage = document.createElement('section');
       stage.className = 'agent-detail-card reels-stage';
       stage.dataset.step = step;
-      stage.open = step === active;
-      const heading = document.createElement('summary');
+      const heading = document.createElement('h3');
       heading.textContent = `0${step} / ${label}`;
       stage.appendChild(heading);
       if (step === active) {
         stage.classList.add('active');
         stage.setAttribute('aria-current', 'step');
       }
-      if (step === 1) {
+      if (step === active && step === 1) {
         if (state.reelsError) stage.appendChild(detailText(state.reelsError, 'danger'));
-        if (state.reels) stage.appendChild(makeReelsAgentCard());
-        else stage.appendChild(detailText('주제 후보 미연결'));
-      } else if (episode && ((step === 2 && ['producing', 'revising', 'failed'].includes(episode.status))
+        if (batch) stage.appendChild(makeReelsAgentCard());
+        else stage.appendChild(detailText(state.reels ? '오늘 주제 후보를 기다리는 중이야.' : '주제 후보 미연결'));
+      } else if (step === active && episode && ((step === 2 && ['producing', 'revising', 'failed'].includes(episode.status))
         || (step === 3 && ['ready', 'discarded'].includes(episode.status)) || (step === 4 && episode.status === 'approved'))) {
         stage.appendChild(makeReelsEpisodeCard());
-      } else {
+      } else if (step === active) {
         stage.appendChild(detailText(state.reelsEpisodeError || '아직 이 단계의 영상이 없어.'));
       }
       if (step < active) heading.appendChild(svgIcon('ok'));
@@ -2310,6 +2317,14 @@
     state.pushState = pushClient.getState();
     state.showToast = showToast;
     state.container = container;
+    let cycleId = reelsCycle().id;
+    setInterval(() => {
+      const next = reelsCycle().id;
+      if (next === cycleId) return;
+      cycleId = next;
+      releaseReelsMedia();
+      if (['summary', 'reels'].includes(state.mode) && state.container.offsetParent !== null) void refresh();
+    }, 1000);
     state.initialized = true;
   }
 

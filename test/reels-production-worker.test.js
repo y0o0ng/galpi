@@ -315,6 +315,7 @@ test('라우트: 플래그 503, latest는 경로 대신 URL, approve/discard는 
   assert.equal(app.call('GET /api/reels/episodes/latest').body.episode, null);
   const row = await readyEpisode(ctx);
   const { episode } = app.call('GET /api/reels/episodes/latest').body;
+  assert.equal(episode.batchId, '2026-10-03');
   assert.equal(episode.status, 'ready');
   assert.equal(episode.videoUrl, `/api/reels/episodes/${row.id}/video`);
   assert.equal(episode.title, 't1');

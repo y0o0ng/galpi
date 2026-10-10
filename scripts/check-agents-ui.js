@@ -32,7 +32,7 @@ async function main() {
     await page.addScriptTag({ url: `${url}/task-panel.js` });
     await page.addScriptTag({ url: `${url}/agent-panel.js` });
     await page.evaluate(() => {
-      const day = '2026-10-10';
+      const day = new Date(Date.now() - 10 * 3600000).toISOString().slice(0, 10);
       const days = Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${String(i + 5).padStart(2, '0')}`, count: i === 5 ? 2 : 0, isToday: i === 5 }));
       window.fixture = {
         '/api/tasks/summary': { today: day, calendarCenter: day, counts: { overdue: 1, today: 2, upcoming: 5, inbox: 3 }, calendar: [{ days }, { days }, { days }], preview: [{ title: '테스트 마감', bucket: 'overdue' }], nextReminder: null },
@@ -160,6 +160,7 @@ async function main() {
     await page.locator('.agent-rail-entry').filter({ hasText: 'Reels · Shorts' }).click();
     await page.locator('.reels-stage[aria-current="step"]').waitFor();
     assert.equal(await page.locator('.reels-stage').count(), 4);
+    assert.equal(await page.locator('details.reels-stage').count(), 0);
     assert.equal(await page.locator('.reels-stage img[onerror]').count(), 0);
     await snapshotAll('reels-candidates');
     await page.getByRole('button', { name: '이걸로' }).click();
@@ -167,10 +168,12 @@ async function main() {
     for (const status of ['producing', 'revising', 'failed', 'ready', 'approved']) {
       await page.evaluate(status => {
         window.fixture['/api/reels/latest'].batch.status = 'selected';
-        window.fixture['/api/reels/episodes/latest'].episode = { id: 9, candidateId: 7, status, title: 'Fixture episode', caption: '<script>fixture</script>', videoUrl: status === 'ready' || status === 'approved' ? '/api/reels/episodes/9/video' : null, claims: [], revisions: [], attempts: 1, errorCode: status === 'failed' ? 'FIXTURE_FAILURE' : null, uploads: status === 'approved' ? [{ platform: 'youtube', status: 'failed', errorCode: 'FIXTURE_UPLOAD' }, { platform: 'instagram', status: 'done', remoteUrl: 'https://www.instagram.com/reel/fixture/' }] : [] };
+        window.fixture['/api/reels/episodes/latest'].episode = { id: 9, candidateId: 7, batchId: window.fixture['/api/reels/latest'].batch.batchId, status, title: 'Fixture episode', caption: '<script>fixture</script>', videoUrl: status === 'ready' || status === 'approved' ? '/api/reels/episodes/9/video' : null, claims: [], revisions: [], attempts: 1, errorCode: status === 'failed' ? 'FIXTURE_FAILURE' : null, uploads: status === 'approved' ? [{ platform: 'youtube', status: 'failed', errorCode: 'FIXTURE_UPLOAD' }, { platform: 'instagram', status: 'done', remoteUrl: 'https://www.instagram.com/reel/fixture/' }] : [] };
       }, status);
       await refresh();
       const step = await page.locator('.reels-stage[aria-current="step"]').getAttribute('data-step');
+      assert.equal(await page.locator('.reels-stage:not(.active) .reels-episode-card').count(), 0);
+      assert.equal(await page.locator('.reels-stage .reels-check').count(), Number(step) - 1);
       assert.equal(step, ['producing', 'revising', 'failed'].includes(status) ? '2' : status === 'ready' ? '3' : '4');
       assert.equal(await page.getByRole('button', { name: '승인', exact: true }).count(), status === 'ready' ? 1 : 0);
       await snapshotAll(`reels-${status}`);
@@ -193,6 +196,18 @@ async function main() {
     await refresh();
     assert.equal(await page.locator('.agent-rail-entry').count(), 5);
     await page.screenshot({ path: path.join(output, 'phone-dark-source-error.png'), fullPage: true });
+    await page.locator('.agent-rail-entry').filter({ hasText: 'Reels · Shorts' }).click();
+    await page.evaluate(() => {
+      window.fixture['/api/reels/latest'].batch.batchId = '2000-01-01';
+      window.fixture['/api/reels/episodes/latest'].episode.batchId = '2000-01-01';
+    });
+    await refresh();
+    assert.equal(await page.locator('.reels-stage .reels-check').count(), 0);
+    assert.equal(await page.locator('.reels-stage[aria-current="step"]').getAttribute('data-step'), '1');
+    await page.getByText('오늘 주제 후보를 기다리는 중이야.').waitFor();
+    await snapshotAll('reels-new-cycle');
+    await page.getByRole('button', { name: 'Agents로 돌아가기' }).click();
+    await page.locator('.agents-dashboard').waitFor();
     await page.evaluate(() => {
       window.fixture['/api/cards/latest'] = { batch: null };
       window.fixture['/api/cards/jobs/latest'] = { job: { id: 12, status: 'ready', title: 'Fixture card job', images: [], claims: [], caption: 'Fixture caption', finishedAt: 123 } };
