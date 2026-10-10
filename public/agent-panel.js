@@ -39,6 +39,9 @@
     reelsError: '',
     reelsEpisodeError: '',
     returnAgent: null,
+    cards: null,
+    cardJob: null,
+    cardMedia: null,
     reelsEpisode: null,
     reelsMedia: null,
     weatherEnabled: false,
@@ -1052,6 +1055,97 @@
     await refresh();
   }
 
+  function releaseCardMedia() {
+    const media = state.cardMedia; state.cardMedia = null;
+    media?.urls.forEach(url => url && URL.revokeObjectURL(url));
+  }
+
+  function makeCardsAgentCard() {
+    const batch = state.cards?.batch;
+    const block = document.createElement('section');
+    block.className = 'agents-operational-card cards-agent-card';
+    block.appendChild(agentSummaryHead('카드뉴스 에이전트', '최근 일주일 기술 소식에서 한 주제를 골라.',
+      batch ? REELS_STATUS[batch.status] : '후보 없음', refresh));
+    if (!batch) { block.appendChild(agentSummaryMessage('후보는 저녁 7시에 올라와.')); return block; }
+    const open = ['candidate', 'held'].includes(batch.status);
+    const list = document.createElement('div'); list.className = 'reels-cards';
+    batch.cards.forEach(row => {
+      const card = row.candidate;
+      const item = document.createElement('article'); item.className = 'reels-card';
+      const title = document.createElement('p'); title.className = 'reels-card-title'; title.textContent = card.title;
+      item.appendChild(title);
+      for (const text of [`${card.audience === 'general' ? '일반인용' : '실무자용'} · ${card.mode === 'news' ? '뉴스 브리프' : '기술 비교'}`,
+        card.summary, card.reader_question, card.format_reason]) {
+        const line = document.createElement('p'); line.textContent = text; item.appendChild(line);
+      }
+      if (open) item.appendChild(button('이걸로', () => decideReels(`/api/cards/candidates/${row.id}/select`), true));
+      list.appendChild(item);
+    });
+    block.appendChild(list);
+    if (batch.shortageReason) block.appendChild(agentSummaryMessage(batch.shortageReason));
+    if (batch.errorCode) block.appendChild(agentSummaryMessage('후보를 가져오지 못했어. 다음 수집 때 다시 시도해.'));
+    if (open) {
+      const actions = document.createElement('div'); actions.className = 'agent-summary-actions reels-actions';
+      actions.append(button('전부 거절', () => decideReels(`/api/cards/batches/${batch.batchId}/reject`)));
+      if (batch.status === 'candidate') actions.appendChild(button('보류', () => decideReels(`/api/cards/batches/${batch.batchId}/hold`)));
+      block.appendChild(actions);
+    }
+    return block;
+  }
+
+  function makeCardJobCard() {
+    const job = state.cardJob; if (!job) { releaseCardMedia(); return null; }
+    const labels = { queued: '제작 대기', producing: '만드는 중', ready: '승인 대기', failed: '실행 중단', blocked: '수정 필요', approved: '승인됨', discarded: '폐기됨' };
+    const stages = { script: '대본 작성', review: '대본 검토', build: '이미지 조립', 'visual-0': '완성본 검토', 'visual-1': '수정본 검토', 'visual-2': '수정본 검토', 'fix-1': '이미지 수정', 'fix-2': '이미지 수정' };
+    const block = document.createElement('section'); block.className = 'agents-operational-card cards-agent-card';
+    block.appendChild(agentSummaryHead('시온의 원리노트', job.title, labels[job.status] || job.status, refresh));
+    const body = document.createElement('div'); body.className = 'reels-episode-body';
+    if (job.status === 'producing') body.appendChild(agentSummaryMessage(stages[job.stage] || '제작 중이야.'));
+    if (job.images.length) {
+      const holder = document.createElement('div'); holder.className = 'cards-carousel'; holder.tabIndex = 0;
+      holder.setAttribute('aria-label', '카드뉴스 이미지. 옆으로 넘겨 볼 수 있어.');
+      const key = `${job.id}:${job.finishedAt}`;
+      if (state.cardMedia?.key !== key) {
+        releaseCardMedia(); const media = { key, urls: [] }; state.cardMedia = media;
+        media.ready = Promise.all(job.images.map(async (url, i) => {
+          const response = await state.apiFetch(url); if (!response.ok) return;
+          const blob = URL.createObjectURL(await response.blob());
+          if (state.cardMedia !== media) { URL.revokeObjectURL(blob); return; }
+          media.urls[i] = blob;
+        })).catch(() => {});
+      }
+      const media = state.cardMedia;
+      void media.ready.then(() => {
+        if (!holder.isConnected || state.cardMedia !== media) return;
+        media.urls.forEach((url, i) => { if (!url) return; const image = document.createElement('img');
+          image.src = url; image.alt = `${job.title} · ${i+1}장`; image.width = 1080; image.height = 1350; holder.appendChild(image); });
+      });
+      body.appendChild(holder);
+    } else releaseCardMedia();
+    if (job.caption) { const caption = document.createElement('p'); caption.className = 'reels-caption'; caption.textContent = job.caption; body.appendChild(caption); }
+    if (job.claims.length) body.appendChild(reelsClaims(job.claims));
+    const actions = document.createElement('div'); actions.className = 'agent-summary-actions';
+    if (job.status === 'ready') actions.append(button('승인', () => decideReels(`/api/cards/jobs/${job.id}/approve`), true));
+    if (['failed', 'blocked'].includes(job.status)) actions.append(button('다시 시도', () => decideReels(`/api/cards/jobs/${job.id}/retry`)));
+    if (['ready', 'failed', 'blocked', 'queued'].includes(job.status)) actions.append(button('폐기', () => decideReels(`/api/cards/jobs/${job.id}/discard`)));
+    if (job.publishStatus) {
+      const labels = { pending: '게시 대기', uploading: '게시 중', done: '게시 완료', failed: '게시 실패', unknown: '게시 여부 확인 필요' };
+      const line = document.createElement('p'); line.textContent = labels[job.publishStatus]; body.appendChild(line);
+      if (['failed', 'unknown'].includes(job.publishStatus)) body.appendChild(agentSummaryMessage('중복 게시를 막기 위해 자동 재전송하지 않아. Instagram에서 게시 여부를 확인해줘.'));
+      if (job.remoteUrl) { const link = document.createElement('a'); link.href = job.remoteUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Instagram에서 보기'; body.appendChild(link); }
+    }
+    if (job.errorCode) body.appendChild(agentSummaryMessage(`실행이 멈췄어. ${job.errorCode}`));
+    body.appendChild(actions); block.appendChild(body); return block;
+  }
+
+  async function loadCards() {
+    const results = await Promise.allSettled(['/api/cards/latest', '/api/cards/jobs/latest'].map(async url => {
+      const response = await state.apiFetch(url); return response.ok ? response.json() : null;
+    }));
+    state.cards = results[0].status === 'fulfilled' ? results[0].value : null;
+    state.cardJob = results[1].status === 'fulfilled' ? results[1].value?.job || null : null;
+  }
+
   // --- Reels 편 (검토 2) ------------------------------------------------------
   // 캡션·주장·인용·제목·의견·오류는 모델이 만든 비신뢰 문자열이라 전부 textContent로만 넣는다.
   const EPISODE_STATUS = {
@@ -1367,6 +1461,7 @@
 
   function renderSummary() {
     releaseReelsMedia();
+    releaseCardMedia();
     state.container.replaceChildren();
     const layout = document.createElement('div');
     layout.className = 'agents-dashboard';
@@ -1390,7 +1485,10 @@
       : state.reels?.batch ? REELS_STATUS[state.reels.batch.status] : state.reels ? '후보 없음' : '꺼짐';
     content.append(makeAgentRow({ title: 'Reels · Shorts', status: reelsStatus,
       tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' ? 'danger' : episode?.status === 'ready' || state.reels?.batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
-      makeAgentRow({ title: '카드 뉴스', status: '미연결', tone: 'off', onOpen: () => state.showToast('카드 뉴스 제작 기능은 아직 연결되지 않았어.') }));
+      makeAgentRow({ title: '카드 뉴스',
+        status: state.cardJob ? ({ queued: '제작 대기', producing: '만드는 중', ready: '승인 대기', failed: '실행 중단', blocked: '수정 필요', approved: '승인됨', discarded: '폐기됨' }[state.cardJob.status] || '확인 필요')
+          : state.cards?.batch ? REELS_STATUS[state.cards.batch.status] || '확인 필요' : '미연결',
+        tone: ['failed', 'blocked'].includes(state.cardJob?.status) ? 'danger' : state.cardJob?.status === 'ready' ? 'warn' : state.cards || state.cardJob ? 'ok' : 'off', onOpen: openCards }));
     rail.append(heading, makeMailRow(), makeScheduleRow(), makeCodexRow(), content);
     layout.append(board, rail);
     state.container.appendChild(layout);
@@ -1405,7 +1503,12 @@
     const workspace = document.createElement('section');
     workspace.className = 'agent-detail-workspace reels-workspace';
     workspace.appendChild(makeDetailHead('Reels · Shorts', 'Agents로 돌아가기'));
-    const columns = detailColumns([], [detailCard('카드 뉴스', detailText('미연결'))]);
+    const cards = detailCard('카드 뉴스');
+    if (state.cards) cards.appendChild(makeCardsAgentCard());
+    const cardJob = makeCardJobCard();
+    if (cardJob) cards.appendChild(cardJob);
+    if (!state.cards && !cardJob) cards.appendChild(detailText('미연결'));
+    const columns = detailColumns([], [cards]);
     columns.classList.add('reels-workflow-columns');
     const stages = columns.firstElementChild;
     const episode = state.reelsEpisode;
@@ -2063,6 +2166,11 @@
     }
   }
 
+  async function openCards() {
+    await openReels();
+    state.container.querySelector('.reels-workflow-columns > .agent-detail-column:last-child')?.scrollIntoView({ block: 'start' });
+  }
+
   async function openReels() {
     state.mode = 'reels';
     renderReelsDetail();
@@ -2072,6 +2180,7 @@
 
   function openSummary() {
     releaseReelsMedia();
+    releaseCardMedia();
     state.mode = 'summary';
     state.focusReminders = false;
     refresh();
@@ -2141,7 +2250,7 @@
       return;
     }
     if (state.mode === 'reels') {
-      const results = await Promise.allSettled([loadReelsLatest(), loadReelsEpisode()]);
+      const results = await Promise.allSettled([loadReelsLatest(), loadReelsEpisode(), loadCards()]);
       state.reelsError = results[0].status === 'rejected' ? results[0].reason.message : '';
       state.reelsEpisodeError = results[1].status === 'rejected' ? results[1].reason.message : '';
       if (state.mode === 'reels') renderReelsDetail();
@@ -2157,6 +2266,7 @@
       loadMailPreferences(),
       loadReelsLatest(),
       loadReelsEpisode(),
+      loadCards(),
     ]);
     state.scheduleError = scheduleResult.status === 'rejected'
       ? scheduleResult.reason.message

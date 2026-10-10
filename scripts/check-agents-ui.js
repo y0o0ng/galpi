@@ -57,6 +57,7 @@ async function main() {
         const base = route.split('?')[0];
         window.calls.push({ route, ...options });
         if (base === '/api/reels/episodes/9/video') return new Response(window.mediaBlob);
+        if (base.startsWith('/api/cards/') && !window.fixture[base]) return new Response('{}', { status: 404 });
         if (window.apiFailures[base]) return new Response(JSON.stringify({ error: 'fixture unavailable' }), { status: 503 });
         if (options.method === 'PUT' && base === '/api/mail/settings') Object.assign(window.fixture[base].settings, JSON.parse(options.body));
         if (options.method === 'PUT' && base === '/api/settings/codex-models') {
@@ -192,6 +193,17 @@ async function main() {
     await refresh();
     assert.equal(await page.locator('.agent-rail-entry').count(), 5);
     await page.screenshot({ path: path.join(output, 'phone-dark-source-error.png'), fullPage: true });
+    await page.evaluate(() => {
+      window.fixture['/api/cards/latest'] = { batch: null };
+      window.fixture['/api/cards/jobs/latest'] = { job: { id: 12, status: 'ready', title: 'Fixture card job', images: [], claims: [], caption: 'Fixture caption', finishedAt: 123 } };
+    });
+    await refresh();
+    await page.locator('.agent-rail-entry').filter({ hasText: '카드 뉴스' }).click();
+    await page.getByText('시온의 원리노트', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '승인', exact: true }).count(), 1);
+    await page.getByRole('button', { name: '승인', exact: true }).click();
+    assert.ok(await page.evaluate(() => window.calls.some(c => c.route === '/api/cards/jobs/12/approve' && c.method === 'POST')));
+    await snapshotAll('cards-existing-contract');
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(output, 'receipt.json'), JSON.stringify({ viewports: [1440, 820, 390], assertions: 'layout, detail navigation, mail settings/recovery, model versions, Codex fail-close, Reels states/selection/approval/revision/upload retry, XSS text, source isolation, dark', errors, apiCalls: await page.evaluate(() => window.calls) }, null, 2));
     console.log(`Agents browser checks passed; screenshots and receipt: ${output}`);
