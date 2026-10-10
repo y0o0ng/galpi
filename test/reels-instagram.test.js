@@ -12,12 +12,12 @@ const { createReelsEpisodes } = require('../lib/reels/episodes');
 const { createReelsUploads } = require('../lib/reels/uploads');
 const { createReelsProductionWorker } = require('../lib/reels/production-worker');
 const { registerReelsRoutes } = require('../lib/reels/routes');
-const { API_VERSION, checkCaption, createInstagramUploader, createTokenStore, runNextInstagramUpload } = require('../lib/reels/instagram');
+const { API_VERSION, checkCaption, createInstagramUploader, createTokenStore, runNextInstagramUpload, startCloudflared } = require('../lib/reels/instagram');
 
 const T = 1_790_000_000;
 const TOKEN = 'ig-secret-token-value';
 const ENV_TOKEN = 'env-token-value';
-const BASE = 'https://pi.example.ts.net:8443';
+const BASE = 'https://abc-def.trycloudflare.com';
 const CAPTION = '왜 그럴까\n\n설명 한 줄\n#태그';
 
 const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
@@ -31,22 +31,22 @@ function tmp() {
   return { dir, video, cover, root: path.join(dir, 'public-tmp') };
 }
 
-// 가짜 execFile: 호출 인자를 모으고 funnel 기동 때 로컬 포트를 기록한다.
-function fakeExec({ failOn } = {}) {
-  const calls = [];
-  const fn = (cmd, args, opts, cb) => {
-    calls.push([cmd, ...args]);
-    const port = /127\.0\.0\.1:(\d+)/.exec(args.join(' '))?.[1];
-    if (port) fn.port = Number(port);
-    setImmediate(() => cb(failOn?.(args) ? new Error('boom') : null));
+// 가짜 터널: 로컬 포트를 기록하고 시작·종료 횟수를 센다.
+function fakeTunnel({ fail = false } = {}) {
+  const fn = async port => {
+    fn.port = port;
+    fn.started += 1;
+    if (fail) throw Object.assign(new Error('REELS_IG_TUNNEL'), { code: 'REELS_IG_TUNNEL' });
+    return { origin: BASE, stop: () => { fn.stopped += 1; } };
   };
-  fn.calls = calls;
+  fn.started = 0;
+  fn.stopped = 0;
   return fn;
 }
 
-function makeUploader(t, { fetch, execFile = fakeExec(), sleeps = [], publicDnsReady = async () => true } = {}) {
+function makeUploader(t, { fetch, tunnel = fakeTunnel(), sleeps = [], publicDnsReady = async () => true } = {}) {
   return createInstagramUploader({
-    userId: '1789', tokens: { get: () => TOKEN }, publicBaseUrl: `${BASE}/`, tmpRoot: t.root, execFile, fetch,
+    userId: '1789', tokens: { get: () => TOKEN }, tmpRoot: t.root, startTunnel: tunnel, fetch,
     sleep: async ms => { sleeps.push(ms); }, publicDnsReady,
   });
 }
@@ -68,18 +68,9 @@ function igFetch({ statuses = ['FINISHED'], onCreate, create = () => json(200, {
   return fn;
 }
 
-const noServeOr443 = exec => {
-  for (const [cmd, sub, ...rest] of exec.calls) {
-    assert.equal(cmd, 'tailscale');
-    assert.equal(sub, 'funnel'); // serve는 없다
-    assert.ok(rest.includes('--https=8443'), '8443만 쓴다');
-    assert.equal(rest.some(a => /443(?!\d)/.test(a) && a !== '--https=8443'), false);
-  }
-};
-
 test('게시: 컨테이너 필드·상태 폴링·publish·permalink, 임시 서버는 폴더 밖·목록 요청을 거부하고 끝나면 모두 닫힌다', async () => {
   const t = tmp();
-  const exec = fakeExec();
+  const tunnel = fakeTunnel();
   const sleeps = [];
   let served;
   const fetch = igFetch({
@@ -95,7 +86,7 @@ test('게시: 컨테이너 필드·상태 폴링·publish·permalink, 임시 서
       assert.equal(init.headers.authorization, `Bearer ${TOKEN}`);
       // 열려 있는 동안 로컬 서버 동작을 확인한다.
       const token = /\/([0-9a-f]{32})\//.exec(body.get('video_url'))[1];
-      served = `http://127.0.0.1:${exec.port}`;
+      served = `http://127.0.0.1:${tunnel.port}`;
       assert.equal(await (await globalThis.fetch(`${served}/${token}/video.mp4`)).text(), 'VIDEO');
       assert.equal((await globalThis.fetch(`${served}/${token}/video.mp4`, { method: 'HEAD' })).status, 200);
       assert.equal((await globalThis.fetch(`${served}/${token}/`)).status, 404); // 목록 없음
@@ -107,21 +98,18 @@ test('게시: 컨테이너 필드·상태 폴링·publish·permalink, 임시 서
       assert.equal(fs.readdirSync(t.root).length, 1);
     },
   });
-  const result = await makeUploader(t, { fetch, execFile: exec, sleeps }).upload({ videoPath: t.video, caption: CAPTION, coverPath: t.cover });
+  const result = await makeUploader(t, { fetch, tunnel, sleeps }).upload({ videoPath: t.video, caption: CAPTION, coverPath: t.cover });
   assert.deepEqual(result, { mediaId: 'm1', permalink: 'https://www.instagram.com/reel/abc/' });
   assert.equal(fetch.calls[0].url, `https://graph.instagram.com/${API_VERSION}/1789/media`);
   assert.equal(fetch.calls.find(c => c.url.endsWith('/media_publish')).init.body, 'creation_id=c1');
   assert.deepEqual(sleeps, [10_000, 10_000]);
 
-  // funnel on → off 순서, 8443만, serve 없음
-  assert.deepEqual(exec.calls[0].slice(0, 4), ['tailscale', 'funnel', '--bg', '--https=8443']);
-  assert.deepEqual(exec.calls.at(-1), ['tailscale', 'funnel', '--https=8443', 'off']);
-  noServeOr443(exec);
+  assert.deepEqual([tunnel.started, tunnel.stopped], [1, 1]);
   assert.deepEqual(fs.readdirSync(t.root), []); // 임시 폴더 삭제
   await assert.rejects(globalThis.fetch(`${served}/x`)); // 서버 close
 });
 
-test('실패·예외 경로에도 funnel off·서버 close·폴더 삭제가 불린다', async () => {
+test('실패·예외 경로에도 터널 종료·서버 close·폴더 삭제가 불린다', async () => {
   const cases = {
     'HTTP 400': igFetch({ create: () => json(400, { error: { code: 100, error_subcode: 2207026, message: `bad ${TOKEN}` } }) }),
     'ERROR': igFetch({ statuses: ['ERROR'] }),
@@ -131,23 +119,22 @@ test('실패·예외 경로에도 funnel off·서버 close·폴더 삭제가 불
   };
   for (const [name, fetch] of Object.entries(cases)) {
     const t = tmp();
-    const exec = fakeExec();
-    await assert.rejects(makeUploader(t, { fetch, execFile: exec }).upload({ videoPath: t.video, caption: CAPTION, coverPath: t.cover }), error => {
+    const tunnel = fakeTunnel();
+    await assert.rejects(makeUploader(t, { fetch, tunnel }).upload({ videoPath: t.video, caption: CAPTION, coverPath: t.cover }), error => {
       const text = JSON.stringify({ m: error.message, d: error.detail, c: error.code });
       assert.equal(text.includes(TOKEN), false, name);
       assert.equal(text.includes('bad'), false, name); // Meta 메시지 원문 저장 금지
       return true;
     }, name);
-    assert.deepEqual(exec.calls.at(-1), ['tailscale', 'funnel', '--https=8443', 'off'], name);
-    noServeOr443(exec);
+    assert.deepEqual([tunnel.started, tunnel.stopped], [1, 1], name);
     assert.deepEqual(fs.readdirSync(t.root), [], name);
   }
 
-  // funnel을 못 열어도(execFile 실패) 서버·폴더는 정리된다.
+  // 터널을 못 열어도 Meta는 부르지 않고 서버·폴더는 정리된다.
   const t = tmp();
-  const exec = fakeExec({ failOn: args => args.includes('--bg') });
-  await assert.rejects(makeUploader(t, { fetch: igFetch(), execFile: exec }).upload({ videoPath: t.video, caption: CAPTION }));
-  assert.deepEqual(exec.calls.at(-1), ['tailscale', 'funnel', '--https=8443', 'off']);
+  const fetch = igFetch();
+  await assert.rejects(makeUploader(t, { fetch, tunnel: fakeTunnel({ fail: true }) }).upload({ videoPath: t.video, caption: CAPTION }), { code: 'REELS_IG_TUNNEL' });
+  assert.equal(fetch.calls.length, 0);
   assert.deepEqual(fs.readdirSync(t.root), []);
 });
 
@@ -175,7 +162,7 @@ test('상태 폴링: ERROR/EXPIRED는 실패, 10분(60회) 넘으면 시간 초�
   assert.equal(fetch.calls.some(c => c.url.endsWith('/media_publish')), false);
 });
 
-test('공개 DNS에 이름이 뜨기 전에는 Meta를 부르지 않고, 10분 넘으면 재시도 가능한 실패로 funnel을 끈다', async () => {
+test('공개 DNS에 이름이 뜨기 전에는 Meta를 부르지 않고, 10분 넘으면 재시도 가능한 실패로 터널을 닫는다', async () => {
   const t = tmp();
   const sleeps = [];
   const hosts = [];
@@ -188,18 +175,18 @@ test('공개 DNS에 이름이 뜨기 전에는 Meta를 부르지 않고, 10분 �
     return ++checks >= 3;
   };
   await makeUploader(t, { fetch, sleeps, publicDnsReady }).upload({ videoPath: t.video, caption: CAPTION });
-  assert.deepEqual(hosts, Array(3).fill('pi.example.ts.net'));
+  assert.deepEqual(hosts, Array(3).fill('abc-def.trycloudflare.com'));
   assert.deepEqual(sleeps.slice(0, 2), [10_000, 10_000]);
 
   const t2 = tmp();
-  const exec = fakeExec();
+  const tunnel = fakeTunnel();
   const fetch2 = igFetch();
   await assert.rejects(
-    makeUploader(t2, { fetch: fetch2, execFile: exec, publicDnsReady: async () => false }).upload({ videoPath: t2.video, caption: CAPTION }),
+    makeUploader(t2, { fetch: fetch2, tunnel, publicDnsReady: async () => false }).upload({ videoPath: t2.video, caption: CAPTION }),
     { code: 'REELS_IG_PUBLIC_DNS_TIMEOUT', retryable: true },
   );
   assert.equal(fetch2.calls.length, 0);
-  assert.deepEqual(exec.calls.at(-1), ['tailscale', 'funnel', '--https=8443', 'off']);
+  assert.equal(tunnel.stopped, 1);
   assert.deepEqual(fs.readdirSync(t2.root), []);
 });
 
@@ -227,19 +214,49 @@ test('permalink를 못 읽어도 게시는 성공이고, 캡션 한도는 게시
   assert.throws(() => checkCaption(Array.from({ length: 31 }, (_, i) => `#t${i}`).join(' ')), { code: 'REELS_IG_TOO_MANY_HASHTAGS' });
   assert.throws(() => checkCaption(Array.from({ length: 21 }, (_, i) => `@u${i}`).join(' ')), { code: 'REELS_IG_TOO_MANY_MENTIONS' });
   const fetch = igFetch();
-  const exec = fakeExec();
-  await assert.rejects(makeUploader(t, { fetch, execFile: exec }).upload({ videoPath: t.video, caption: '' }), { code: 'REELS_IG_CAPTION_EMPTY' });
-  assert.equal(exec.calls.length, 0); // 검사에서 막히면 funnel도 안 연다
+  const tunnel = fakeTunnel();
+  await assert.rejects(makeUploader(t, { fetch, tunnel }).upload({ videoPath: t.video, caption: '' }), { code: 'REELS_IG_CAPTION_EMPTY' });
+  assert.equal(tunnel.started, 0); // 검사에서 막히면 터널도 안 연다
 });
 
-test('기동 정리: 남은 임시 폴더를 지우고 8443 funnel을 끈다(실패는 무시)', async () => {
+test('기동 정리: 남은 임시 폴더를 지운다', async () => {
   const t = tmp();
   fs.mkdirSync(path.join(t.root, 'leftover'), { recursive: true });
   fs.writeFileSync(path.join(t.root, 'leftover', 'x'), '1');
-  const exec = fakeExec({ failOn: () => true });
-  await makeUploader(t, { fetch: igFetch(), execFile: exec }).cleanup();
-  assert.deepEqual(exec.calls, [['tailscale', 'funnel', '--https=8443', 'off']]);
+  await makeUploader(t, { fetch: igFetch() }).cleanup();
   assert.deepEqual(fs.readdirSync(t.root), []);
+});
+
+// cloudflared를 실제로 띄우지 않는다. spawn을 가짜로 바꿔 stderr 출력만 흉내 낸다.
+function fakeCloudflared(lines, { exitEarly = false } = {}) {
+  const { EventEmitter } = require('node:events');
+  const spawn = (bin, args) => {
+    const child = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = signal => { spawn.killed = signal; };
+    spawn.call = [bin, ...args];
+    setImmediate(() => {
+      for (const line of lines) child.stderr.emit('data', Buffer.from(`${line}\n`));
+      if (exitEarly) child.emit('exit', 1);
+    });
+    return child;
+  };
+  return spawn;
+}
+
+test('cloudflared: 주소와 연결 등록을 둘 다 본 뒤에 열리고, 주소 전에 끝나면 재시도 가능한 실패다', async () => {
+  const spawn = fakeCloudflared([
+    'INF |  https://abc-def.trycloudflare.com  |',
+    'INF Registered tunnel connection connIndex=0',
+  ]);
+  const tunnel = await startCloudflared(4321, { bin: '/x/cloudflared', spawn });
+  assert.equal(tunnel.origin, 'https://abc-def.trycloudflare.com');
+  assert.deepEqual(spawn.call, ['/x/cloudflared', 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:4321']);
+  tunnel.stop();
+  assert.equal(spawn.killed, 'SIGTERM');
+
+  const early = fakeCloudflared(['INF |  https://abc-def.trycloudflare.com  |'], { exitEarly: true });
+  await assert.rejects(startCloudflared(1, { spawn: early }), { code: 'REELS_IG_TUNNEL', retryable: true });
 });
 
 // ── 토큰 ──────────────────────────────────────────────────────────────────────
@@ -460,11 +477,11 @@ test('서버 연결·설정 계약: 플래그 기본 false, .env.example 이름�
   const env = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
   assert.match(env, /^REELS_INSTAGRAM_UPLOAD_ENABLED=false$/m);
   for (const name of ['USER_ID', 'ACCESS_TOKEN', 'TOKEN_FILE']) assert.match(env, new RegExp(`^REELS_INSTAGRAM_${name}=$`, 'm'));
-  assert.match(env, /^REELS_PUBLIC_BASE_URL=$/m);
+  assert.match(env, /^REELS_CLOUDFLARED_BIN=$/m);
   assert.match(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), /^reels\/public-tmp\/$/m);
   const panel = fs.readFileSync(path.join(root, 'public/agent-panel.js'), 'utf8');
   assert.match(panel.slice(panel.indexOf('function reelsUploadLines'), panel.indexOf('function makeReelsEpisodeCard')), /youtu\\\.be\|www\\\.instagram\\\.com/);
-  // tailscale·funnel 코드는 instagram.js에만 있다.
+  // 옛 funnel 코드가 다른 파일로 새지 않았다.
   for (const file of ['server.js', 'lib/reels/routes.js', 'lib/reels/production-worker.js', 'lib/reels/uploads.js']) {
     assert.doesNotMatch(fs.readFileSync(path.join(root, file), 'utf8'), /tailscale|funnel/i, file);
   }

@@ -1062,7 +1062,7 @@ const reelsInstagramUploader = REELS_INSTAGRAM_UPLOAD_ENABLED
       tokenFile: process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE,
       envToken: process.env.REELS_INSTAGRAM_ACCESS_TOKEN,
     }),
-    publicBaseUrl: process.env.REELS_PUBLIC_BASE_URL,
+    cloudflaredBin: process.env.REELS_CLOUDFLARED_BIN || undefined,
     tmpRoot: path.join(__dirname, 'reels', 'public-tmp'),
   })
   : null;
