@@ -1209,11 +1209,14 @@
     batch.cards.forEach(card => {
       const item = document.createElement('article');
       item.className = 'reels-card';
-      const title = document.createElement('a');
+      // 유입용 카드는 원문이 없어 링크 대신 글자로 둔다.
+      const title = document.createElement(card.url ? 'a' : 'p');
       title.className = 'reels-card-title';
-      title.href = card.url;
-      title.target = '_blank';
-      title.rel = 'noopener noreferrer';
+      if (card.url) {
+        title.href = card.url;
+        title.target = '_blank';
+        title.rel = 'noopener noreferrer';
+      }
       title.textContent = card.title;
       const lines = [card.why, card.everydayDoor && `일상의 문: ${card.everydayDoor}`,
         `${card.concept}: ${card.bridge}`, `${card.template} · ${card.hookParadox} / ${card.hookTerm} / ${card.hookSubtitle}`, `위험·불확실: ${card.risk}`]

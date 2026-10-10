@@ -42,7 +42,8 @@ function card(name) {
   };
 }
 
-const CARDS = ['a', 'b', 'c'].map(card);
+// 세 번째는 뉴스 없는 유입용 카드다.
+const CARDS = [card('a'), card('b'), { ...card('c'), url: '', published_at: '없음' }];
 const ITEMS = ['a', 'b', 'c'].map(name => ({
   source: 'S', title: `title ${name}`, url: `https://example.com/${name}`, published_at: '', summary: '',
 }));
