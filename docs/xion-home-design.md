@@ -172,6 +172,7 @@ Desktop은 큰 데이터 보드(800px 기준) + 오른쪽 상태 레일, Pad는 
 Phone은 압축형 2열 상태 카드가 위에 오고 데이터 보드가 아래에 온다.
 Mail·일정·Codex·Reels/Shorts 진입은 기존 상세 컨트롤러와 API를 사용한다.
 
+- 데이터 보드는 설명 헤더 없이 그래프부터 표시한다. 우상단에 `인스타그램`과 작은 색상 범례를 두고, 집계 기준·조회 시각은 접힌 일별 데이터 안에서 확인한다. 그래프 높이는 최대 220px로 제한해 아래 YouTube 영역을 확보한다.
 - Instagram 조회수는 `/api/reels/instagram/insights`로 계정 전체 Reels(수동 게시 포함)의
   최근 7개 Meta 집계일을 조회한다. `views`의 `media_product_type=REEL`만 사용한다.
   Meta의 `reach` 일별 응답에서 경계 `end_time`만 읽고, 조회수는 각 인접 경계 사이의
