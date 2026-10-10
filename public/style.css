@@ -6117,20 +6117,17 @@ a.reels-claim-source { text-decoration: underline; }
 
 .cards-agent-card .reels-episode-body { min-width: 0; }
 
-.instagram-insights { min-width: 0; padding: 0 0 8px; }
+:is(.instagram-insights, .youtube-insights) { min-width: 0; padding: 0 0 8px; }
 .instagram-chart-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.instagram-insights h4 { margin: 0; font-size: 16px; font-weight: 600; order: 1; flex-shrink: 0; }
-.instagram-insights p { font-size: 12px; line-height: 1.6; }
-.instagram-insights svg { display: block; width: 100%; max-height: 220px; margin: 6px 0 0; }
-.instagram-insights summary { cursor: pointer; min-height: 44px; line-height: 44px; font-size: 12px; }
-.instagram-insights table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.instagram-insights :is(th, td) { text-align: left; padding: 9px 0; border-bottom: 1px solid var(--hairline); }
-.instagram-insights :is(th, td):last-child { text-align: right; }
+:is(.instagram-insights, .youtube-insights) h4 { margin: 0; font-size: 16px; font-weight: 600; order: 1; flex-shrink: 0; }
+:is(.instagram-insights, .youtube-insights) p { font-size: 12px; line-height: 1.6; }
+:is(.instagram-insights, .youtube-insights) svg { display: block; width: 100%; max-height: 220px; margin: 6px 0 0; }
 
-@media (max-width: 900px) { .instagram-insights svg text { font-size: 12px; } }
+@media (max-width: 900px) { :is(.instagram-insights, .youtube-insights) svg text { font-size: 12px; } }
 
-.instagram-insights .instagram-series-legend { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px 12px; font-size: 10px; line-height: 1.4; }
+:is(.instagram-insights, .youtube-insights) .instagram-series-legend { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px 12px; font-size: 10px; line-height: 1.4; }
 .instagram-series-legend span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; background: currentColor; }
 .instagram-series-legend span:first-child { color: var(--brand); }
 .instagram-series-legend span:last-child { color: var(--council); }
-.instagram-insights table td { overflow-wrap: anywhere; }
+
+.youtube-insights { border-top: 1px solid var(--hairline); padding-top: 16px; }

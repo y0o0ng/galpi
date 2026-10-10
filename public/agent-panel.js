@@ -14,6 +14,9 @@
     instagramInsights: null,
     instagramInsightsError: '',
     instagramInsightsLoading: false,
+    youtubeInsights: null,
+    youtubeInsightsError: '',
+    youtubeInsightsLoading: false,
     mode: 'summary',
     summary: null,
     reminders: [],
@@ -1464,48 +1467,53 @@
     return wrapper;
   }
 
-  function makeInstagramChart() {
+  function makePerformanceChart(platform) {
+    const youtube = platform === 'youtube';
+    const error = youtube ? state.youtubeInsightsError : state.instagramInsightsError;
+    const loading = youtube ? state.youtubeInsightsLoading : state.instagramInsightsLoading;
     const section = document.createElement('section');
-    section.className = 'instagram-insights';
+    section.className = youtube ? 'youtube-insights' : 'instagram-insights';
     const title = document.createElement('h4');
-    title.textContent = '인스타그램';
+    title.textContent = youtube ? '유튜브' : '인스타그램';
     const header = document.createElement('div'); header.className = 'instagram-chart-header';
     header.appendChild(title); section.appendChild(header);
-    const data = state.instagramInsights;
+    const data = youtube ? state.youtubeInsights : state.instagramInsights;
     if (!data || data.status === 'disconnected') {
-      section.appendChild(detailText(state.instagramInsightsError || (state.instagramInsightsLoading ? '인스타 조회수를 불러오는 중이야.' : '데이터 미연결')));
+      section.appendChild(detailText(error || (loading ? '조회수를 불러오는 중이야.' : '데이터 미연결')));
       return section;
     }
-    if (state.instagramInsightsError || data.status === 'stale') section.appendChild(detailText('지금 조회하지 못해 마지막 조회 결과를 표시해.', 'danger'));
+    if (error || data.status === 'stale') section.appendChild(detailText('지금 조회하지 못해 마지막 조회 결과를 표시해.', 'danger'));
     const dayLabel = at => new Date(at * 1000).toISOString().slice(0, 10);
-    const points = (data.points || []).map(point => ({ ...point, day: dayLabel(point.endAt) }));
-    const latestFollower = data.followers?.latest;
-    if (latestFollower && (!points.length || latestFollower.observedAt >= points[points.length - 1].endAt)) {
-      const day = dayLabel(latestFollower.observedAt + 9 * 3600);
+    const points = (data.points || []).map(point => ({ ...point, day: youtube ? point.day : dayLabel(point.endAt), followers: youtube ? point.subscribers : point.followers }));
+    const followerData = youtube ? data.subscribers : data.followers;
+    const latestFollower = followerData?.latest;
+    if (latestFollower && (youtube || !points.length || latestFollower.observedAt >= points[points.length - 1].endAt)) {
+      const day = youtube ? latestFollower.day : dayLabel(latestFollower.observedAt + 9 * 3600);
       const sameDay = points.find(point => point.day === day);
       if (sameDay) sameDay.followers = latestFollower;
-      else points.push({ startAt: null, endAt: latestFollower.observedAt, day, views: null, followers: latestFollower, observationOnly: true });
+      else if (!points.length || day > points[points.length - 1].day) points.push({ startAt: null, endAt: latestFollower.observedAt, day, views: null, followers: latestFollower, observationOnly: true });
     }
     const legend = document.createElement('p');
     legend.className = 'instagram-series-legend';
     const viewsLegend = document.createElement('span'); viewsLegend.textContent = '조회수 (회)';
-    const followersLegend = document.createElement('span'); followersLegend.textContent = '팔로워 (명)';
+    const followersLegend = document.createElement('span'); followersLegend.textContent = youtube ? '구독자 (명·유튜브 제공)' : '팔로워 (명)';
     legend.append(viewsLegend, followersLegend); header.appendChild(legend);
-    if (data.followers?.status === 'unavailable') section.appendChild(detailText('팔로워 조회·기록 실패. 저장된 관측값만 표시해.', 'danger'));
-    else if (!latestFollower) section.appendChild(detailText('팔로워 기록 전 · 과거 총수는 미제공'));
+    if (followerData?.status === 'unavailable') section.appendChild(detailText(youtube ? '구독자 조회·기록 실패. 저장된 관측값만 표시해.' : '팔로워 조회·기록 실패. 저장된 관측값만 표시해.', 'danger'));
+    else if (!latestFollower) section.appendChild(detailText(youtube ? '구독자 기록 전 · 과거 총수는 미제공' : '팔로워 기록 전 · 과거 총수는 미제공'));
     if (!points.some(point => point.views !== null || point.followers)) {
-      section.appendChild(detailText('인스타가 아직 일별 Reels 조회수를 반환하지 않았어.'));
+      section.appendChild(detailText(youtube ? '유튜브가 아직 일별 Shorts 조회수를 반환하지 않았어.' : '인스타가 아직 일별 Reels 조회수를 반환하지 않았어.'));
       return section;
     }
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 560 200');
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', '조회수와 관측한 팔로워 총수의 추세선. 조회수는 왼쪽 축, 팔로워는 오른쪽 축이며 정확한 구간과 관측 시각은 아래 표에서 확인할 수 있어.');
+    svg.setAttribute('aria-label', youtube ? '채널 전체 Shorts 조회수는 왼쪽 축, 누적 구독자는 오른쪽 축. YouTube 집계일(미국 태평양 시간) 기준. 구독자는 API에서 유효 숫자 세 자리로 내림한 관측 총수.' : '계정 전체 Reels 조회수는 왼쪽 축, 누적 팔로워는 오른쪽 축. 조회수는 Meta 집계 종료일, 최신 팔로워는 한국 시간 관측일 기준.');
     const draw = (tag, attrs, text) => {
       const node = document.createElementNS(svg.namespaceURI, tag);
       Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
       if (text !== undefined) node.textContent = text;
       svg.appendChild(node);
+      return node;
     };
     const axisMax = value => {
       const step = 10 ** Math.floor(Math.log10(Math.max(1, value)));
@@ -1533,28 +1541,16 @@
         trend += `${connected ? 'L' : 'M'}${x},${y} `; connected = true;
       });
       draw('path', { class: `${series}-trend`, d: trend, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
-      coordinates.forEach(({ value, x, y }) => {
+      coordinates.forEach(({ value, x, y }, index) => {
         if (value === null) return;
-        draw('circle', { class: `${series}-point`, cx: x, cy: y, r: 3, fill: color });
+        const dot = draw('circle', { class: `${series}-point`, cx: x, cy: y, r: 3, fill: color });
+        const tooltip = document.createElementNS(svg.namespaceURI, 'title');
+        tooltip.textContent = `${points[index].day} · ${series === 'views' ? '조회수' : youtube ? '구독자' : '팔로워'} ${value.toLocaleString('ko-KR')}${series === 'views' ? '회' : '명'}`;
+        dot.appendChild(tooltip);
       });
     });
     points.forEach((point, index) => draw('text', { x: 40 + width * (index + .5), y: 184, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 10 }, point.day.slice(5).replace('-', '/')));
     section.appendChild(svg);
-    const details = document.createElement('details');
-    const summary = document.createElement('summary'); summary.textContent = '일별 데이터';
-    const table = document.createElement('table');
-    const head = document.createElement('tr');
-    ['집계 구간 (UTC)', '조회수', '팔로워 총수 · 관측 (UTC)'].forEach(label => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = label; head.appendChild(th); });
-    const thead = document.createElement('thead'); thead.appendChild(head); table.appendChild(thead);
-    const body = document.createElement('tbody');
-    const format = at => new Date(at * 1000).toISOString().slice(5, 16).replace('T', ' ');
-    points.forEach(point => {
-      const row = document.createElement('tr');
-      [point.observationOnly ? `${point.day} 관측` : `${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'), point.followers ? `${point.followers.total.toLocaleString('ko-KR')}명 · ${format(point.followers.observedAt)}` : '미제공'].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
-      body.appendChild(row);
-    });
-    table.appendChild(body); details.append(summary, detailText('조회수: 계정 전체 Reels · Meta 집계 종료일. 최신 팔로워: 한국 시간 관측일에 표시.'), table); section.appendChild(details);
-    details.appendChild(detailText(`조회 시각: ${new Date(data.fetchedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
     return section;
   }
 
@@ -1568,6 +1564,16 @@
     } finally { state.instagramInsightsLoading = false; }
   }
 
+  async function loadYoutubeInsights() {
+    state.youtubeInsightsLoading = true;
+    try {
+      const response = await state.apiFetch('/api/reels/youtube/insights');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '유튜브 성과를 불러오지 못했어.');
+      state.youtubeInsights = data;
+    } finally { state.youtubeInsightsLoading = false; }
+  }
+
   function renderSummary() {
     releaseReelsMedia();
     releaseCardMedia();
@@ -1577,7 +1583,7 @@
     const board = document.createElement('section');
     board.className = 'agent-detail-card agents-data-board';
     board.setAttribute('aria-label', '성과 추세');
-    board.append(makeInstagramChart(), detailText('YouTube Shorts · 데이터 미연결'));
+    board.append(makePerformanceChart('instagram'), makePerformanceChart('youtube'));
     const rail = document.createElement('nav');
     rail.className = 'agents-status-rail';
     rail.setAttribute('aria-label', '에이전트 현황');
@@ -2390,7 +2396,7 @@
       return;
     }
     renderLoading();
-    const performance = Promise.allSettled([loadInstagramInsights()]);
+    const performance = Promise.allSettled([loadInstagramInsights(), loadYoutubeInsights()]);
     // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
     const [scheduleResult, codexResult, mailResult, , , reelsResult, episodeResult] = await Promise.allSettled([
       state.enabled ? loadAgentData() : Promise.resolve(false),
@@ -2414,8 +2420,9 @@
     state.reelsError = reelsResult.status === 'rejected' ? reelsResult.reason.message : '';
     state.reelsEpisodeError = episodeResult.status === 'rejected' ? episodeResult.reason.message : '';
     if (state.mode === 'summary') renderSummary();
-    const [instagramResult] = await performance;
+    const [instagramResult, youtubeResult] = await performance;
     state.instagramInsightsError = instagramResult.status === 'rejected' ? instagramResult.reason.message : '';
+    state.youtubeInsightsError = youtubeResult.status === 'rejected' ? youtubeResult.reason.message : '';
     if (state.mode === 'summary') renderSummary();
   }
 

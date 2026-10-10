@@ -78,6 +78,7 @@ const { createReelsEpisodes } = require('./lib/reels/episodes');
 const { createReelsProductionWorker } = require('./lib/reels/production-worker');
 const { createReelsUploads } = require('./lib/reels/uploads');
 const { createYoutubeUploader, resolvePrivacy: resolveYoutubePrivacy } = require('./lib/reels/youtube');
+const { createYoutubeInsightsService } = require('./lib/reels/youtube-insights');
 const { createInstagramUploader, createTokenStore: createInstagramTokenStore, DEFAULT_TOKEN_FILE: INSTAGRAM_TOKEN_FILE } = require('./lib/reels/instagram');
 const {
   buildReelsPushPayload,
@@ -1056,6 +1057,10 @@ const reelsYoutubeUploader = REELS_YOUTUBE_UPLOAD_ENABLED
     thumbnail: process.env.REELS_YOUTUBE_THUMBNAIL === 'true',
   })
   : null;
+const reelsYoutubeInsights = createYoutubeInsightsService({
+  credentials: { clientId: process.env.REELS_YOUTUBE_CLIENT_ID, clientSecret: process.env.REELS_YOUTUBE_CLIENT_SECRET, refreshToken: process.env.REELS_YOUTUBE_REFRESH_TOKEN },
+  subscriberDir: path.dirname(process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE),
+});
 const reelsInstagramTokens = createInstagramTokenStore({
   tokenFile: process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE,
   envToken: process.env.REELS_INSTAGRAM_ACCESS_TOKEN,
@@ -4779,7 +4784,7 @@ registerNewsRoutes({
 });
 
 registerReelsRoutes({
-  app, store: reelsStore, episodes: reelsEpisodes, uploads: reelsUploads, instagramInsights: reelsInstagramInsights,
+  app, store: reelsStore, episodes: reelsEpisodes, uploads: reelsUploads, instagramInsights: reelsInstagramInsights, youtubeInsights: reelsYoutubeInsights,
   onRevise: () => { void reelsProductionWorker?.tick(); },
   onUpload: () => { void reelsProductionWorker?.tickUpload(); },
   config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, youtubeUploadEnabled: REELS_YOUTUBE_UPLOAD_ENABLED, instagramUploadEnabled: REELS_INSTAGRAM_UPLOAD_ENABLED, reelsDir: path.join(__dirname, 'reels') },
@@ -8527,6 +8532,7 @@ const httpServer = app.listen(PORT, HOST, () => {
   }
   if (reelsPushDispatcher) reelsPushDispatcher.start();
   reelsInstagramInsights.start();
+  reelsYoutubeInsights.start();
   if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
     console.log('   뉴스:     홈 노출 꺼짐 (문턱 미확정, NEWS_SURFACE_ENABLED)');
   }
@@ -8601,6 +8607,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     reelsProductionWorker?.stop();
     reelsPushDispatcher?.stop();
     reelsInstagramInsights.stop();
+    reelsYoutubeInsights.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {

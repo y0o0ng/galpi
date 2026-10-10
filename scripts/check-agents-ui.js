@@ -46,6 +46,7 @@ async function main() {
         '/api/reels/episodes/latest': { episode: null },
         '/api/tasks': { tasks: [], counts: {} },
         '/api/reels/instagram/insights': { status: 'disconnected', points: [] },
+        '/api/reels/youtube/insights': { status: 'disconnected', points: [] },
       };
       const canvas = document.createElement('canvas'); canvas.width = 80; canvas.height = 120;
       const stream = canvas.captureStream(20);
@@ -116,7 +117,7 @@ async function main() {
       assert.equal(geometry.overflow, false, name);
       if (width > 600) assert.ok(geometry.rail.x > geometry.board.x + geometry.board.width - 1, name);
       else assert.ok(geometry.board.y > geometry.rail.y, name);
-      assert.equal(await page.getByText('데이터 미연결', { exact: true }).count(), 1);
+      assert.equal(await page.getByText('데이터 미연결', { exact: true }).count(), 2);
       assert.equal(await page.getByText('미연결', { exact: true }).count(), 1);
       await page.screenshot({ path: path.join(output, `${name}-main.png`), fullPage: true });
       for (const label of ['Mail 에이전트', '일정 에이전트', '사서 Codex']) {
@@ -151,9 +152,8 @@ async function main() {
     assert.equal((await page.locator('.followers-trend').getAttribute('d')).match(/M/g).length, 2);
     assert.equal(await page.locator('.followers-point').count(), 2);
     assert.notEqual(await page.locator('.followers-trend').getAttribute('stroke'), await page.locator('.views-trend').getAttribute('stroke'));
-    assert.equal(await page.locator('.instagram-insights tbody tr').nth(1).locator('td').nth(1).textContent(), '미제공');
-    await page.locator('.instagram-insights summary').click();
-    assert.equal(await page.locator('.instagram-insights tbody tr').count(), 3);
+    assert.equal(await page.locator('.instagram-insights details').count(), 0);
+    assert.ok((await page.locator('.instagram-insights circle title').first().textContent()).includes('1,234'));
     await snapshotAll('instagram-ready');
     await page.evaluate(() => { window.apiFailures['/api/reels/instagram/insights'] = true; });
     await refresh();
@@ -169,8 +169,8 @@ async function main() {
     await refresh();
     assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
     assert.equal(await page.locator('.agents-data-board > h3').count(), 0);
-    assert.equal(await page.locator('.instagram-chart-header h4').textContent(), '인스타그램');
-    assert.equal(await page.locator('.instagram-chart-header .instagram-series-legend span').count(), 2);
+    assert.equal(await page.locator('.instagram-insights .instagram-chart-header h4').textContent(), '인스타그램');
+    assert.equal(await page.locator('.instagram-insights .instagram-chart-header .instagram-series-legend span').count(), 2);
     assert.ok(await page.locator('.instagram-insights svg').evaluate(el => el.getBoundingClientRect().height <= 220));
     assert.equal((await page.locator('.views-trend').getAttribute('d')).match(/L/g).length, 6);
     assert.equal(await page.locator('.instagram-insights rect').count(), 0);
@@ -183,7 +183,7 @@ async function main() {
     assert.equal((await page.locator('.followers-trend').getAttribute('d')).includes('L'), false);
     assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
     assert.equal(await page.getByText('현재', { exact: true }).count(), 0);
-    assert.equal(await page.locator('.instagram-insights tbody tr').count(), 7);
+    assert.equal(await page.locator('.instagram-insights details').count(), 0);
     assert.equal(await page.locator('.followers-point').getAttribute('cx'), await page.locator('.views-point').last().getAttribute('cx'));
     assert.equal(await page.locator('.chart-grid').count(), 5);
     assert.equal(await page.locator('.chart-axis').count(), 2);
@@ -192,16 +192,33 @@ async function main() {
     await snapshotAll('instagram-seven-days');
     for (const width of [1440, 820, 390]) {
       await page.setViewportSize({ width, height: 1100 });
-      assert.ok(await page.locator('.instagram-chart-header').evaluate(el => el.querySelector('.instagram-series-legend').getBoundingClientRect().right < el.querySelector('h4').getBoundingClientRect().left));
+      assert.ok(await page.locator('.instagram-insights .instagram-chart-header').evaluate(el => el.querySelector('.instagram-series-legend').getBoundingClientRect().right < el.querySelector('h4').getBoundingClientRect().left));
     }
     await page.evaluate(() => { window.fixture['/api/reels/instagram/insights'].followers.latest.observedAt = Date.parse('2026-10-10T15:01:00Z') / 1000; });
     await refresh();
-    assert.equal(await page.locator('.instagram-insights tbody tr').count(), 8);
+    assert.equal(await page.locator('.instagram-insights svg text:not(.chart-tick)').count(), 8);
     assert.equal(await page.locator('.instagram-insights svg text:not(.chart-tick)').last().textContent(), '10/11');
-    assert.equal(await page.locator('.instagram-insights tbody tr').last().locator('td').nth(1).textContent(), '미제공');
+    assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
     await page.evaluate(() => { window.fixture['/api/reels/instagram/insights'].followers.latest.observedAt = 1791633069; });
     await refresh();
 
+    await page.evaluate(() => {
+      window.fixture['/api/reels/youtube/insights'] = { status: 'ready', basis: 'youtube_day', subscribers: { status: 'ready', latest: { day: '2026-10-10', observedAt: 1791633069, total: 23 } }, points: [
+        { day: '2026-10-07', views: 12 }, { day: '2026-10-08', views: null }, { day: '2026-10-09', views: 0 }, { day: '2026-10-10', views: 18, subscribers: { observedAt: 1791633069, total: 23 } },
+      ] };
+    });
+    await refresh();
+    assert.equal(await page.locator('.youtube-insights .views-point').count(), 3);
+    assert.equal(await page.locator('.youtube-insights .followers-point').count(), 1);
+    assert.equal(await page.locator('.youtube-insights details').count(), 0);
+    assert.equal(await page.locator('.youtube-insights h4').textContent(), '유튜브');
+    assert.equal(await page.locator('.youtube-insights .followers-point').getAttribute('cx'), await page.locator('.youtube-insights .views-point').last().getAttribute('cx'));
+    await snapshotAll('two-platforms');
+    await page.evaluate(() => { window.apiFailures['/api/reels/youtube/insights'] = true; });
+    await refresh();
+    assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
+    assert.equal(await page.locator('.youtube-insights .views-point').count(), 3);
+    await page.evaluate(() => { delete window.apiFailures['/api/reels/youtube/insights']; });
     await page.locator('.agent-rail-entry').filter({ hasText: '일정 에이전트' }).click();
     await page.getByRole('button', { name: '전체 일정', exact: true }).click();
     await page.locator('#agent-task-content .task-view-tabs').waitFor();
