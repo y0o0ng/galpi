@@ -36,6 +36,9 @@
     mailPreferenceSaving: false,
     news: null,
     reels: null,
+    reelsError: '',
+    reelsEpisodeError: '',
+    returnAgent: null,
     reelsEpisode: null,
     reelsMedia: null,
     weatherEnabled: false,
@@ -264,109 +267,85 @@
     }
   }
 
+  function codexCanRun() {
+    return !state.codexError && state.codex?.runner?.ok === true
+      && state.organize?.runner?.ok === true && Number(state.organize.recoveryRequired) === 0;
+  }
+
+  function detailCard(titleText, ...children) {
+    const section = document.createElement('section');
+    section.className = 'agent-detail-card';
+    const title = document.createElement('h3');
+    title.textContent = titleText;
+    section.append(title, ...children);
+    return section;
+  }
+
+  function detailText(text, tone = '') {
+    const line = document.createElement('p');
+    line.className = `codex-agent-message ${tone}`;
+    line.textContent = text;
+    return line;
+  }
+
+  function detailColumns(left, right) {
+    const grid = document.createElement('div');
+    grid.className = 'agent-detail-columns';
+    for (const cards of [left, right]) {
+      const column = document.createElement('div');
+      column.className = 'agent-detail-column';
+      column.append(...cards);
+      grid.appendChild(column);
+    }
+    return grid;
+  }
+
   function makeCodexBlock() {
     const block = document.createElement('section');
-    block.className = 'codex-agent-block';
-    const head = document.createElement('div');
-    head.className = 'schedule-agent-head';
-    const title = document.createElement('div');
-    const kicker = document.createElement('span');
-    kicker.className = 'schedule-agent-kicker';
-    kicker.textContent = 'CODEX LIBRARIAN';
-    const heading = document.createElement('h2');
-    heading.textContent = '사서 Codex';
-    title.append(kicker, heading);
-    const status = document.createElement('span');
-    status.className = 'schedule-agent-status';
-    status.textContent = state.codex?.runner?.ok ? 'CLI 정상' : 'CLI 확인 필요';
-    status.classList.toggle('danger', state.codex?.runner?.ok !== true);
-    head.append(title, status);
-
-    const description = document.createElement('p');
-    description.className = 'codex-agent-description';
-    description.textContent = '노트 정리와 연결을 담당해. 변경은 실행 중 작업이 아니라 다음 작업부터 적용돼.';
-    block.append(head, description);
-
+    block.className = 'agent-detail-body codex-detail';
     if (!state.codex) {
-      const error = document.createElement('p');
-      error.className = 'codex-agent-message danger';
-      error.textContent = state.codexError || 'Codex 모델 목록을 불러오지 못했습니다.';
-      block.appendChild(error);
-      const retry = button('다시 시도', refresh);
-      retry.classList.add('codex-agent-retry');
-      block.appendChild(retry);
+      block.appendChild(detailCard('상태 확인 필요', detailText(state.codexError || 'Codex 상태를 불러오지 못했어.', 'danger'), button('다시 시도', refresh)));
       return block;
     }
-
-    const models = Array.isArray(state.codex.models) ? state.codex.models : [];
-    const fields = document.createElement('div');
-    fields.className = 'codex-model-fields';
-    fields.append(
-      makeCodexSelect('일반 정리 모델', state.codex.settings.general.value, models, 'generalModel'),
-      makeCodexSelect('깊은 재정리 모델', state.codex.settings.deep.value, models, 'deepModel'),
-    );
-    block.appendChild(fields);
-
-    const message = document.createElement('p');
-    message.className = 'codex-agent-message';
-    if (state.codexError) {
-      message.textContent = state.codexError;
-      message.classList.add('danger');
-    } else if (state.codex.catalog?.status === 'stale') {
-      message.textContent = '목록 갱신에 실패해 마지막 정상 목록을 사용 중이야.';
-      message.classList.add('warn');
-    } else if (models.length === 0) {
-      message.textContent = '모델 목록을 먼저 갱신해줘.';
-      message.classList.add('warn');
-    } else {
-      message.textContent = `${models.length}개 모델 · 선택한 정확한 ID를 유지해.`;
-    }
-    block.appendChild(message);
-
-    const queueable = Number(state.organize?.queueable) || 0;
-    const stranded = Number(state.organize?.stranded) || 0;
-    const waitingJobs = Number(state.organize?.waitingJobs) || 0;
-    const stalled = (state.organize?.stalledNotes || []).length;
-    const canOrganize = queueable > 0 || waitingJobs > 0;
+    const queueable = state.organize?.queueable;
+    const waiting = state.organize?.waitingJobs;
+    const stalled = state.organize?.stalledNotes?.length;
+    const recovery = Number(state.organize?.recoveryRequired) || 0;
+    if (!codexCanRun()) block.appendChild(detailCard(recovery ? '원본 수동 복구 필요' : 'CLI와 정리 상태 확인 필요',
+      detailText(recovery ? '원본을 복구하기 전에는 정리와 재시도를 실행할 수 없어.' : state.codexError || '정상 상태를 확인한 뒤에 정리를 실행할 수 있어.', 'danger')));
+    const metrics = agentMetrics([['정리 대기', queueable], ['진행 대기', waiting], ['멈춘 노트', stalled], ['자동 시작', state.organize?.autoQueueThreshold]]);
+    metrics.classList.add('agent-detail-metrics');
+    block.appendChild(metrics);
+    const organizeButton = button(state.organizeRunning ? '시작하는 중…' : '대기열 정리', organizeQueuedNotes, true);
+    organizeButton.disabled = state.organizeRunning || state.codexSaving || !codexCanRun() || !(queueable || waiting);
+    const queue = detailCard('정리 대기열');
     if (state.organize) {
-      const queue = document.createElement('p');
-      queue.className = 'codex-agent-message';
-      const parts = [];
-      // 밀려 있는 job이 먼저다. 실패 뒤 멈춰 있어 새 저장이 있어야 다시 도는 상태다.
-      if (stalled > 0) parts.push(`멈춘 노트 ${stalled}개`);
-      if (waitingJobs > 0) parts.push(`밀려 있는 정리 ${waitingJobs}건`);
-      if (queueable > 0) {
-        parts.push(stranded > 0
-          ? `대기 노트 ${queueable}개(그중 ${stranded}개는 지난 실패로 멈춤)`
-          : `대기 노트 ${queueable}개 · 자동 시작은 ${state.organize.autoQueueThreshold}개부터`);
+      for (const [label, value] of [['대기 중인 노트', `${queueable}개`], ['진행 대기 작업', `${waiting}건`], ['좌초 / 복구 필요', `${state.organize.stranded} / ${recovery}개`]]) {
+        const line = detailText(label);
+        line.classList.add('agent-queue-line');
+        const count = document.createElement('strong');
+        count.textContent = value;
+        line.appendChild(count);
+        queue.appendChild(line);
       }
-      queue.textContent = parts.length > 0 ? parts.join(' · ') : '정리 대기 중인 노트 없음';
-      if (waitingJobs > 0 || stranded > 0 || stalled > 0) queue.classList.add('warn');
-      block.appendChild(queue);
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'codex-agent-actions';
-    const refreshButton = button('목록 갱신', refreshCodexCatalog);
-    const organizeButton = button(
-      state.organizeRunning ? '시작하는 중…' : '대기열 정리',
-      organizeQueuedNotes,
-    );
-    const saveButton = button(state.codexSaving ? '저장 중…' : '변경 저장', () => saveCodexModels(block), true);
-    refreshButton.disabled = state.codexSaving;
-    organizeButton.disabled = state.organizeRunning || state.codexSaving || !canOrganize;
-    saveButton.disabled = state.codexSaving || models.length === 0;
+    } else queue.appendChild(detailText('정리 상태를 불러오지 못했어.'));
+    queue.append(organizeButton, button('상태 새로고침', refresh));
     if (stalled > 0) {
-      const retryButton = button(
-        state.organizeRunning ? '시작하는 중…' : `멈춘 ${stalled}개 다시`,
-        retryStalledNotes,
-      );
-      retryButton.disabled = state.organizeRunning || state.codexSaving;
-      actions.append(refreshButton, organizeButton, retryButton, saveButton);
-    } else {
-      actions.append(refreshButton, organizeButton, saveButton);
+      const retry = button(`멈춘 ${stalled}개 다시`, retryStalledNotes);
+      retry.disabled = state.organizeRunning || state.codexSaving || !codexCanRun();
+      queue.appendChild(retry);
     }
-    block.appendChild(actions);
+    const catalog = detailCard('CLI와 모델 카탈로그', detailText(state.codex.runner?.ok ? 'CLI 정상' : 'CLI 확인 필요', state.codex.runner?.ok ? '' : 'danger'),
+      detailText(state.codex.catalog?.status === 'stale' ? '목록 갱신에 실패해 마지막 정상 목록을 사용 중이야.' : '정확한 모델 ID를 유지해.'), button('목록 갱신', refreshCodexCatalog));
+    catalog.querySelector('button').disabled = state.codexSaving;
+    const models = Array.isArray(state.codex.models) ? state.codex.models : [];
+    const settings = detailCard('사용 모델',
+      makeCodexSelect('일반 정리 모델', state.codex.settings.general.value, models, 'generalModel'),
+      makeCodexSelect('깊은 재정리 모델', state.codex.settings.deep.value, models, 'deepModel'));
+    const save = button(state.codexSaving ? '저장 중…' : '변경 저장', () => saveCodexModels(settings), true);
+    save.disabled = state.codexSaving || !models.length || !!state.codexError;
+    settings.appendChild(save);
+    block.appendChild(detailColumns([queue, catalog], [settings, detailCard('모델 설정 안내', detailText('모델 변경은 다음 작업부터 적용돼.'))]));
     return block;
   }
 
@@ -458,7 +437,7 @@
   function settleCalendar(viewport) {
     clearTimeout(state.calendarSettleTimer);
     state.calendarSettleTimer = setTimeout(() => {
-      if (!viewport.isConnected || state.mode !== 'summary' || state.calendarLoading) return;
+      if (!viewport.isConnected || state.mode !== 'schedule' || state.calendarLoading) return;
       const width = viewport.clientWidth;
       if (!width) return;
       const pageIndex = Math.max(0, Math.min(2, Math.round(viewport.scrollLeft / width)));
@@ -594,32 +573,23 @@
 
   function makeScheduleBlock(data) {
     const block = document.createElement('section');
-    block.className = 'schedule-agent-block';
-    block.appendChild(makeHeader());
-    if (state.reminders.length > 0) block.appendChild(makeReminderSection(state.reminders, 3));
-
-    const counts = data.counts || {};
-    const total = countLabels.reduce((sum, [key]) => sum + (Number(counts[key]) || 0), 0);
-    if (total === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'schedule-agent-empty';
-      const title = document.createElement('strong');
-      title.textContent = '등록된 일정 없음';
-      const description = document.createElement('p');
-      description.textContent = '기억해둘 약속이나 할 일을 바로 추가할 수 있어.';
-      empty.append(title, description);
-      block.appendChild(empty);
+    block.className = 'agent-detail-body schedule-detail';
+    if (['denied', 'unsupported', 'insecure'].includes(state.pushState.status)) {
+      block.appendChild(detailCard('알림 상태 확인 필요', detailText(state.pushState.label, 'warn')));
     }
-    block.appendChild(makeCalendar(data));
-    if (total > 0) block.append(makeCounts(counts), makePreview(data.preview), makeNextReminder(data.nextReminder));
-
-    const actions = document.createElement('div');
-    actions.className = 'schedule-agent-actions';
-    actions.append(
-      button('일정 추가', () => openTasks({ compose: true, initialTitle: '' }), true),
-      button('전체 일정', () => openTasks({ view: 'today' })),
-    );
-    block.appendChild(actions);
+    if (Number(data.counts?.overdue) > 0) block.appendChild(detailCard('지연된 일정이 있어', detailText(`지연 ${data.counts.overdue}건`, 'warn')));
+    const metrics = makeCounts(data.counts);
+    metrics.classList.add('agent-detail-metrics');
+    block.appendChild(metrics);
+    const calendar = detailCard(weekRangeLabel(data.calendar?.[1]), makeCalendar(data));
+    const reminders = detailCard(`확인할 알림 ${state.reminders.length}건`, makeReminderSection(state.reminders), makeNextReminder(data.nextReminder));
+    const tasks = detailCard('전체 일정', detailText('추가·변경·완료는 기존 일정 관리 화면에서.'),
+      button('일정 추가', () => openTasks({ compose: true, initialTitle: '' }), true), button('전체 일정', () => openTasks({ view: 'today' })));
+    if (state.pushState.status === 'available') {
+      const push = button('알림 켜기', () => enablePush(push));
+      tasks.appendChild(push);
+    }
+    block.appendChild(detailColumns([calendar, reminders], [detailCard('오늘과 지연', makePreview(data.preview)), tasks]));
     return block;
   }
 
@@ -637,58 +607,55 @@
   function makeAgentRow({ title, tone = 'ok', status, metric, onOpen, ariaLabel }) {
     const row = document.createElement('button');
     row.type = 'button';
-    row.className = 'home-agent';
+    row.className = 'agent-rail-entry';
     if (ariaLabel) row.setAttribute('aria-label', ariaLabel);
-    row.addEventListener('click', onOpen);
+    row.addEventListener('click', () => { state.returnAgent = title; onOpen(); });
 
     const head = document.createElement('span');
-    head.className = 'home-agent-head';
-    const dot = document.createElement('span');
+    head.className = 'agent-rail-head';
+    const dot = document.createElement('img');
     dot.className = `agent-card-dot ${tone}`;
+    dot.src = `assets/figma/agent-status-${['danger', 'warn'].includes(tone) ? tone : 'ok'}.svg`;
+    dot.alt = '';
     const heading = document.createElement('span');
-    heading.className = 'home-agent-title';
+    heading.className = 'agent-rail-title';
     heading.textContent = title;
     const statusText = document.createElement('span');
-    statusText.className = 'home-agent-status';
+    statusText.className = `agent-rail-status ${tone}`;
     statusText.textContent = status;
-    head.append(dot, heading, statusText);
+    statusText.appendChild(dot);
+    head.append(heading, statusText);
     row.appendChild(head);
 
-    if (metric && (tone === 'warn' || tone === 'danger')) {
-      const reason = document.createElement('span');
-      reason.className = 'home-agent-reason';
-      reason.textContent = metric;
-      row.appendChild(reason);
-    }
     return row;
   }
 
   function makeScheduleRow() {
     if (!state.enabled) {
       return makeAgentRow({
-        title: '일정',
+        title: '일정 에이전트',
         tone: 'off',
         status: '꺼짐',
         metric: '일정 기능이 꺼져 있어',
-        onOpen: () => {},
+        onOpen: openSchedule,
       });
     }
     if (state.scheduleError || !state.summary) {
       return makeAgentRow({
-        title: '일정',
+        title: '일정 에이전트',
         tone: 'danger',
         status: '오류',
         metric: state.scheduleError || '일정 요약을 불러오지 못했어',
-        onOpen: refresh,
+        onOpen: openSchedule,
       });
     }
     const counts = state.summary.counts || {};
     const overdue = Number(counts.overdue) || 0;
     const next = state.summary.nextReminder;
     return makeAgentRow({
-      title: '일정',
+      title: '일정 에이전트',
       tone: overdue > 0 ? 'warn' : 'ok',
-      status: overdue > 0 ? `지연 ${overdue}` : '정상',
+      status: overdue > 0 ? `지연 ${overdue}` : state.pushState.label,
       metric: `오늘 ${Number(counts.today) || 0} · 지연 ${overdue} · 예정 ${Number(counts.upcoming) || 0}`,
       onOpen: openSchedule,
       ariaLabel: '일정 에이전트 열기',
@@ -698,7 +665,7 @@
   function makeMailRow() {
     if (state.mail?.disabled) {
       return makeAgentRow({
-        title: 'Mail',
+        title: 'Mail 에이전트',
         tone: 'off',
         status: '꺼짐',
         metric: 'MAIL_AGENT_ENABLED가 꺼져 있어',
@@ -708,11 +675,11 @@
     }
     if (state.mailError || !state.mail) {
       return makeAgentRow({
-        title: 'Mail',
+        title: 'Mail 에이전트',
         tone: 'danger',
         status: '오류',
         metric: state.mailError || 'Mail 상태를 불러오지 못했어',
-        onOpen: refresh,
+        onOpen: openMail,
       });
     }
     const accounts = Array.isArray(state.mail.accounts) ? state.mail.accounts : [];
@@ -728,7 +695,7 @@
     else if (stranded > 0) { tone = 'warn'; status = `멈춤 ${stranded}`; }
     else if (!accounts.length) tone = 'off';
     return makeAgentRow({
-      title: 'Mail',
+      title: 'Mail 에이전트',
       tone,
       status,
       metric: accounts.length
@@ -740,13 +707,13 @@
   }
 
   function makeCodexRow() {
-    if (!state.organize) {
+    if (state.codexError || !state.organize) {
       return makeAgentRow({
         title: '사서 Codex',
         tone: 'danger',
         status: '오류',
         metric: state.codexError || 'Codex 상태를 불러오지 못했어',
-        onOpen: refresh,
+        onOpen: openCodex,
       });
     }
     const queueable = Number(state.organize.queueable) || 0;
@@ -1026,170 +993,6 @@
     return line;
   }
 
-  function makeMailAgentCard() {
-    const accounts = Array.isArray(state.mail?.accounts) ? state.mail.accounts : [];
-    const unhealthy = accounts.some(account => account.status !== 'active');
-    const block = document.createElement('section');
-    block.className = 'agents-operational-card mail-agent-card';
-    block.appendChild(agentSummaryHead('Mail 에이전트', '메일 동기화와 분석 상태. 확인할 메일 자체는 알림 탭에서.',
-      state.mail?.disabled ? '꺼짐' : unhealthy || state.mailError || !accounts.length || Number(state.mail?.analysis?.failed) > 0
-        ? '확인 필요' : '정상', openMail,
-      '메일 동기화와 분석 상태'));
-    if (state.mail?.disabled || state.mailError || !state.mail) {
-      block.appendChild(agentSummaryMessage(state.mailError || (state.mail?.disabled
-        ? '메일 동기화와 분석이 꺼져 있어.' : 'Mail 상태를 불러오지 못했어.'), state.mail?.disabled ? null : refresh));
-      return block;
-    }
-
-    const content = document.createElement('div');
-    content.className = 'agent-summary-columns';
-    const accountSection = agentSummarySection('계정', 'agent-summary-accounts');
-    const accountRows = document.createElement('div');
-    accountRows.className = 'agent-account-rows';
-    accounts.forEach(account => {
-      const row = document.createElement('div');
-      row.className = 'agent-account-row';
-      const name = document.createElement('span');
-      name.textContent = `${providerLabel(account.provider)}  ${account.address}`;
-      const meta = document.createElement('small');
-      meta.textContent = `${account.status} · ${account.lastSyncAt ? formatDateTime(account.lastSyncAt).split(' ').at(-1) : '동기화 전'} · ${Number(account.messages) || 0}`;
-      row.append(name, meta);
-      accountRows.appendChild(row);
-    });
-    if (!accounts.length) accountRows.textContent = '등록된 계정 없음';
-    accountSection.appendChild(accountRows);
-    const compactAccounts = document.createElement('div');
-    compactAccounts.className = 'agent-account-compact';
-    compactAccounts.textContent = accounts.map(account => providerLabel(account.provider)).join(' · ') || '등록된 계정 없음';
-    const compactStatus = document.createElement('small');
-    compactStatus.textContent = accounts.length
-      ? `${accounts.length}개 계정 ${unhealthy ? '확인 필요' : '모두 active'}` : '등록된 계정 없음';
-    accountSection.append(compactAccounts, compactStatus);
-
-    const analysis = state.mail.analysis || {};
-    const metrics = agentSummarySection('분석', 'agent-summary-metrics');
-    metrics.appendChild(agentMetrics([
-      ['대기', analysis.pending], ['완료', analysis.done], ['건너뜀', analysis.skipped],
-    ]));
-
-    const alerts = agentSummarySection('알림', 'agent-summary-alerts');
-    const notification = document.createElement('p');
-    notification.textContent = state.mailSettings
-      ? `Push ${state.mailSettings.notificationsEnabled ? '켜짐' : '꺼짐'} · 방해 금지 ${state.mailSettings.quietHours.enabled ? '켜짐' : '꺼짐'}`
-      : '알림 설정을 불러오지 못했어';
-    const rule = document.createElement('small');
-    const preference = state.mailPreferences?.[0];
-    rule.textContent = preference
-      ? `${preference.target} · ${PREFERENCE_ACTION_LABELS[preference.action] || preference.action}`
-      : '메일 알림 규칙 없음';
-    const actions = document.createElement('div');
-    actions.className = 'agent-summary-actions';
-    const push = button(state.mailSettings?.notificationsEnabled ? 'Push 끄기' : 'Push 켜기', () => {
-      saveMailSettings({ notificationsEnabled: !state.mailSettings.notificationsEnabled });
-    });
-    const quiet = button(state.mailSettings?.quietHours.enabled ? '방해 금지 끄기' : '방해 금지 켜기', () => {
-      saveMailSettings({ quietHours: { ...state.mailSettings.quietHours, enabled: !state.mailSettings.quietHours.enabled } });
-    });
-    const revert = button('되돌리기', () => removeMailPreference(preference.id));
-    push.disabled = quiet.disabled = !state.mailSettings || state.mailSettingsSaving;
-    revert.disabled = !preference || state.mailPreferenceSaving;
-    actions.append(push, quiet, revert);
-    if ((Number(analysis.failed) || 0) > 0) actions.append(button('멈춘 분석 다시', requeueMailAnalysis));
-    alerts.append(notification, rule, actions);
-    content.append(accountSection, metrics, alerts);
-    block.appendChild(content);
-    return block;
-  }
-
-  function makeScheduleAgentCard() {
-    const block = document.createElement('section');
-    block.className = 'agents-operational-card schedule-agent-card';
-    const range = weekRangeLabel(state.summary?.calendar?.[1] || state.summary?.calendar?.[0]);
-    block.appendChild(agentSummaryHead('일정 에이전트', range,
-      state.pushState.label, openSchedule));
-    if (!state.enabled || state.scheduleError || !state.summary) {
-      block.appendChild(agentSummaryMessage(state.scheduleError || (state.enabled
-        ? '일정 요약을 불러오지 못했어.' : '일정 기능이 꺼져 있어.'), state.enabled ? refresh : null));
-      return block;
-    }
-    const content = document.createElement('div');
-    content.className = 'agent-summary-columns';
-    const counts = agentSummarySection('일정', 'agent-summary-counts');
-    counts.appendChild(agentMetrics(countLabels.map(([key, label]) => [label, state.summary.counts?.[key]])));
-    const due = agentSummarySection('오늘과 지연', 'agent-summary-due');
-    const dueItem = state.summary.preview?.[0];
-    const dueText = document.createElement('p');
-    dueText.textContent = dueItem?.title || '지금 확인할 마감 일정 없음';
-    due.appendChild(dueText);
-    const next = agentSummarySection('다음 알림', 'agent-summary-next');
-    const reminder = document.createElement('p');
-    reminder.className = 'agent-next-reminder';
-    const reminderDate = document.createElement('span');
-    const reminderTitle = document.createElement('span');
-    reminderDate.textContent = state.summary.nextReminder
-      ? formatDateTime(state.summary.nextReminder.remindAt) : '예정 없음';
-    reminderTitle.textContent = state.summary.nextReminder?.title || '';
-    reminder.append(reminderDate, reminderTitle);
-    const compactDue = document.createElement('small');
-    compactDue.className = 'agent-next-due';
-    compactDue.textContent = dueText.textContent;
-    const actions = document.createElement('div');
-    actions.className = 'agent-summary-actions';
-    actions.append(button('일정 추가', () => openTasks({ compose: true, initialTitle: '' }), true),
-      button('전체 일정', () => openTasks({ view: 'today' })));
-    next.append(reminder, compactDue, actions);
-    content.append(counts, due, next);
-    block.appendChild(content);
-    return block;
-  }
-
-  function makeCodexAgentCard() {
-    const block = document.createElement('section');
-    block.className = 'agents-operational-card librarian-agent-card';
-    block.appendChild(agentSummaryHead('사서 Codex', '노트 정리와 연결을 담당해. 모델 변경은 다음 작업부터 적용돼.',
-      state.codexError ? '확인 필요' : state.codex?.runner?.ok ? 'CLI 정상' : 'CLI 확인 필요',
-      openCodex, '노트 정리와 연결을 담당해'));
-    if (!state.codex) {
-      block.appendChild(agentSummaryMessage(state.codexError || 'Codex 모델 목록을 불러오지 못했습니다.', refresh));
-      return block;
-    }
-    const content = document.createElement('div');
-    content.className = 'agent-summary-columns';
-    const models = agentSummarySection('모델', 'agent-summary-models');
-    const available = Array.isArray(state.codex.models) ? state.codex.models : [];
-    models.append(makeCodexSelect('일반 정리', state.codex.settings.general.value, available, 'generalModel'),
-      makeCodexSelect('깊은 재정리', state.codex.settings.deep.value, available, 'deepModel'));
-    const metrics = agentSummarySection('정리 상태', 'agent-summary-codex-metrics');
-    metrics.appendChild(agentMetrics([
-      ['모델 목록', available.length], ['대기 노트', state.organize?.queueable],
-      ['자동 시작', state.organize?.autoQueueThreshold],
-    ]));
-    const queue = agentSummarySection('대기열', 'agent-summary-queue');
-    const count = Number(state.organize?.queueable) || 0;
-    const waiting = Number(state.organize?.waitingJobs) || 0;
-    const summary = document.createElement('p');
-    summary.textContent = `대기 노트 ${count}개${waiting ? ` · 진행 대기 ${waiting}건` : ''}`;
-    const compactThreshold = document.createElement('span');
-    compactThreshold.className = 'agent-queue-compact';
-    compactThreshold.textContent = ` · 자동 시작 ${Number(state.organize?.autoQueueThreshold) || 0}개부터`;
-    summary.appendChild(compactThreshold);
-    const threshold = document.createElement('small');
-    threshold.textContent = `자동 시작은 ${Number(state.organize?.autoQueueThreshold) || 0}개부터`;
-    const actions = document.createElement('div');
-    actions.className = 'agent-summary-actions';
-    const refreshButton = button('목록 갱신', refreshCodexCatalog);
-    const organizeButton = button(state.organizeRunning ? '시작하는 중…' : '대기열 정리', organizeQueuedNotes);
-    const saveButton = button(state.codexSaving ? '저장 중…' : '변경 저장', () => saveCodexModels(block), true);
-    refreshButton.disabled = state.codexSaving;
-    organizeButton.disabled = state.organizeRunning || state.codexSaving || !(count || waiting);
-    saveButton.disabled = state.codexSaving || !available.length;
-    actions.append(refreshButton, organizeButton, saveButton);
-    queue.append(summary, threshold, actions);
-    content.append(models, metrics, queue);
-    block.appendChild(content);
-    return block;
-  }
-
   const REELS_STATUS = { candidate: '선택 대기', held: '보류 중', selected: '선택됨', dropped: '거절됨' };
 
   // 후보 텍스트는 모델이 만든 비신뢰 문자열이라 textContent로만 넣는다.
@@ -1273,11 +1076,16 @@
       media.ready = Promise.all([['video', episode.videoUrl], ['cover', episode.coverUrl]].map(async ([key, url]) => {
         if (!url) return;
         const response = await state.apiFetch(url);
-        if (response.ok) media[key] = URL.createObjectURL(await response.blob());
+        if (response.ok) {
+          const url = URL.createObjectURL(await response.blob());
+          if (state.reelsMedia === media) media[key] = url;
+          else URL.revokeObjectURL(url);
+        }
       })).catch(() => {});
     }
-    await state.reelsMedia.ready;
-    return state.reelsMedia;
+    const media = state.reelsMedia;
+    await media.ready;
+    return media;
   }
 
   function svgIcon(kind) {
@@ -1495,7 +1303,10 @@
       line.textContent = `지난 수정 ${last.outcome === 'ok' ? '성공' : '실패'}: ${last.note || ''}${last.outcome === 'ok' ? '' : ` (${[last.errorCode, last.errorDetail].filter(Boolean).join(' · ')})`}`;
       body.appendChild(line);
     }
-    if (episode.status === 'approved') body.append(...reelsUploadLines(episode));
+    if (episode.status === 'approved') {
+      body.append(...reelsUploadLines(episode));
+      if (!episode.uploads?.length) body.appendChild(detailText('게시 상태 미연결'));
+    }
     if (episode.status === 'ready') {
       const form = reelsReviseForm(episode);
       const actions = document.createElement('div');
@@ -1529,15 +1340,6 @@
     return head;
   }
 
-  function agentSummarySection(label, className) {
-    const section = document.createElement('section');
-    section.className = className;
-    const heading = document.createElement('h3');
-    heading.textContent = label;
-    section.appendChild(heading);
-    return section;
-  }
-
   function agentMetrics(entries) {
     const list = document.createElement('dl');
     list.className = 'agent-summary-metric-list';
@@ -1546,7 +1348,7 @@
       const term = document.createElement('dt');
       term.textContent = label;
       const number = document.createElement('dd');
-      number.textContent = String(Number(value) || 0);
+      number.textContent = value == null ? '확인 필요' : String(Number(value) || 0);
       item.append(term, number);
       list.appendChild(item);
     });
@@ -1563,14 +1365,82 @@
     return wrapper;
   }
 
-  // Agents는 Figma의 세 운영 카드다. 각 버튼과 설정은 기존 에이전트 동작을 그대로 쓴다.
   function renderSummary() {
+    releaseReelsMedia();
     state.container.replaceChildren();
-    state.container.append(makeMailAgentCard(), makeScheduleAgentCard(), makeCodexAgentCard());
-    if (state.reels) state.container.appendChild(makeReelsAgentCard());
-    const episodeCard = makeReelsEpisodeCard();
-    if (episodeCard) state.container.appendChild(episodeCard);
-    else releaseReelsMedia();
+    const layout = document.createElement('div');
+    layout.className = 'agents-dashboard';
+    const board = detailCard('데이터 시각화', detailText('Instagram Reels · YouTube Shorts · 기타 소스'));
+    board.classList.add('agents-data-board');
+    const empty = document.createElement('div');
+    empty.className = 'agents-data-empty';
+    empty.append(detailText('데이터 미연결'), detailText('YouTube Shorts · Instagram Reels 조회수·성과 추세'));
+    board.append(empty, detailText('성과 데이터 연결 후 표시돼.'));
+    const rail = document.createElement('nav');
+    rail.className = 'agents-status-rail';
+    rail.setAttribute('aria-label', '에이전트 현황');
+    const heading = document.createElement('h2');
+    heading.textContent = '에이전트 현황';
+    heading.className = 'agents-status-heading';
+    const content = document.createElement('div');
+    content.className = 'agent-content-rail';
+    const episode = state.reelsEpisode;
+    const reelsStatus = state.reelsError || state.reelsEpisodeError ? '확인 필요'
+      : episode ? EPISODE_STATUS[episode.status] || '확인 필요'
+      : state.reels?.batch ? REELS_STATUS[state.reels.batch.status] : state.reels ? '후보 없음' : '꺼짐';
+    content.append(makeAgentRow({ title: 'Reels · Shorts', status: reelsStatus,
+      tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' ? 'danger' : episode?.status === 'ready' || state.reels?.batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
+      makeAgentRow({ title: '카드 뉴스', status: '미연결', tone: 'off', onOpen: () => state.showToast('카드 뉴스 제작 기능은 아직 연결되지 않았어.') }));
+    rail.append(heading, makeMailRow(), makeScheduleRow(), makeCodexRow(), content);
+    layout.append(board, rail);
+    state.container.appendChild(layout);
+    if (state.returnAgent) {
+      [...rail.querySelectorAll('button')].find(item => item.querySelector('.agent-rail-title')?.textContent === state.returnAgent)?.focus();
+      state.returnAgent = null;
+    }
+  }
+
+  function renderReelsDetail() {
+    state.container.replaceChildren();
+    const workspace = document.createElement('section');
+    workspace.className = 'agent-detail-workspace reels-workspace';
+    workspace.appendChild(makeDetailHead('Reels · Shorts', 'Agents로 돌아가기'));
+    const columns = detailColumns([], [detailCard('카드 뉴스', detailText('미연결'))]);
+    columns.classList.add('reels-workflow-columns');
+    const stages = columns.firstElementChild;
+    const episode = state.reelsEpisode;
+    const active = ['candidate', 'held'].includes(state.reels?.batch?.status) || !episode || episode.status === 'discarded' ? 1
+      : ['producing', 'revising', 'failed'].includes(episode.status) ? 2 : episode.status === 'ready' ? 3 : 4;
+    ['주제 선정', '영상 제작', '영상 검토', '게시'].forEach((label, index) => {
+      const step = index + 1;
+      const stage = document.createElement('details');
+      stage.className = 'agent-detail-card reels-stage';
+      stage.dataset.step = step;
+      stage.open = step === active;
+      const heading = document.createElement('summary');
+      heading.textContent = `0${step} / ${label}`;
+      stage.appendChild(heading);
+      if (step === active) {
+        stage.classList.add('active');
+        stage.setAttribute('aria-current', 'step');
+      }
+      if (step === 1) {
+        if (state.reelsError) stage.appendChild(detailText(state.reelsError, 'danger'));
+        if (state.reels) stage.appendChild(makeReelsAgentCard());
+        else stage.appendChild(detailText('주제 후보 미연결'));
+      } else if (episode && ((step === 2 && ['producing', 'revising', 'failed'].includes(episode.status))
+        || (step === 3 && ['ready', 'discarded'].includes(episode.status)) || (step === 4 && episode.status === 'approved'))) {
+        stage.appendChild(makeReelsEpisodeCard());
+      } else {
+        stage.appendChild(detailText(state.reelsEpisodeError || '아직 이 단계의 영상이 없어.'));
+      }
+      if (step < active) heading.appendChild(svgIcon('ok'));
+      if (step === active) stage.appendChild(button('새로고침', refresh));
+      stages.appendChild(stage);
+    });
+    if (state.reelsEpisodeError) workspace.appendChild(detailCard('영상 상태 확인 필요', detailText(state.reelsEpisodeError, 'danger')));
+    workspace.appendChild(columns);
+    state.container.appendChild(workspace);
   }
 
   // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
@@ -1591,27 +1461,24 @@
     }
 
     const { notificationsEnabled, quietHours } = state.mailSettings;
-    const summary = document.createElement('p');
-    summary.className = 'codex-agent-message';
-    summary.textContent = notificationsEnabled
-      ? `Push 켜짐 · 방해 금지 ${quietHours.enabled ? `${quietHours.start}~${quietHours.end}` : '꺼짐'}`
-      : 'Push 꺼짐 · 판단과 Attention은 그대로 쌓여';
-    section.appendChild(summary);
-
-    const actions = document.createElement('div');
-    actions.className = 'codex-agent-actions';
-    const togglePush = button(
-      notificationsEnabled ? 'Push 끄기' : 'Push 켜기',
-      () => saveMailSettings({ notificationsEnabled: !notificationsEnabled }),
-    );
-    const toggleQuiet = button(
-      quietHours.enabled ? '방해 금지 끄기' : '방해 금지 켜기',
-      () => saveMailSettings({ quietHours: { ...quietHours, enabled: !quietHours.enabled } }),
-    );
-    togglePush.disabled = state.mailSettingsSaving;
-    toggleQuiet.disabled = state.mailSettingsSaving;
-    actions.append(togglePush, toggleQuiet);
-    section.appendChild(actions);
+    for (const [labelText, enabled, patch] of [
+      ['Push 알림', notificationsEnabled, { notificationsEnabled: !notificationsEnabled }],
+      ['방해 금지', quietHours.enabled, { quietHours: { ...quietHours, enabled: !quietHours.enabled } }],
+    ]) {
+      const row = document.createElement('div');
+      row.className = 'mail-setting-row';
+      const label = document.createElement('span');
+      label.textContent = labelText;
+      const status = document.createElement('span');
+      status.className = 'agent-rail-status';
+      status.textContent = enabled ? '켜짐' : '꺼짐';
+      const toggle = button(enabled ? '끄기' : '켜기', () => saveMailSettings(patch));
+      toggle.setAttribute('aria-label', `${labelText === 'Push 알림' ? 'Push' : labelText} ${enabled ? '끄기' : '켜기'}`);
+      toggle.disabled = state.mailSettingsSaving;
+      row.append(label, status, toggle);
+      section.appendChild(row);
+    }
+    section.appendChild(detailText(`방해 금지 시간 ${quietHours.start}~${quietHours.end} KST`));
     return section;
   }
 
@@ -1674,15 +1541,30 @@
   }
 
   function makeDetailHead(titleText, ariaLabel) {
-    const head = document.createElement('div');
-    head.className = 'schedule-agent-workspace-head';
-    const back = button('<', openSummary);
-    back.classList.add('schedule-agent-back');
+    const head = document.createElement('header');
+    head.className = 'agent-detail-head';
+    const back = button('Agents', openSummary);
+    back.className = 'agent-detail-back';
     back.setAttribute('aria-label', ariaLabel);
-    back.title = ariaLabel;
-    const title = document.createElement('strong');
+    const icon = document.createElement('img');
+    icon.src = 'assets/figma/left.svg';
+    icon.alt = '';
+    back.prepend(icon);
+    const row = document.createElement('div');
+    row.className = 'agent-detail-title-row';
+    const title = document.createElement('h2');
     title.textContent = titleText;
-    head.append(back, title);
+    title.tabIndex = -1;
+    row.appendChild(title);
+    const statusRow = titleText === 'Mail 에이전트' ? makeMailRow() : titleText === '사서 Codex' ? makeCodexRow() : titleText === '일정 에이전트' ? makeScheduleRow() : null;
+    if (statusRow) row.appendChild(statusRow.querySelector('.agent-rail-status'));
+    const descriptions = {
+      'Mail 에이전트': '메일 수집·분석 상태와 설정 · 실제 메일은 알림에서 확인',
+      '일정 에이전트': '주간 일정·리마인더·마감 확인',
+      '사서 Codex': '노트 정리 대기열·모델·CLI 상태 · 설정 변경은 다음 작업부터 반영',
+    };
+    head.append(back, row);
+    if (descriptions[titleText]) head.appendChild(detailText(descriptions[titleText]));
     return head;
   }
 
@@ -1691,7 +1573,7 @@
   function renderScheduleDetail() {
     state.container.replaceChildren();
     const workspace = document.createElement('section');
-    workspace.className = 'schedule-agent-workspace';
+    workspace.className = 'schedule-agent-workspace agent-detail-workspace';
     workspace.appendChild(makeDetailHead('일정 에이전트', '에이전트 요약으로 돌아가기'));
     if (!state.enabled) {
       const message = document.createElement('p');
@@ -1714,7 +1596,7 @@
   function renderCodexDetail() {
     state.container.replaceChildren();
     const workspace = document.createElement('section');
-    workspace.className = 'schedule-agent-workspace';
+    workspace.className = 'schedule-agent-workspace agent-detail-workspace';
     workspace.append(makeDetailHead('사서 Codex', '에이전트 요약으로 돌아가기'), makeCodexBlock());
     state.container.appendChild(workspace);
   }
@@ -1722,7 +1604,7 @@
   function renderMailDetail() {
     state.container.replaceChildren();
     const workspace = document.createElement('section');
-    workspace.className = 'schedule-agent-workspace';
+    workspace.className = 'schedule-agent-workspace agent-detail-workspace';
     workspace.append(makeDetailHead('Mail 에이전트', '에이전트 요약으로 돌아가기'), makeMailBlock());
     state.container.appendChild(workspace);
   }
@@ -1731,79 +1613,36 @@
   // 여기에 두 번째 받은편지함을 만들지 않는다(설계 23절).
   function makeMailBlock() {
     const block = document.createElement('section');
-    block.className = 'codex-agent-block';
-    const description = document.createElement('p');
-    description.className = 'codex-agent-description';
-    description.textContent = '메일 동기화와 분석 상태야. 확인할 메일 자체는 알림 탭에 있어.';
-    block.appendChild(description);
-
-    if (state.mail?.disabled) {
-      const message = document.createElement('p');
-      message.className = 'codex-agent-message warn';
-      message.textContent = '메일 동기화와 분석이 꺼져 있어.';
-      block.appendChild(message);
+    block.className = 'agent-detail-body mail-detail';
+    if (state.mail?.disabled || state.mailError || !state.mail) {
+      block.appendChild(detailCard('메일 상태', detailText(state.mailError || (state.mail?.disabled ? '메일 동기화와 분석이 꺼져 있어.' : 'Mail 상태를 불러오지 못했어.'), 'warn'), button('다시 시도', refresh)));
       return block;
     }
-    if (state.mailError || !state.mail) {
-      const message = document.createElement('p');
-      message.className = 'codex-agent-message danger';
-      message.textContent = state.mailError || 'Mail 상태를 불러오지 못했습니다.';
-      const retry = button('다시 시도', refresh);
-      retry.classList.add('codex-agent-retry');
-      block.append(message, retry);
-      return block;
-    }
-
-    const accounts = Array.isArray(state.mail.accounts) ? state.mail.accounts : [];
-    if (accounts.length === 0) {
-      const message = document.createElement('p');
-      message.className = 'codex-agent-message warn';
-      message.textContent = '등록된 메일 계정이 없어.';
-      block.appendChild(message);
-    }
-    accounts.forEach(account => {
-      const line = document.createElement('p');
-      line.className = 'codex-agent-message';
-      const label = providerLabel(account.provider);
-      const parts = [`${label} ${account.address}`, account.status];
-      if (account.lastSyncAt) parts.push(`마지막 동기화 ${formatDateTime(account.lastSyncAt)}`);
-      if (account.lastErrorCode) parts.push(account.lastErrorCode);
-      parts.push(`메시지 ${account.messages}`);
-      line.textContent = parts.join(' · ');
-      if (account.status !== 'active') line.classList.add(account.status === 'auth_required' ? 'danger' : 'warn');
-      block.appendChild(line);
+    const accounts = detailCard('연결 계정');
+    const items = Array.isArray(state.mail.accounts) ? state.mail.accounts : [];
+    if (!items.length) accounts.appendChild(detailText('등록된 메일 계정이 없어.'));
+    items.forEach(account => {
+      accounts.appendChild(detailText(`${providerLabel(account.provider)} · ${account.address}`));
+      accounts.appendChild(detailText(`${account.status} · ${account.lastSyncAt ? formatDateTime(account.lastSyncAt) : '동기화 전'}${account.lastErrorCode ? ` · ${account.lastErrorCode}` : ''}`, account.status === 'auth_required' ? 'danger' : ''));
     });
-
+    if (items.some(account => account.status === 'auth_required')) block.appendChild(detailCard('메일 재인증 필요', detailText('계정 인증을 확인해줘. 자동 재인증은 제공되지 않아.', 'danger')));
     const analysis = state.mail.analysis || {};
     const failed = Number(analysis.failed) || 0;
-    const queue = document.createElement('p');
-    queue.className = 'codex-agent-message';
-    queue.textContent = `분석 대기 ${Number(analysis.pending) || 0} · 진행 ${Number(analysis.analyzing) || 0}`
-      + ` · 완료 ${Number(analysis.done) || 0} · 멈춤 ${failed} · 건너뜀 ${Number(analysis.skipped) || 0}`;
-    if (failed > 0) queue.classList.add('warn');
-    block.appendChild(queue);
-
-    block.appendChild(makeMailSettings());
-    block.appendChild(makeMailPreferences());
-
-    // 좌초한 분석은 열어봐야 고칠 것이 없다. 사람이 할 수 있는 일은 다시 돌리는 것뿐이라
-    // 사유 코드까지만 보여주고 제목·발신자는 싣지 않는다(설계 19절).
+    const queue = detailCard('메일 분석 상태', agentMetrics([['대기', analysis.pending], ['진행', analysis.analyzing], ['완료', analysis.done], ['건너뜀', analysis.skipped]]));
+    const left = [accounts, queue, detailCard('메일 확인은 알림에서', detailText('확인할 메일 자체는 알림 화면에 있어.'), button('알림에서 확인', openMailAttention))];
+    const right = [detailCard('알림 설정', makeMailSettings()), detailCard('저장된 선호 규칙', makeMailPreferences())];
     if (failed > 0) {
-      const actions = document.createElement('div');
-      actions.className = 'codex-agent-actions';
-      const requeue = button(
-        state.mailRequeueRunning ? '되돌리는 중…' : `멈춘 ${failed}개 다시`,
-        requeueMailAnalysis,
-        true,
-      );
-      requeue.disabled = state.mailRequeueRunning;
-      actions.appendChild(requeue);
-      block.appendChild(actions);
+      const retry = button(state.mailRequeueRunning ? '되돌리는 중…' : `멈춘 ${failed}개 다시`, requeueMailAnalysis, true);
+      retry.disabled = state.mailRequeueRunning;
+      right.push(detailCard('분석 복구', detailText(`멈춘 분석 ${failed}건`, 'warn'), retry));
     }
+    block.appendChild(detailColumns(left, right));
     return block;
   }
 
   async function loadCodexData() {
+    state.codex = null;
+    state.organize = null;
     const [modelResponse, organizeResponse] = await Promise.all([
       state.apiFetch('/api/models/codex'),
       state.apiFetch('/api/organize/status'),
@@ -1822,7 +1661,7 @@
   // `queued`에 갇힌 노트가 다시 job에 들어가는 유일한 사용자 경로다.
   // 같은 이유로 여러 개가 한꺼번에 멈추는 일이 흔하다. 하나씩 누르지 않아도 되게 한다.
   async function retryStalledNotes() {
-    if (state.organizeRunning) return;
+    if (state.organizeRunning || state.codexSaving || !codexCanRun()) return;
     state.organizeRunning = true;
     renderCodexSurface();
     try {
@@ -1845,7 +1684,7 @@
   }
 
   async function organizeQueuedNotes() {
-    if (state.organizeRunning) return;
+    if (state.organizeRunning || state.codexSaving || !codexCanRun()) return;
     state.organizeRunning = true;
     renderCodexSurface();
     try {
@@ -1919,6 +1758,7 @@
 
   // 플래그가 꺼진 것은 오류가 아니다. 꺼져 있으면 카드 자체를 그리지 않는다.
   async function loadReelsLatest() {
+    state.reels = null;
     const response = await state.apiFetch('/api/reels/latest');
     const data = await response.json().catch(() => ({}));
     if (response.status === 503 && data.code === 'REELS_AGENT_DISABLED') {
@@ -1930,15 +1770,13 @@
     return true;
   }
 
-  // 503(제작 꺼짐)이나 실패는 오류가 아니라 카드를 안 그리는 것이다.
   async function loadReelsEpisode() {
-    try {
-      const response = await state.apiFetch('/api/reels/episodes/latest');
-      const data = response.ok ? await response.json().catch(() => ({})) : {};
-      state.reelsEpisode = data.episode || null;
-    } catch {
-      state.reelsEpisode = null;
-    }
+    state.reelsEpisode = null;
+    const response = await state.apiFetch('/api/reels/episodes/latest');
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 503 && data.code === 'REELS_PRODUCTION_DISABLED') return true;
+    if (!response.ok) throw new Error(data.error || '영상 제작 상태를 불러오지 못했어.');
+    state.reelsEpisode = data.episode || null;
     return true;
   }
 
@@ -2051,6 +1889,7 @@
   }
 
   async function loadMailSettings() {
+    state.mailSettings = null;
     const response = await state.apiFetch('/api/mail/settings');
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return false;
@@ -2059,6 +1898,7 @@
   }
 
   async function loadMailPreferences() {
+    state.mailPreferences = null;
     const response = await state.apiFetch('/api/mail/preferences');
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return false;
@@ -2184,7 +2024,7 @@
   function renderTaskWorkspace() {
     state.container.replaceChildren();
     const workspace = document.createElement('section');
-    workspace.className = 'schedule-agent-workspace';
+    workspace.className = 'schedule-agent-workspace agent-detail-workspace';
     const taskContent = document.createElement('div');
     taskContent.id = 'agent-task-content';
     const head = document.createElement('div');
@@ -2223,28 +2063,39 @@
     }
   }
 
+  async function openReels() {
+    state.mode = 'reels';
+    renderReelsDetail();
+    await refresh();
+    if (state.mode === 'reels') state.container.querySelector('.agent-detail-head h2')?.focus();
+  }
+
   function openSummary() {
+    releaseReelsMedia();
     state.mode = 'summary';
     state.focusReminders = false;
     refresh();
   }
 
-  function openSchedule() {
+  async function openSchedule() {
     state.mode = 'schedule';
     renderScheduleDetail();
-    refresh();
+    await refresh();
+    if (state.mode === 'schedule') state.container.querySelector('.agent-detail-head h2')?.focus();
   }
 
-  function openCodex() {
+  async function openCodex() {
     state.mode = 'codex';
     renderCodexDetail();
-    refresh();
+    await refresh();
+    if (state.mode === 'codex') state.container.querySelector('.agent-detail-head h2')?.focus();
   }
 
-  function openMail() {
+  async function openMail() {
     state.mode = 'mail';
     renderMailDetail();
-    refresh();
+    await refresh();
+    if (state.mode === 'mail') state.container.querySelector('.agent-detail-head h2')?.focus();
   }
 
   // 홈은 무엇을 봐야 하는지만 말한다. 완료·미루기는 알림 탭이 맡으므로 그쪽 메일
@@ -2272,13 +2123,13 @@
         state.enabled ? loadAgentData() : Promise.resolve(false),
       ]);
       state.scheduleError = result[0].status === 'rejected' ? result[0].reason.message : '';
-      renderScheduleDetail();
+      if (state.mode === 'schedule') renderScheduleDetail();
       return;
     }
     if (state.mode === 'codex') {
       const result = await Promise.allSettled([loadCodexData()]);
       state.codexError = result[0].status === 'rejected' ? result[0].reason.message : '';
-      renderCodexDetail();
+      if (state.mode === 'codex') renderCodexDetail();
       return;
     }
     if (state.mode === 'mail') {
@@ -2286,12 +2137,19 @@
         loadMailData(), loadMailSettings(), loadMailPreferences(),
       ]);
       state.mailError = mail.status === 'rejected' ? mail.reason.message : '';
-      renderMailDetail();
+      if (state.mode === 'mail') renderMailDetail();
+      return;
+    }
+    if (state.mode === 'reels') {
+      const results = await Promise.allSettled([loadReelsLatest(), loadReelsEpisode()]);
+      state.reelsError = results[0].status === 'rejected' ? results[0].reason.message : '';
+      state.reelsEpisodeError = results[1].status === 'rejected' ? results[1].reason.message : '';
+      if (state.mode === 'reels') renderReelsDetail();
       return;
     }
     renderLoading();
     // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
-    const [scheduleResult, codexResult, mailResult] = await Promise.allSettled([
+    const [scheduleResult, codexResult, mailResult, , , reelsResult, episodeResult] = await Promise.allSettled([
       state.enabled ? loadAgentData() : Promise.resolve(false),
       loadCodexData(),
       loadMailData(),
@@ -2309,6 +2167,8 @@
     state.mailError = mailResult.status === 'rejected'
       ? mailResult.reason.message
       : '';
+    state.reelsError = reelsResult.status === 'rejected' ? reelsResult.reason.message : '';
+    state.reelsEpisodeError = episodeResult.status === 'rejected' ? episodeResult.reason.message : '';
     if (state.mode !== 'summary') return;
     renderSummary();
   }

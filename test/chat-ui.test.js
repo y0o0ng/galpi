@@ -444,9 +444,10 @@ test('Home actions reuse TaskPanel, Mail settings, and Codex settings', () => {
   assert.match(panel, /state\.apiFetch\('\/api\/mail\/settings', \{\s*method: 'PUT'/s);
   assert.match(panel, /state\.apiFetch\('\/api\/models\/codex'\)/);
   assert.match(panel, /state\.apiFetch\('\/api\/settings\/codex-models', \{\s*method: 'PUT'/s);
-  assert.match(panel, /makeMailAgentCard\(\), makeScheduleAgentCard\(\), makeCodexAgentCard\(\)/);
-  assert.match(panel, /saveMailSettings\(\{ notificationsEnabled:/);
-  assert.match(panel, /button\('대기열 정리', organizeQueuedNotes\)|button\(state\.organizeRunning \? '시작하는 중…' : '대기열 정리', organizeQueuedNotes\)/);
+  assert.match(panel, /makeMailRow\(\), makeScheduleRow\(\), makeCodexRow\(\)/);
+  assert.match(panel, /notificationsEnabled: !notificationsEnabled/);
+  assert.match(panel, /saveMailSettings\(patch\)/);
+  assert.match(panel, /button\('대기열 정리', organizeQueuedNotes\)|button\(state\.organizeRunning \? '시작하는 중…' : '대기열 정리', organizeQueuedNotes, true\)/);
 });
 
 test('focused notifications inspect existing categories and provider counts', () => {
@@ -456,17 +457,14 @@ test('focused notifications inspect existing categories and provider counts', ()
   assert.match(home, /home-notification-detail-row/);
 });
 
-test('Agents summary matches the three Figma operational cards without embedding the task calendar', () => {
+test('Agents uses a data board and status rail with no invented performance', () => {
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  const css = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8');
-  const summary = panel.slice(panel.indexOf('function makeMailAgentCard()'), panel.indexOf('function makeDetailHead('));
-  assert.doesNotMatch(summary, /makeCalendar\(|makeScheduleBlock\(/);
-  assert.match(summary, /agentSummarySection\('계정'/);
-  assert.match(summary, /agentSummarySection\('정리 상태'/);
-  assert.match(css, /#agent-panel-content > \.agents-operational-card \{[^}]*min-height: 210px/s);
-  assert.match(css, /#agent-panel-content > \.mail-agent-card \{ min-height: 238px; \}/);
-  assert.match(css, /#agent-panel-content > \.schedule-agent-card \{ min-height: 286px; \}/);
-  assert.match(css, /\.home-page-head \{[^}]*min-height: 78px/s);
+  const summary = panel.slice(panel.indexOf('function renderSummary()'), panel.indexOf('function renderReelsDetail()'));
+  assert.match(summary, /데이터 미연결/);
+  assert.match(summary, /카드 뉴스.*미연결/);
+  assert.doesNotMatch(summary, /makeCalendar\(|makeScheduleBlock\(|makeReelsEpisodeCard\(/);
+  assert.match(css, /\.agents-dashboard \{[^}]*grid-template-columns:/);
+  assert.match(css, /\.agents-status-rail \{ order: -1;/);
 });
 
 test('legacy task and notification links route into working Home surfaces', () => {
@@ -702,5 +700,5 @@ test('Reels episode card keeps model strings as text, revokes blobs, and hides w
   assert.match(card, /\^https\?:/);
   assert.match(panel, /\/api\/reels\/episodes\/latest/);
   assert.match(panel, /state\.reelsEpisode = data\.episode \|\| null/);
-  assert.match(panel, /else releaseReelsMedia\(\)/);
+  assert.match(panel, /function openSummary\(\) \{\s*releaseReelsMedia\(\)/);
 });
