@@ -167,23 +167,37 @@ Home의 Notes 카드 확장은 Note/Paper 패널 DOM과 controller를 그대로 
 
 ## 8. Agents
 
-Agents는 과거 세 줄 요약이 아니라 세 운영 카드다.
-Figma `Home - Agents`의 Desktop은 폭 1058px·높이 210px 카드 셋을 21px 간격으로,
-Pad는 폭 740px에 높이 238/234/246px을 16px 간격으로, Phone은 폭 358px에
-Mail 334px·일정 286px·Codex 362px을 세로로 둔다. 내용이 길면 카드 높이는 늘어난다.
-Desktop은 계정/분석/알림, 일정 수/현재 마감/다음 알림, 모델/정리 상태/대기열의 3열이다.
-Pad는 각 카드가 2열로 재배치되고 Phone은 한 열로 압축된다. 운영 요약 안에 주간 달력을
-넣지 않는다. 주간 달력과 상세 진단은 기존 에이전트 상세 화면에 남긴다.
+Agents 메인은 Figma `392:958`(Desktop), `398:994`(Pad), `396:976`(Phone)을 따른다.
+Desktop은 큰 데이터 보드(800px 기준) + 오른쪽 상태 레일, Pad는 같은 2열,
+Phone은 압축형 2열 상태 카드가 위에 오고 데이터 보드가 아래에 온다.
+Mail·일정·Codex·Reels/Shorts 진입은 기존 상세 컨트롤러와 API를 사용한다.
 
-- Mail 에이전트: 계정 상태, 분석 수, 알림 상태, 규칙과 status를 보인다. Push, 방해 금지,
-  규칙 되돌리기는 기존 mail settings/preferences API를 호출한다.
-- 일정 에이전트: `/api/tasks/summary`의 기간, 지연·오늘·예정·Inbox, 현재 마감과 다음 알림을
-  보인다. 일정 추가와 전체 일정은 기존 `TaskPanel`을 연다.
-- 사서 Codex: 일반 정리와 깊은 재처리 모델은 `/api/models/codex`가 준 실제 select다. 변경
-  저장은 기존 app_settings 경로를, 목록 갱신과 대기열 정리는 기존 model/organize API를 쓴다.
+- 데이터 보드는 **데이터 미연결**만 표시한다. YouTube Shorts / Instagram Reels 조회수·성과
+  수집 API는 2차 범위다. 가상 조회수·추세·성과와 별도 dashboard DB를 만들지 않는다.
+- 카드 뉴스 제작은 별도 작업이다. 현재 main에 제작 API가 없으므로 미연결로 표시한다.
+  일반 `/api/news/briefing`을 카드 뉴스 제작 API로 취급하지 않는다. 1차·2차에서 제작 파이프라인을 개편하지 않는다.
+- Mail 상세는 연결 계정·분석 상태·알림 설정·저장된 선호 규칙을 두 열로 배치한다.
+  Push/방해 금지는 기존 settings API, 규칙 되돌리기는 기존 preferences API를 쓴다.
+  인증 오류는 재인증 안내만, 분석 복구는 실패 건이 있을 때만 표시한다. 실제 메일은 기존 알림 화면에서 확인한다.
+- 일정 상세는 summary의 counts·주간 달력·오늘/지연·알림을 재사용한다.
+  추가·변경·완료와 알림 동작은 기존 TaskPanel을 쓰며 화면 열기로 알림을 자동 확인하지 않는다.
+- Codex 상세는 대기열·CLI/카탈로그와 모델 설정을 분리한다. 정확한 모델 ID·version을 유지한다.
+  CLI 비정상·상태 조회 실패·recovery_required에서는 정리/재시도를 fail-close한다.
+  수동 복구는 자동 재시도와 구분하며 기존 서버 복구 gate를 유지한다.
+- Reels 상세는 주제 선정 → 영상 제작 → 영상 검토 → 게시의 4단계다.
+  기존 후보 선택/거절/보류, 승인/수정/폐기, 인증된 미디어 blob, 다운로드/공유,
+  플랫폼별 게시 상태·실패 재시도·수동 게시 계약을 유지한다. 완료는 실제 uploads 상태로만 표시한다.
+  카드 뉴스 열은 미연결 안내만 표시한다. Pad는 두 열, Phone은 한 열이다.
 
-세 카드는 각 소스 실패를 격리한다. Phone에서는 카드가 세로로 흐르고 action 영역은 줄바꿈해
-버튼과 글자가 겹치지 않는다.
+각 소스 실패는 다른 에이전트에 전파하지 않는다. 모든 도메인 문자열은 textContent로 표시한다.
+기존 task/mail/reels API의 시간·identity·provenance, 모델, 업로드와 복구 계약 및 SW payload는 바꾸지 않는다.
+
+1차 로컬 검증 (2026-10-10, 기준 main `e98732f`): 변경 관련 59 PASS.
+전체 실행은 2,039 PASS / 2 FAIL / 24 SKIP였고 두 실패는 변경 전 main으로도 재현한
+`assistant-task-ui.test.js`의 기존 다크 테마 기대값 불일치다. GitHub CI 결과로 주장하지 않는다.
+`scripts/check-agents-ui.js`는 설치된 Chrome/Playwright로 실제 public 셸·AgentPanel·TaskPanel을
+메모리 fixture API에 연결해 1440/820/390px의 메인·상세·오류·Reels 상태를 검사한다.
+실제 계정·Push·게시 API 호출, Pi 배포와 iOS 기기 인수는 이 검증에 포함하지 않는다.
 
 ## 9. 이전 링크 호환
 

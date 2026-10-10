@@ -72,7 +72,7 @@ test('notification, task, and agent modules load before the product shell contro
   const agentWindow = {};
   vm.runInNewContext(agentSource, { window: agentWindow }, { filename: 'agent-panel.js' });
   assert.deepEqual(Object.keys(agentWindow.AgentPanel).sort(), ['init', 'openTasks', 'refresh', 'show']);
-  assert.match(agentSource, /heading\.textContent = '사서 Codex'/);
+  assert.match(agentSource, /makeDetailHead\('사서 Codex'/);
   assert.match(agentSource, /\/api\/settings\/codex-models/);
 });
 
@@ -557,12 +557,12 @@ test('the librarian block can run the queue without waiting for the auto thresho
   assert.match(agentSource, /'\/api\/organize\/queue', \{\s*\n\s*method: 'POST'/);
   assert.match(agentSource, /button\(\s*\n?\s*state\.organizeRunning \? '시작하는 중…' : '대기열 정리'/);
   // 누를 것이 없으면 못 누른다.
-  assert.match(agentSource, /organizeButton\.disabled = state\.organizeRunning \|\| state\.codexSaving \|\| !canOrganize;/);
+  assert.match(agentSource, /organizeButton\.disabled = state\.organizeRunning \|\| state\.codexSaving \|\| !codexCanRun\(\) \|\| !\(queueable \|\| waiting\);/);
   // 실패 뒤 멈춰 밀려 있는 job도 이 버튼이 다시 돌린다.
-  assert.match(agentSource, /const canOrganize = queueable > 0 \|\| waitingJobs > 0;/);
-  assert.match(agentSource, /밀려 있는 정리 \$\{waitingJobs\}건/);
+  assert.match(agentSource, /const waiting = state\.organize\?\.waitingJobs;/);
+  assert.match(agentSource, /진행 대기 작업.*\$\{waiting\}건/);
   // 지난 실패로 멈춘 노트가 있으면 그 사실을 숫자로 말한다.
-  assert.match(agentSource, /그중 \$\{stranded\}개는 지난 실패로 멈춤/);
+  assert.match(agentSource, /좌초 \/ 복구 필요.*\$\{state\.organize\.stranded\}/);
   // 정리 상태를 못 읽어도 모델 설정은 계속 쓸 수 있어야 한다.
   assert.match(agentSource, /state\.organize = organizeResponse\.ok/);
 });

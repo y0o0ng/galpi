@@ -901,7 +901,9 @@
 
   function handleInitialUrl() {
     const params = new URLSearchParams(global.location.search);
-    if (params.get('panel') === 'agents' || params.get('notification') === 'tasks') {
+    if (params.get('panel') === 'agents' && !params.has('taskView') && params.get('notification') !== 'tasks') {
+      setRoute('home', 'agents');
+    } else if (params.get('panel') === 'agents' || params.get('notification') === 'tasks') {
       openTasks({ view: 'today', focusReminders: params.get('taskView') === 'reminders' || params.get('notification') === 'tasks' });
     } else if (params.get('panel') === 'notifications') {
       openNotifications(params.get('notification') === 'mail' ? 'mail' : 'all');
