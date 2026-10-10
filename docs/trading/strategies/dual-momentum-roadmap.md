@@ -12,19 +12,20 @@
 
 ## 1. 출처와 규칙 동일성
 
-- Gary Antonacci, *Dual Momentum Investing* 제8장의 GEM 설명: 미국(S&P 500)과 미국 제외 글로벌 주식(MSCI ACWI ex-US)의 **지난 12개월 총수익률을 비교해 승자를 고르고**, 그 승자가 같은 기간 미국 T-bills보다 높을 때만 승자를 보유; 아니면 미국 종합채권. 매월 재판정.
+- Gary Antonacci, *Dual Momentum Investing* 제8장의 GEM 설명: **먼저 미국 S&P 500의 지난 12개월 총수익률이 같은 기간 T-bills를 초과하는지 판단**하고, 초과했을 때에만 미국(S&P 500)과 미국 제외 글로벌 주식(MSCI ACWI ex-US) 중 **12개월 수익률이 높은 쪽**에 투자한다. 그렇지 않으면 미국 종합채권. 매월 재판정. **Gary Antonacci 본인의 FAQ는 책 p.98이 이 US-first 규칙이며, p.101은 상대모멘텀 우선의 별도 흐름도라고 명시한다.**
 - 2012/2017 Antonacci 논문 및 본인 사이트는 듀얼 모멘텀의 학술적 배경을 제공하지만, 수익률 숫자는 실거래 수익이 아닌 백테스트다.
-- 주의: 2026년의 일부 재현에서는 **미국 주식만** T-bills와 비교한다. 이는 여기서 고정한 *winner-versus-T-bills*와 다른 알고리즘이다. 다른 방식을 몰래 원형으로 취급하지 않고 이번 primary 실험에는 넣지 않는다.
+- 주의: 일부 후속 구현은 **상대모멘텀 승자**를 T-bills와 비교한다. 이는 이번 책 p.98의 *US-first absolute filter*와 **다른 알고리즘**이다. 결과를 보고 갈아타지 않는다.
 - ETF proxy는 지수 자체가 아니며 VEU/VXUS를 EFA와 혼용하지 않는다. EFA는 MSCI EAFE(캐나다·신흥국 제외)라 원형 ACWI ex-US와 다르다.
 
 출처:
 - https://www.optimalmomentum.com/global-equities-momentum/
-- https://www.optimalmomentum.com/faq/
+- https://www.optimalmomentum.com/faq/ (저자의 GEM 책 p.98/p.101 적용 순서 확인)
+- https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7427878 (2026 재현 논문: 미국 주식 절대 필터)
 - https://www.optimalmomentum.com/dual-relative-absolute-momentum/
 - https://doi.org/10.2139/SSRN.2042750
 - https://github.com/Petitmarius/Backtest_Strategies (검증 보조 자료; 독립적인 OOS가 아님)
 
-## 2. 첫 번째 평가 정책 — `GEM_W12_TBILL_WINNER_v0` (검토 전 잠정 동결)
+## 2. 첫 번째 평가 정책 — `GEM_W12_US_TBILL_v0` (검토 전 잠정 동결)
 
 | 항목 | 사전 고정 규칙 |
 |---|---|
@@ -34,7 +35,7 @@
 | 절대 비교 | 같은 12개월 동안의 미 국채 단기무위험자산(T-bills) **누적 총수익** |
 | lookback | 직전 월말 대비 12개월 전 월말의 총수익; **skip-month 없음** |
 | winner | 미국/미국 제외 중 12개월 수익률이 큰 쪽; 동률은 미국 |
-| switch | winner_return > tbill_12m_return 이면 winner에 100%; 그 외 AGG 100% |
+| switch | **us_12m_return > tbill_12m_return** 이면 미국/미국 제외 중 winner에 100%; 그 외 AGG 100% (미국 외 시장이 강해도 US 절대 필터 실패 시 채권) |
 | 주문 시점 | t월 말 신호를 t+1월 **첫 미국 거래일 시가 이후**에 집행; 신호일 종가 체결 금지 |
 | 거래 | 주식 롱온리, 무차입, 동시 한 자산, 월중 재판정/임의 청산 없음 |
 | 결측 | 필요한 시점 가격, T-bill 시점 정보 또는 다음 개장 체결 기준가 결측이면 **fail-close**. 다른 proxy 자동 대체나 forward-fill로 통과 금지 |
@@ -61,7 +62,7 @@
 
 ### Phase 1 — 단 한 번의 사전등록 GEM portfolio translation (Phase 0 승인 후)
 
-- 고정된 `GEM_W12_TBILL_WINNER_v0` 하나만 실행. 기존 `momentum-v2`의 `jt_*` 코어를 수정하지 않는다.
+- 고정된 `GEM_W12_US_TBILL_v0` 하나만 실행. 기존 `momentum-v2`의 `jt_*` 코어를 수정하지 않는다.
 - 동일 데이터·동일 거래 시점·동일 비용으로 비교: (a) SPY 100% buy/hold, (b) SPY/AGG 60/40 월말 리밸런싱, (c) SPY/VEU/AGG 동등 비교를 위한 정적 자산배분 대조군(비율은 실행 전 승인), (d) GEM.
 - 1차 지표: 비용 후 GEM CAGR − 비용 후 60/40 CAGR. 필수 공동 보고: Sharpe, Sortino, MDD, 월별 초과수익, 회전율, 거래 횟수, 총 거래비용, 자산별 체류시간, 연도별 기여, 신호 지연.
 - 판정 후보(Phase 1 실행 전 승인 필요): `ECONOMIC_AND_RISK_PASS` = CAGR gap > 0 **AND** Sharpe >= 60/40 **AND** MDD 악화 없음; `RISK_ONLY` = CAGR gap <= 0 이나 MDD 개선; 나머지 `REJECT`. 실제 값에 맞춰 기준을 나중에 고치지 않는다.
@@ -84,7 +85,7 @@
 
 ## 5. 승인 전 확인 사항
 
-1. 고정 primary 규칙: **승자 vs T-bills** (책 설명 기준). 다른 GEM 구현과 혼동하지 않는다.
+1. 고정 primary 규칙: **미국 주식 vs T-bills → 통과 시 미/해외 승자 선택** (Antonacci 책 p.98). 상대모멘텀 승자 vs T-bills 형태(p.101)는 별도 방식이다.
 2. 지수 총수익과 ETF 총수익 중 어떤 입력이 실제로 확보되는지 Phase 0에서 객관적으로 확인한다.
 3. Phase 1의 primary/리스크 합격선과 거래비용 가정을 사용자 검토한 뒤에만 고정한다.
 
