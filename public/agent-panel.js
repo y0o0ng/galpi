@@ -1476,43 +1476,68 @@
       return section;
     }
     if (state.instagramInsightsError || data.status === 'stale') section.appendChild(detailText('지금 조회하지 못해 마지막 조회 결과를 표시해.', 'danger'));
-    const points = data.points || [];
-    if (!points.some(point => point.views !== null)) {
+    const points = [...(data.points || [])];
+    const latestFollower = data.followers?.latest;
+    if (latestFollower && (!points.length || latestFollower.observedAt >= points[points.length - 1].endAt)) {
+      points.push({ startAt: null, endAt: latestFollower.observedAt, views: null, followers: latestFollower, current: true });
+    }
+    const legend = document.createElement('p');
+    legend.className = 'instagram-series-legend';
+    const viewsLegend = document.createElement('span'); viewsLegend.textContent = '조회수 · 왼쪽 축 (회)';
+    const followersLegend = document.createElement('span'); followersLegend.textContent = '팔로워 총수 · 오른쪽 축 (명)';
+    legend.append(viewsLegend, followersLegend); section.appendChild(legend);
+    if (latestFollower) section.appendChild(detailText(`팔로워 총수 ${latestFollower.total.toLocaleString('ko-KR')}명 · 관측: ${new Date(latestFollower.observedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
+    if (data.followers?.status === 'unavailable') section.appendChild(detailText('팔로워 조회·기록 실패. 저장된 관측값만 표시해.', 'danger'));
+    else if (!latestFollower) section.appendChild(detailText('팔로워 기록 전 · 과거 총수는 미제공'));
+    if (!points.some(point => point.views !== null || point.followers)) {
       section.appendChild(detailText('인스타가 아직 일별 Reels 조회수를 반환하지 않았어.'));
       return section;
     }
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 560 240');
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', '최근 Meta 집계일별 Instagram Reels 조회수. 정확한 구간과 값은 아래 일별 데이터에서 확인할 수 있어.');
+    svg.setAttribute('aria-label', '조회수와 관측한 팔로워 총수의 추세선. 조회수는 왼쪽 축, 팔로워는 오른쪽 축이며 정확한 구간과 관측 시각은 아래 표에서 확인할 수 있어.');
     const draw = (tag, attrs, text) => {
       const node = document.createElementNS(svg.namespaceURI, tag);
       Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
       if (text !== undefined) node.textContent = text;
       svg.appendChild(node);
     };
-    const max = Math.max(1, ...points.map(point => point.views || 0));
+    const viewsMax = Math.max(1, ...points.map(point => point.views || 0));
+    const followersMax = Math.max(1, ...points.map(point => point.followers?.total || 0));
     const width = 480 / points.length;
     draw('line', { x1: 40, y1: 196, x2: 520, y2: 196, stroke: 'var(--hairline)' });
-    points.forEach((point, index) => {
-      const x = 40 + width * (index + .5);
-      const height = point.views === null ? 0 : point.views / max * 145;
-      if (point.views !== null) draw('rect', { x: x - width * .28, y: 196 - height, width: width * .56, height, rx: 3, fill: 'var(--brand)' });
-      draw('text', { x, y: 184 - height, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'));
-      draw('text', { x, y: 221, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, new Date(point.endAt * 1000).toISOString().slice(5, 10).replace('-', '/'));
+    [['views', viewsMax, 'var(--brand)', 4, 'start'], ['followers', followersMax, 'var(--council)', 556, 'end']].forEach(([series, max, color, axisX, anchor]) => {
+      const values = points.map(point => series === 'views' ? point.views : point.followers?.total ?? null);
+      if (!values.some(value => value !== null)) return;
+      draw('text', { x: axisX, y: 57, fill: color, 'text-anchor': anchor, 'font-size': 12 }, max.toLocaleString('ko-KR'));
+      draw('text', { x: axisX, y: 200, fill: color, 'text-anchor': anchor, 'font-size': 12 }, '0');
+      const coordinates = values.map((value, index) => ({ value, x: 40 + width * (index + .5), y: 196 - (value === null ? 0 : value / max * 145) }));
+      let trend = '', connected = false;
+      coordinates.forEach(({ value, x, y }) => {
+        if (value === null) { connected = false; return; }
+        trend += `${connected ? 'L' : 'M'}${x},${y} `; connected = true;
+      });
+      draw('path', { class: `${series}-trend`, d: trend, fill: 'none', stroke: color, 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+      coordinates.forEach(({ value, x, y }) => {
+        if (value === null) return;
+        draw('circle', { class: `${series}-point`, cx: x, cy: y, r: 4, fill: color });
+        draw('text', { x, y: y - (series === 'views' ? 12 : -21), 'text-anchor': 'middle', fill: color, 'font-size': 13 }, value.toLocaleString('ko-KR'));
+      });
     });
+    points.forEach((point, index) => draw('text', { x: 40 + width * (index + .5), y: 221, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, point.current ? '현재' : new Date(point.endAt * 1000).toISOString().slice(5, 10).replace('-', '/')));
     section.appendChild(svg);
     const details = document.createElement('details');
     const summary = document.createElement('summary'); summary.textContent = '일별 데이터';
     const table = document.createElement('table');
     const head = document.createElement('tr');
-    ['집계 구간 (UTC)', '조회수'].forEach(label => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = label; head.appendChild(th); });
+    ['집계 구간 (UTC)', '조회수', '팔로워 총수 · 관측 (UTC)'].forEach(label => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = label; head.appendChild(th); });
     const thead = document.createElement('thead'); thead.appendChild(head); table.appendChild(thead);
     const body = document.createElement('tbody');
     const format = at => new Date(at * 1000).toISOString().slice(5, 16).replace('T', ' ');
     points.forEach(point => {
       const row = document.createElement('tr');
-      [`${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR')].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
+      [point.current ? '현재 관측' : `${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'), point.followers ? `${point.followers.total.toLocaleString('ko-KR')}명 · ${format(point.followers.observedAt)}` : '미제공'].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
       body.appendChild(row);
     });
     table.appendChild(body); details.append(summary, table); section.appendChild(details);
