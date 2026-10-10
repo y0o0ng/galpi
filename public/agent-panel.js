@@ -1477,10 +1477,14 @@
       return section;
     }
     if (state.instagramInsightsError || data.status === 'stale') section.appendChild(detailText('지금 조회하지 못해 마지막 조회 결과를 표시해.', 'danger'));
-    const points = [...(data.points || [])];
+    const dayLabel = at => new Date(at * 1000).toISOString().slice(0, 10);
+    const points = (data.points || []).map(point => ({ ...point, day: dayLabel(point.endAt) }));
     const latestFollower = data.followers?.latest;
     if (latestFollower && (!points.length || latestFollower.observedAt >= points[points.length - 1].endAt)) {
-      points.push({ startAt: null, endAt: latestFollower.observedAt, views: null, followers: latestFollower, current: true });
+      const day = dayLabel(latestFollower.observedAt + 9 * 3600);
+      const sameDay = points.find(point => point.day === day);
+      if (sameDay) sameDay.followers = latestFollower;
+      else points.push({ startAt: null, endAt: latestFollower.observedAt, day, views: null, followers: latestFollower, observationOnly: true });
     }
     const legend = document.createElement('p');
     legend.className = 'instagram-series-legend';
@@ -1503,15 +1507,25 @@
       if (text !== undefined) node.textContent = text;
       svg.appendChild(node);
     };
-    const viewsMax = Math.max(1, ...points.map(point => point.views || 0));
-    const followersMax = Math.max(1, ...points.map(point => point.followers?.total || 0));
+    const axisMax = value => {
+      const step = 10 ** Math.floor(Math.log10(Math.max(1, value)));
+      return Math.ceil(Math.max(1, value) / step) * step;
+    };
+    const viewsMax = axisMax(Math.max(0, ...points.map(point => point.views || 0)));
+    const followersMax = axisMax(Math.max(0, ...points.map(point => point.followers?.total || 0)));
     const width = 480 / points.length;
-    draw('line', { x1: 40, y1: 160, x2: 520, y2: 160, stroke: 'var(--hairline)' });
+    for (let tick = 0; tick <= 4; tick++) {
+      const y = 160 - tick * 130 / 4;
+      draw('line', { class: 'chart-grid', x1: 40, y1: y, x2: 520, y2: y, stroke: 'var(--hairline)' });
+    }
+    draw('line', { class: 'chart-axis', x1: 40, y1: 30, x2: 40, y2: 160, stroke: 'var(--hairline)' });
+    draw('line', { class: 'chart-axis', x1: 520, y1: 30, x2: 520, y2: 160, stroke: 'var(--hairline)' });
     [['views', viewsMax, 'var(--brand)', 4, 'start'], ['followers', followersMax, 'var(--council)', 556, 'end']].forEach(([series, max, color, axisX, anchor]) => {
       const values = points.map(point => series === 'views' ? point.views : point.followers?.total ?? null);
       if (!values.some(value => value !== null)) return;
-      draw('text', { x: axisX, y: 36, fill: color, 'text-anchor': anchor, 'font-size': 10 }, max.toLocaleString('ko-KR'));
-      draw('text', { x: axisX, y: 164, fill: color, 'text-anchor': anchor, 'font-size': 10 }, '0');
+      for (let tick = 0; tick <= 4; tick++) {
+        draw('text', { class: 'chart-tick', x: axisX, y: 164 - tick * 130 / 4, fill: color, 'text-anchor': anchor, 'font-size': 10 }, (max * tick / 4).toLocaleString('ko-KR', { maximumFractionDigits: 2 }));
+      }
       const coordinates = values.map((value, index) => ({ value, x: 40 + width * (index + .5), y: 160 - (value === null ? 0 : value / max * 130) }));
       let trend = '', connected = false;
       coordinates.forEach(({ value, x, y }) => {
@@ -1522,10 +1536,9 @@
       coordinates.forEach(({ value, x, y }) => {
         if (value === null) return;
         draw('circle', { class: `${series}-point`, cx: x, cy: y, r: 3, fill: color });
-        draw('text', { x, y: y - (series === 'views' ? 12 : -21), 'text-anchor': 'middle', fill: color, 'font-size': 10 }, value.toLocaleString('ko-KR'));
       });
     });
-    points.forEach((point, index) => draw('text', { x: 40 + width * (index + .5), y: 184, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 10 }, point.current ? '현재' : new Date(point.endAt * 1000).toISOString().slice(5, 10).replace('-', '/')));
+    points.forEach((point, index) => draw('text', { x: 40 + width * (index + .5), y: 184, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 10 }, point.day.slice(5).replace('-', '/')));
     section.appendChild(svg);
     const details = document.createElement('details');
     const summary = document.createElement('summary'); summary.textContent = '일별 데이터';
@@ -1537,10 +1550,10 @@
     const format = at => new Date(at * 1000).toISOString().slice(5, 16).replace('T', ' ');
     points.forEach(point => {
       const row = document.createElement('tr');
-      [point.current ? '현재 관측' : `${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'), point.followers ? `${point.followers.total.toLocaleString('ko-KR')}명 · ${format(point.followers.observedAt)}` : '미제공'].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
+      [point.observationOnly ? `${point.day} 관측` : `${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'), point.followers ? `${point.followers.total.toLocaleString('ko-KR')}명 · ${format(point.followers.observedAt)}` : '미제공'].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
       body.appendChild(row);
     });
-    table.appendChild(body); details.append(summary, detailText('계정 전체 Reels · Meta 집계일 기준 · 종료일 표시'), table); section.appendChild(details);
+    table.appendChild(body); details.append(summary, detailText('조회수: 계정 전체 Reels · Meta 집계 종료일. 최신 팔로워: 한국 시간 관측일에 표시.'), table); section.appendChild(details);
     details.appendChild(detailText(`조회 시각: ${new Date(data.fetchedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
     return section;
   }

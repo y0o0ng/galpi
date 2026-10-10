@@ -182,9 +182,25 @@ async function main() {
     assert.equal(await page.locator('.followers-point').count(), 1);
     assert.equal((await page.locator('.followers-trend').getAttribute('d')).includes('L'), false);
     assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
-    await page.getByText('현재', { exact: true }).waitFor();
+    assert.equal(await page.getByText('현재', { exact: true }).count(), 0);
+    assert.equal(await page.locator('.instagram-insights tbody tr').count(), 7);
+    assert.equal(await page.locator('.followers-point').getAttribute('cx'), await page.locator('.views-point').last().getAttribute('cx'));
+    assert.equal(await page.locator('.chart-grid').count(), 5);
+    assert.equal(await page.locator('.chart-axis').count(), 2);
+    assert.equal(await page.locator('.instagram-insights svg text:not(.chart-tick)').count(), 7);
 
     await snapshotAll('instagram-seven-days');
+    for (const width of [1440, 820, 390]) {
+      await page.setViewportSize({ width, height: 1100 });
+      assert.ok(await page.locator('.instagram-chart-header').evaluate(el => el.querySelector('.instagram-series-legend').getBoundingClientRect().right < el.querySelector('h4').getBoundingClientRect().left));
+    }
+    await page.evaluate(() => { window.fixture['/api/reels/instagram/insights'].followers.latest.observedAt = Date.parse('2026-10-10T15:01:00Z') / 1000; });
+    await refresh();
+    assert.equal(await page.locator('.instagram-insights tbody tr').count(), 8);
+    assert.equal(await page.locator('.instagram-insights svg text:not(.chart-tick)').last().textContent(), '10/11');
+    assert.equal(await page.locator('.instagram-insights tbody tr').last().locator('td').nth(1).textContent(), '미제공');
+    await page.evaluate(() => { window.fixture['/api/reels/instagram/insights'].followers.latest.observedAt = 1791633069; });
+    await refresh();
 
     await page.locator('.agent-rail-entry').filter({ hasText: '일정 에이전트' }).click();
     await page.getByRole('button', { name: '전체 일정', exact: true }).click();
