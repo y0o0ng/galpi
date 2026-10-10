@@ -44,10 +44,10 @@ function fakeExec({ failOn } = {}) {
   return fn;
 }
 
-function makeUploader(t, { fetch, execFile = fakeExec(), sleeps = [] } = {}) {
+function makeUploader(t, { fetch, execFile = fakeExec(), sleeps = [], publicDnsReady = async () => true } = {}) {
   return createInstagramUploader({
     userId: '1789', tokens: { get: () => TOKEN }, publicBaseUrl: `${BASE}/`, tmpRoot: t.root, execFile, fetch,
-    sleep: async ms => { sleeps.push(ms); },
+    sleep: async ms => { sleeps.push(ms); }, publicDnsReady,
   });
 }
 
@@ -173,6 +173,34 @@ test('상태 폴링: ERROR/EXPIRED는 실패, 10분(60회) 넘으면 시간 초�
   assert.equal(sleeps.length, 59);
   assert.equal(fetch.calls.filter(c => c.url.includes('status_code')).length, 60);
   assert.equal(fetch.calls.some(c => c.url.endsWith('/media_publish')), false);
+});
+
+test('공개 DNS에 이름이 뜨기 전에는 Meta를 부르지 않고, 10분 넘으면 재시도 가능한 실패로 funnel을 끈다', async () => {
+  const t = tmp();
+  const sleeps = [];
+  const hosts = [];
+  const fetch = igFetch();
+  let checks = 0;
+  const publicDnsReady = async host => {
+    hosts.push(host);
+    // 이름이 뜨기 전에 Meta를 불렀으면 여기서 잡힌다.
+    assert.equal(fetch.calls.length, 0);
+    return ++checks >= 3;
+  };
+  await makeUploader(t, { fetch, sleeps, publicDnsReady }).upload({ videoPath: t.video, caption: CAPTION });
+  assert.deepEqual(hosts, Array(3).fill('pi.example.ts.net'));
+  assert.deepEqual(sleeps.slice(0, 2), [10_000, 10_000]);
+
+  const t2 = tmp();
+  const exec = fakeExec();
+  const fetch2 = igFetch();
+  await assert.rejects(
+    makeUploader(t2, { fetch: fetch2, execFile: exec, publicDnsReady: async () => false }).upload({ videoPath: t2.video, caption: CAPTION }),
+    { code: 'REELS_IG_PUBLIC_DNS_TIMEOUT', retryable: true },
+  );
+  assert.equal(fetch2.calls.length, 0);
+  assert.deepEqual(exec.calls.at(-1), ['tailscale', 'funnel', '--https=8443', 'off']);
+  assert.deepEqual(fs.readdirSync(t2.root), []);
 });
 
 test('5xx는 재시도하지만 media_publish는 재시도하지 않는다', async () => {
