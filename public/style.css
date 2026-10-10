@@ -6115,3 +6115,9 @@ a.reels-claim-source { text-decoration: underline; }
 @media (max-width: 1100px) { .agent-rail-entry { justify-content: flex-start; } }
 
 .agents-data-board .codex-agent-message { margin: 0; }
+
+.cards-carousel { min-width: 0; display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; }
+.cards-carousel img { flex: 0 0 100%; width: 100%; height: auto; object-fit: contain; scroll-snap-align: start; }
+.cards-agent-card .schedule-agent-action { min-height: 44px; }
+
+.cards-agent-card .reels-episode-body { min-width: 0; }

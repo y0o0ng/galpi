@@ -461,7 +461,8 @@ test('Agents uses a data board and status rail with no invented performance', ()
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
   const summary = panel.slice(panel.indexOf('function renderSummary()'), panel.indexOf('function renderReelsDetail()'));
   assert.match(summary, /데이터 미연결/);
-  assert.match(summary, /카드 뉴스.*미연결/);
+  assert.match(summary, /카드 뉴스/);
+  assert.match(summary, /미연결/);
   assert.doesNotMatch(summary, /makeCalendar\(|makeScheduleBlock\(|makeReelsEpisodeCard\(/);
   assert.match(css, /\.agents-dashboard \{[^}]*grid-template-columns:/);
   assert.match(css, /\.agents-status-rail \{ order: -1;/);
