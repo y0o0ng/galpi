@@ -168,6 +168,10 @@ async function main() {
     });
     await refresh();
     assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
+    assert.equal(await page.locator('.agents-data-board > h3').count(), 0);
+    assert.equal(await page.locator('.instagram-chart-header h4').textContent(), '인스타그램');
+    assert.equal(await page.locator('.instagram-chart-header .instagram-series-legend span').count(), 2);
+    assert.ok(await page.locator('.instagram-insights svg').evaluate(el => el.getBoundingClientRect().height <= 220));
     assert.equal((await page.locator('.views-trend').getAttribute('d')).match(/L/g).length, 6);
     assert.equal(await page.locator('.instagram-insights rect').count(), 0);
     await page.evaluate(() => {

@@ -1468,8 +1468,9 @@
     const section = document.createElement('section');
     section.className = 'instagram-insights';
     const title = document.createElement('h4');
-    title.textContent = 'Instagram Reels 조회수';
-    section.append(title, detailText('계정 전체 Reels · Meta 집계일 기준 · 종료일 표시'));
+    title.textContent = '인스타그램';
+    const header = document.createElement('div'); header.className = 'instagram-chart-header';
+    header.appendChild(title); section.appendChild(header);
     const data = state.instagramInsights;
     if (!data || data.status === 'disconnected') {
       section.appendChild(detailText(state.instagramInsightsError || (state.instagramInsightsLoading ? '인스타 조회수를 불러오는 중이야.' : '데이터 미연결')));
@@ -1483,10 +1484,9 @@
     }
     const legend = document.createElement('p');
     legend.className = 'instagram-series-legend';
-    const viewsLegend = document.createElement('span'); viewsLegend.textContent = '조회수 · 왼쪽 축 (회)';
-    const followersLegend = document.createElement('span'); followersLegend.textContent = '팔로워 총수 · 오른쪽 축 (명)';
-    legend.append(viewsLegend, followersLegend); section.appendChild(legend);
-    if (latestFollower) section.appendChild(detailText(`팔로워 총수 ${latestFollower.total.toLocaleString('ko-KR')}명 · 관측: ${new Date(latestFollower.observedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
+    const viewsLegend = document.createElement('span'); viewsLegend.textContent = '조회수 (회)';
+    const followersLegend = document.createElement('span'); followersLegend.textContent = '팔로워 (명)';
+    legend.append(viewsLegend, followersLegend); header.appendChild(legend);
     if (data.followers?.status === 'unavailable') section.appendChild(detailText('팔로워 조회·기록 실패. 저장된 관측값만 표시해.', 'danger'));
     else if (!latestFollower) section.appendChild(detailText('팔로워 기록 전 · 과거 총수는 미제공'));
     if (!points.some(point => point.views !== null || point.followers)) {
@@ -1494,7 +1494,7 @@
       return section;
     }
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 560 240');
+    svg.setAttribute('viewBox', '0 0 560 200');
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', '조회수와 관측한 팔로워 총수의 추세선. 조회수는 왼쪽 축, 팔로워는 오른쪽 축이며 정확한 구간과 관측 시각은 아래 표에서 확인할 수 있어.');
     const draw = (tag, attrs, text) => {
@@ -1506,26 +1506,26 @@
     const viewsMax = Math.max(1, ...points.map(point => point.views || 0));
     const followersMax = Math.max(1, ...points.map(point => point.followers?.total || 0));
     const width = 480 / points.length;
-    draw('line', { x1: 40, y1: 196, x2: 520, y2: 196, stroke: 'var(--hairline)' });
+    draw('line', { x1: 40, y1: 160, x2: 520, y2: 160, stroke: 'var(--hairline)' });
     [['views', viewsMax, 'var(--brand)', 4, 'start'], ['followers', followersMax, 'var(--council)', 556, 'end']].forEach(([series, max, color, axisX, anchor]) => {
       const values = points.map(point => series === 'views' ? point.views : point.followers?.total ?? null);
       if (!values.some(value => value !== null)) return;
-      draw('text', { x: axisX, y: 57, fill: color, 'text-anchor': anchor, 'font-size': 12 }, max.toLocaleString('ko-KR'));
-      draw('text', { x: axisX, y: 200, fill: color, 'text-anchor': anchor, 'font-size': 12 }, '0');
-      const coordinates = values.map((value, index) => ({ value, x: 40 + width * (index + .5), y: 196 - (value === null ? 0 : value / max * 145) }));
+      draw('text', { x: axisX, y: 36, fill: color, 'text-anchor': anchor, 'font-size': 10 }, max.toLocaleString('ko-KR'));
+      draw('text', { x: axisX, y: 164, fill: color, 'text-anchor': anchor, 'font-size': 10 }, '0');
+      const coordinates = values.map((value, index) => ({ value, x: 40 + width * (index + .5), y: 160 - (value === null ? 0 : value / max * 130) }));
       let trend = '', connected = false;
       coordinates.forEach(({ value, x, y }) => {
         if (value === null) { connected = false; return; }
         trend += `${connected ? 'L' : 'M'}${x},${y} `; connected = true;
       });
-      draw('path', { class: `${series}-trend`, d: trend, fill: 'none', stroke: color, 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+      draw('path', { class: `${series}-trend`, d: trend, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
       coordinates.forEach(({ value, x, y }) => {
         if (value === null) return;
-        draw('circle', { class: `${series}-point`, cx: x, cy: y, r: 4, fill: color });
-        draw('text', { x, y: y - (series === 'views' ? 12 : -21), 'text-anchor': 'middle', fill: color, 'font-size': 13 }, value.toLocaleString('ko-KR'));
+        draw('circle', { class: `${series}-point`, cx: x, cy: y, r: 3, fill: color });
+        draw('text', { x, y: y - (series === 'views' ? 12 : -21), 'text-anchor': 'middle', fill: color, 'font-size': 10 }, value.toLocaleString('ko-KR'));
       });
     });
-    points.forEach((point, index) => draw('text', { x: 40 + width * (index + .5), y: 221, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, point.current ? '현재' : new Date(point.endAt * 1000).toISOString().slice(5, 10).replace('-', '/')));
+    points.forEach((point, index) => draw('text', { x: 40 + width * (index + .5), y: 184, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 10 }, point.current ? '현재' : new Date(point.endAt * 1000).toISOString().slice(5, 10).replace('-', '/')));
     section.appendChild(svg);
     const details = document.createElement('details');
     const summary = document.createElement('summary'); summary.textContent = '일별 데이터';
@@ -1540,8 +1540,8 @@
       [point.current ? '현재 관측' : `${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'), point.followers ? `${point.followers.total.toLocaleString('ko-KR')}명 · ${format(point.followers.observedAt)}` : '미제공'].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
       body.appendChild(row);
     });
-    table.appendChild(body); details.append(summary, table); section.appendChild(details);
-    section.appendChild(detailText(`조회 시각: ${new Date(data.fetchedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
+    table.appendChild(body); details.append(summary, detailText('계정 전체 Reels · Meta 집계일 기준 · 종료일 표시'), table); section.appendChild(details);
+    details.appendChild(detailText(`조회 시각: ${new Date(data.fetchedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
     return section;
   }
 
@@ -1561,8 +1561,9 @@
     state.container.replaceChildren();
     const layout = document.createElement('div');
     layout.className = 'agents-dashboard';
-    const board = detailCard('데이터 시각화', detailText('Instagram Reels · YouTube Shorts · 기타 소스'));
-    board.classList.add('agents-data-board');
+    const board = document.createElement('section');
+    board.className = 'agent-detail-card agents-data-board';
+    board.setAttribute('aria-label', '성과 추세');
     board.append(makeInstagramChart(), detailText('YouTube Shorts · 데이터 미연결'));
     const rail = document.createElement('nav');
     rail.className = 'agents-status-rail';
