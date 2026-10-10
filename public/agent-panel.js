@@ -11,6 +11,9 @@
     showToast: null,
     container: null,
     requestId: 0,
+    instagramInsights: null,
+    instagramInsightsError: '',
+    instagramInsightsLoading: false,
     mode: 'summary',
     summary: null,
     reminders: [],
@@ -1459,6 +1462,72 @@
     return wrapper;
   }
 
+  function makeInstagramChart() {
+    const section = document.createElement('section');
+    section.className = 'instagram-insights';
+    const title = document.createElement('h4');
+    title.textContent = 'Instagram Reels 조회수';
+    section.append(title, detailText('계정 전체 Reels · Meta 집계일 기준 · 종료일 표시'));
+    const data = state.instagramInsights;
+    if (!data || data.status === 'disconnected') {
+      section.appendChild(detailText(state.instagramInsightsError || (state.instagramInsightsLoading ? '인스타 조회수를 불러오는 중이야.' : '데이터 미연결')));
+      return section;
+    }
+    if (state.instagramInsightsError || data.status === 'stale') section.appendChild(detailText('지금 조회하지 못해 마지막 조회 결과를 표시해.', 'danger'));
+    const points = data.points || [];
+    if (!points.some(point => point.views !== null)) {
+      section.appendChild(detailText('인스타가 아직 일별 Reels 조회수를 반환하지 않았어.'));
+      return section;
+    }
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 560 240');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', '최근 Meta 집계일별 Instagram Reels 조회수. 정확한 구간과 값은 아래 일별 데이터에서 확인할 수 있어.');
+    const draw = (tag, attrs, text) => {
+      const node = document.createElementNS(svg.namespaceURI, tag);
+      Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+      if (text !== undefined) node.textContent = text;
+      svg.appendChild(node);
+    };
+    const max = Math.max(1, ...points.map(point => point.views || 0));
+    const width = 480 / points.length;
+    draw('line', { x1: 40, y1: 196, x2: 520, y2: 196, stroke: 'var(--hairline)' });
+    points.forEach((point, index) => {
+      const x = 40 + width * (index + .5);
+      const height = point.views === null ? 0 : point.views / max * 145;
+      if (point.views !== null) draw('rect', { x: x - width * .28, y: 196 - height, width: width * .56, height, rx: 3, fill: 'var(--brand)' });
+      draw('text', { x, y: 184 - height, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR'));
+      draw('text', { x, y: 221, 'text-anchor': 'middle', fill: 'var(--ai-text)', 'font-size': 13 }, new Date(point.endAt * 1000).toISOString().slice(5, 10).replace('-', '/'));
+    });
+    section.appendChild(svg);
+    const details = document.createElement('details');
+    const summary = document.createElement('summary'); summary.textContent = '일별 데이터';
+    const table = document.createElement('table');
+    const head = document.createElement('tr');
+    ['집계 구간 (UTC)', '조회수'].forEach(label => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = label; head.appendChild(th); });
+    const thead = document.createElement('thead'); thead.appendChild(head); table.appendChild(thead);
+    const body = document.createElement('tbody');
+    const format = at => new Date(at * 1000).toISOString().slice(5, 16).replace('T', ' ');
+    points.forEach(point => {
+      const row = document.createElement('tr');
+      [`${format(point.startAt)} → ${format(point.endAt)}`, point.views === null ? '미제공' : point.views.toLocaleString('ko-KR')].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
+      body.appendChild(row);
+    });
+    table.appendChild(body); details.append(summary, table); section.appendChild(details);
+    section.appendChild(detailText(`조회 시각: ${new Date(data.fetchedAt * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)`));
+    return section;
+  }
+
+  async function loadInstagramInsights() {
+    state.instagramInsightsLoading = true;
+    try {
+      const response = await state.apiFetch('/api/reels/instagram/insights');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '인스타 성과를 불러오지 못했어.');
+      state.instagramInsights = data;
+    } finally { state.instagramInsightsLoading = false; }
+  }
+
   function renderSummary() {
     releaseReelsMedia();
     releaseCardMedia();
@@ -1467,10 +1536,7 @@
     layout.className = 'agents-dashboard';
     const board = detailCard('데이터 시각화', detailText('Instagram Reels · YouTube Shorts · 기타 소스'));
     board.classList.add('agents-data-board');
-    const empty = document.createElement('div');
-    empty.className = 'agents-data-empty';
-    empty.append(detailText('데이터 미연결'), detailText('YouTube Shorts · Instagram Reels 조회수·성과 추세'));
-    board.append(empty, detailText('성과 데이터 연결 후 표시돼.'));
+    board.append(makeInstagramChart(), detailText('YouTube Shorts · 데이터 미연결'));
     const rail = document.createElement('nav');
     rail.className = 'agents-status-rail';
     rail.setAttribute('aria-label', '에이전트 현황');
@@ -2264,6 +2330,7 @@
       return;
     }
     renderLoading();
+    const performance = Promise.allSettled([loadInstagramInsights()]);
     // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
     const [scheduleResult, codexResult, mailResult, , , reelsResult, episodeResult] = await Promise.allSettled([
       state.enabled ? loadAgentData() : Promise.resolve(false),
@@ -2286,8 +2353,10 @@
       : '';
     state.reelsError = reelsResult.status === 'rejected' ? reelsResult.reason.message : '';
     state.reelsEpisodeError = episodeResult.status === 'rejected' ? episodeResult.reason.message : '';
-    if (state.mode !== 'summary') return;
-    renderSummary();
+    if (state.mode === 'summary') renderSummary();
+    const [instagramResult] = await performance;
+    state.instagramInsightsError = instagramResult.status === 'rejected' ? instagramResult.reason.message : '';
+    if (state.mode === 'summary') renderSummary();
   }
 
   function show() {

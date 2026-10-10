@@ -45,6 +45,7 @@ async function main() {
         '/api/reels/latest': { batch: { batchId: day, status: 'candidate', cards: [{ id: 7, title: '<img onerror=alert(1)> fixture 후보', concept: 'test', why: 'fixture reason' }] } },
         '/api/reels/episodes/latest': { episode: null },
         '/api/tasks': { tasks: [], counts: {} },
+        '/api/reels/instagram/insights': { status: 'disconnected', points: [] },
       };
       window.mediaBlob = new Blob(['fixture video'], { type: 'video/mp4' });
       window.calls = [];
@@ -56,6 +57,7 @@ async function main() {
       const apiFetch = async (route, options = {}) => {
         const base = route.split('?')[0];
         window.calls.push({ route, ...options });
+        if (base === '/api/reels/instagram/insights' && window.insightsGate) await window.insightsGate;
         if (base === '/api/reels/episodes/9/video') return new Response(window.mediaBlob);
         if (base.startsWith('/api/cards/') && !window.fixture[base]) return new Response('{}', { status: 404 });
         if (window.apiFailures[base]) return new Response(JSON.stringify({ error: 'fixture unavailable' }), { status: 503 });
@@ -115,6 +117,42 @@ async function main() {
         await back();
       }
     }
+    await page.evaluate(() => {
+      window.insightsGate = new Promise(resolve => { window.resolveInsights = resolve; });
+      window.pendingInsightsRefresh = window.AgentPanel.refresh();
+    });
+    await page.locator('.agents-dashboard').waitFor();
+    assert.equal(await page.locator('.agent-rail-entry').count(), 5);
+    await page.evaluate(() => { window.resolveInsights(); window.insightsGate = null; });
+    await page.evaluate(() => window.pendingInsightsRefresh);
+    await page.evaluate(() => {
+      window.fixture['/api/reels/instagram/insights'] = { status: 'ready', basis: 'meta_day', scope: 'account_reels', metric: 'views', fetchedAt: 1791600000, points: [
+        { startAt: 1791266400, endAt: 1791352800, views: 1234 },
+        { startAt: 1791352800, endAt: 1791439200, views: null },
+        { startAt: 1791439200, endAt: 1791525600, views: 0 },
+      ] };
+    });
+    await refresh();
+    assert.equal(await page.locator('.instagram-insights rect').count(), 2);
+    assert.equal(await page.getByText('미제공', { exact: true }).count(), 2);
+    await page.locator('.instagram-insights summary').click();
+    assert.equal(await page.locator('.instagram-insights tbody tr').count(), 3);
+    await snapshotAll('instagram-ready');
+    await page.evaluate(() => { window.apiFailures['/api/reels/instagram/insights'] = true; });
+    await refresh();
+    await page.getByText('지금 조회하지 못해 마지막 조회 결과를 표시해.').waitFor();
+    assert.equal(await page.locator('.instagram-insights rect').count(), 2);
+    await snapshotAll('instagram-stale');
+    await page.evaluate(() => { delete window.apiFailures['/api/reels/instagram/insights']; });
+    await page.evaluate(() => {
+      const values = [2618, 4865, 1318, 707, 802, 2480, 1530];
+      window.fixture['/api/reels/instagram/insights'] = { status: 'ready', basis: 'meta_day', scope: 'account_reels', metric: 'views', fetchedAt: 1791633069,
+        points: values.map((views, i) => ({ startAt: 1791010800 + i * 86400, endAt: 1791097200 + i * 86400, views })) };
+    });
+    await refresh();
+    assert.equal(await page.locator('.instagram-insights rect').count(), 7);
+    await snapshotAll('instagram-seven-days');
+
     await page.locator('.agent-rail-entry').filter({ hasText: '일정 에이전트' }).click();
     await page.getByRole('button', { name: '전체 일정', exact: true }).click();
     await page.locator('#agent-task-content .task-view-tabs').waitFor();
