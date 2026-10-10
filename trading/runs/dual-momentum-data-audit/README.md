@@ -16,7 +16,7 @@
 | hurdle | 관측 가능한 미국 단기 국채의 12개월 누적 수익 | 사전검증된 PIT Treasury bill rate/price | 사후 공개 월간 RF값과 당시 가용값의 차이 |
 
 - `data_sources`의 source, source_version, PIT/survivorship flags와 `bars_daily`의 실제 SPY/VEU/AGG 행을 DB에 **readonly** 질의.
-- 연구 신호는 동일 월말 기준 12개월 비교. 월말 누락과 교차 휴장일을 명시 처리하지 않으면 fail-close.
+- 연구 신호는 **먼저 미국(S&P 500) 12개월 총수익률 > T-bills 12개월 누적 수익률**을 검사한다(저자 GEM 책 p.98). 통과 시 미국/미국 제외 주식 수익률을 비교해 강한 쪽, 실패 시 AGG. 미국 외 시장이 강하더라도 미국 절대 게이트 실패 시 주식에 진입하지 않는다. 모두 동일 월말 기준 12개월 비교. 월말 누락과 교차 휴장일을 명시 처리하지 않으면 fail-close.
 - 최초 적격 월은 **모든 고정 입력이 사용 가능해진 뒤 처음으로 12개월 완전 이력이 생긴 월말**로 기계적으로 결정. 시작일을 성과에 맞춰 고르지 않는다.
 - 달력은 `trading/backtest/holdout.py`의 2025-08-07 미만 전체 달력으로 고정; 마지막 보유 기간의 모든 거래일과 배당도 경계 미만.
 - `eodhd-15y-2026-08` 적재는 보존하고, 기존 DB의 write/DDL 변경 금지.
@@ -31,7 +31,7 @@
 | D | 12개월 warmup 이후 120개 이상의 연속된 완전한 월간 신호와 보유 결과 | DATA_NOT_READY |
 | E | 이전 trading 홀드아웃의 경계 밖 정보가 신호, 거래, 결과에 0개 | DATA_NOT_READY |
 | F | ETF/지수 proxy 불일치와 inception-date 처리 명시; 다른 자산으로 임의 fallback 0 | DATA_NOT_READY |
-| G | T-bill의 시점 가용성과 월간 총수익 누적 방식 검증 | DATA_NOT_READY |
+| G | T-bill의 시점 가용성과 월간 총수익 누적 방식 검증; 미국 주식만을 절대 게이트에 쓰는 구현 계약 확인 | DATA_NOT_READY |
 
 전부 PASS일 때 `DATA_READY`. 다른 모든 경우 `DATA_NOT_READY`; 지수/ETF input selection이 다르게 필요하면 사용자 검토용 별도 정책 변경부터.
 
