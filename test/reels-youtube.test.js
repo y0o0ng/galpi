@@ -328,7 +328,7 @@ test('서버 연결·화면 계약: 플래그 기본 false, .env.example 이름�
   assert.match(lines, /label\.textContent/);
   assert.match(lines, /\^https:\\\/\\\/\(youtu\\\.be\|www\\\.instagram\\\.com\)\\\//); // 링크는 youtu.be·instagram.com 주소만
   assert.match(lines, /uploads\/\$\{upload\.platform\}\/retry/);
-  assert.match(panel, /episode\.status === 'approved'\) body\.append\(\.\.\.reelsUploadLines/);
+  assert.match(panel, /episode\.status === 'approved'\) \{\s*body\.append\(\.\.\.reelsUploadLines/);
 });
 
 test('썸네일: 켜져 있으면 업로드 뒤 커버를 thumbnails.set으로 올리고, 실패해도 업로드는 성공이다', async () => {
