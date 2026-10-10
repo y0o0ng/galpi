@@ -6127,4 +6127,9 @@ a.reels-claim-source { text-decoration: underline; }
 .instagram-insights :is(th, td) { text-align: left; padding: 9px 0; border-bottom: 1px solid var(--hairline); }
 .instagram-insights :is(th, td):last-child { text-align: right; }
 
-@media (max-width: 900px) { .instagram-insights svg text { font-size: 18px; } }
+@media (max-width: 900px) { .instagram-insights svg text { font-size: 15px; } }
+
+.instagram-series-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.instagram-series-legend span:first-child { color: var(--brand); }
+.instagram-series-legend span:last-child { color: var(--council); }
+.instagram-insights table td { overflow-wrap: anywhere; }

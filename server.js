@@ -1060,7 +1060,11 @@ const reelsInstagramTokens = createInstagramTokenStore({
   tokenFile: process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE,
   envToken: process.env.REELS_INSTAGRAM_ACCESS_TOKEN,
 });
-const reelsInstagramInsights = createInstagramInsightsService({ userId: process.env.REELS_INSTAGRAM_USER_ID, tokens: reelsInstagramTokens });
+const reelsInstagramInsights = createInstagramInsightsService({
+  userId: process.env.REELS_INSTAGRAM_USER_ID, tokens: reelsInstagramTokens,
+  followersFile: path.join(path.dirname(process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE),
+    `instagram-followers-${crypto.createHash('sha256').update(process.env.REELS_INSTAGRAM_USER_ID || '').digest('hex').slice(0, 16)}.json`),
+});
 const reelsInstagramUploader = REELS_INSTAGRAM_UPLOAD_ENABLED
   ? createInstagramUploader({
     userId: process.env.REELS_INSTAGRAM_USER_ID,
@@ -8522,6 +8526,7 @@ const httpServer = app.listen(PORT, HOST, () => {
     console.log('   릴스:     제작 worker 실행 중 (04:00~07:00 KST, 선택된 후보 1편)');
   }
   if (reelsPushDispatcher) reelsPushDispatcher.start();
+  reelsInstagramInsights.start();
   if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
     console.log('   뉴스:     홈 노출 꺼짐 (문턱 미확정, NEWS_SURFACE_ENABLED)');
   }
@@ -8595,6 +8600,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     reelsWorker?.stop();
     reelsProductionWorker?.stop();
     reelsPushDispatcher?.stop();
+    reelsInstagramInsights.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {

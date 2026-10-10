@@ -138,22 +138,27 @@ async function main() {
     await page.evaluate(() => { window.resolveInsights(); window.insightsGate = null; });
     await page.evaluate(() => window.pendingInsightsRefresh);
     await page.evaluate(() => {
-      window.fixture['/api/reels/instagram/insights'] = { status: 'ready', basis: 'meta_day', scope: 'account_reels', metric: 'views', fetchedAt: 1791600000, points: [
-        { startAt: 1791266400, endAt: 1791352800, views: 1234 },
+      window.fixture['/api/reels/instagram/insights'] = { status: 'ready', followers: { status: 'ready', latest: { total: 53, observedAt: 1791525500 } }, basis: 'meta_day', scope: 'account_reels', metric: 'views', fetchedAt: 1791600000, points: [
+        { startAt: 1791266400, endAt: 1791352800, views: 1234, followers: { total: 54, observedAt: 1791352700 } },
         { startAt: 1791352800, endAt: 1791439200, views: null },
-        { startAt: 1791439200, endAt: 1791525600, views: 0 },
+        { startAt: 1791439200, endAt: 1791525600, views: 0, followers: { total: 53, observedAt: 1791525500 } },
       ] };
     });
     await refresh();
-    assert.equal(await page.locator('.instagram-insights rect').count(), 2);
-    assert.equal(await page.getByText('미제공', { exact: true }).count(), 2);
+    assert.equal(await page.locator('.instagram-insights .views-point').count(), 2);
+    assert.equal((await page.locator('.views-trend').getAttribute('d')).match(/M/g).length, 2);
+    assert.equal((await page.locator('.views-trend').getAttribute('d')).includes('L'), false);
+    assert.equal((await page.locator('.followers-trend').getAttribute('d')).match(/M/g).length, 2);
+    assert.equal(await page.locator('.followers-point').count(), 2);
+    assert.notEqual(await page.locator('.followers-trend').getAttribute('stroke'), await page.locator('.views-trend').getAttribute('stroke'));
+    assert.equal(await page.locator('.instagram-insights tbody tr').nth(1).locator('td').nth(1).textContent(), '미제공');
     await page.locator('.instagram-insights summary').click();
     assert.equal(await page.locator('.instagram-insights tbody tr').count(), 3);
     await snapshotAll('instagram-ready');
     await page.evaluate(() => { window.apiFailures['/api/reels/instagram/insights'] = true; });
     await refresh();
     await page.getByText('지금 조회하지 못해 마지막 조회 결과를 표시해.').waitFor();
-    assert.equal(await page.locator('.instagram-insights rect').count(), 2);
+    assert.equal(await page.locator('.instagram-insights .views-point').count(), 2);
     await snapshotAll('instagram-stale');
     await page.evaluate(() => { delete window.apiFailures['/api/reels/instagram/insights']; });
     await page.evaluate(() => {
@@ -162,7 +167,19 @@ async function main() {
         points: values.map((views, i) => ({ startAt: 1791010800 + i * 86400, endAt: 1791097200 + i * 86400, views })) };
     });
     await refresh();
-    assert.equal(await page.locator('.instagram-insights rect').count(), 7);
+    assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
+    assert.equal((await page.locator('.views-trend').getAttribute('d')).match(/L/g).length, 6);
+    assert.equal(await page.locator('.instagram-insights rect').count(), 0);
+    await page.evaluate(() => {
+      const data = window.fixture['/api/reels/instagram/insights'];
+      data.followers = { status: 'ready', latest: { total: 54, observedAt: 1791633069 } };
+    });
+    await refresh();
+    assert.equal(await page.locator('.followers-point').count(), 1);
+    assert.equal((await page.locator('.followers-trend').getAttribute('d')).includes('L'), false);
+    assert.equal(await page.locator('.instagram-insights .views-point').count(), 7);
+    await page.getByText('현재', { exact: true }).waitFor();
+
     await snapshotAll('instagram-seven-days');
 
     await page.locator('.agent-rail-entry').filter({ hasText: '일정 에이전트' }).click();
