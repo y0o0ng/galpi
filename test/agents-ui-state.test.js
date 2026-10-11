@@ -92,7 +92,7 @@ test('native calendar swipe loads the previous week from schedule detail', () =>
 
 test('Reels resets at 19:00 KST and never completes steps from another daily batch', () => {
   const state = { reels: { batch: { batchId: '2026-10-09', status: 'selected' } }, reelsEpisode: { batchId: '2026-10-09', status: 'approved' } };
-  const cycle = helper('reelsCycle', 'function renderReelsDetail', { state, Date });
+  const cycle = helper('reelsCycle', 'function decorateContentStage', { state, Date });
   assert.equal(cycle(Date.parse('2026-10-10T18:59:59+09:00')).active, 4);
   const reset = cycle(Date.parse('2026-10-10T19:00:00+09:00'));
   assert.equal(reset.id, '2026-10-10');

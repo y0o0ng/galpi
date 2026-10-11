@@ -1,0 +1,69 @@
+{
+  "mode": "compare",
+  "source": "레이아웃 샘플 · 가상 내용 · 게시용 아님",
+  "cards": [
+    {
+      "layout": "cover",
+      "eyebrow": "TECH COMPARE",
+      "title": "빨리 끝낼까\n깊이 볼까?",
+      "body": "가상 도구 A와 B.\n선택은 작업에서 시작해.",
+      "art": "pair.png"
+    },
+    {
+      "layout": "compare",
+      "eyebrow": "TECH COMPARE",
+      "title": "한눈에 보는\n두 가지 방향",
+      "columns": [
+        {
+          "name": "도구 A",
+          "art": "cube-mint.png",
+          "body": "짧은 작업을\n빠르게 반복하는\n가상 도구야."
+        },
+        {
+          "name": "도구 B",
+          "art": "cube-purple.png",
+          "body": "복잡한 작업을\n충분히 검토하는\n가상 도구야."
+        }
+      ]
+    },
+    {
+      "layout": "compare",
+      "eyebrow": "TECH COMPARE",
+      "title": "먼저 볼 건\n작업의 형태",
+      "columns": [
+        {
+          "name": "반복 작업",
+          "body": "입력과 결과가\n명확할 때.\n\n같은 규칙으로\n여러 번 제작해."
+        },
+        {
+          "name": "판단 작업",
+          "body": "여러 조건을\n함께 봐야 할 때.\n\n대안을 비교하고\n근거를 정리해."
+        }
+      ]
+    },
+    {
+      "layout": "compare",
+      "eyebrow": "TECH COMPARE",
+      "title": "검토할 지점도\n달라져",
+      "columns": [
+        {
+          "name": "도구 A",
+          "body": "정해둔 규칙을\n잘 지켰는지.\n\n누락과 형식 오류를\n먼저 확인해."
+        },
+        {
+          "name": "도구 B",
+          "body": "판단의 근거가\n충분한지.\n\n전제와 결론을\n함께 확인해."
+        }
+      ]
+    },
+    {
+      "layout": "closing",
+      "eyebrow": "TECH COMPARE",
+      "title": "무엇을 고르면 될까?",
+      "statement": "작업부터 정하고,\n그 작업으로\n비교하자.",
+      "body": "같은 입력과 조건에서 비교하자.\n이 샘플은 실제 제품 평가가 아니야."
+    }
+  ],
+  "topic": "AI 도구 비교",
+  "date": "2026-10-10"
+}

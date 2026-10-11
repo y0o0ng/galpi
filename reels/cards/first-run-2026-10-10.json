@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-10",
+  "topic": "Mistral Large 4",
+  "mode": "news",
+  "humanSelected": true,
+  "selectionSource": "사용자 직접 후보 선택",
+  "outcome": "ok",
+  "cards": 5,
+  "stages": [
+    {
+      "name": "script",
+      "model": "gpt-5.6-sol",
+      "startedAt": "2026-10-10T06:50:59.944Z",
+      "result": "ok",
+      "usage": {
+        "input_tokens": 1228863,
+        "cached_input_tokens": 1152640,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 12230,
+        "reasoning_output_tokens": 4094
+      },
+      "finishedAt": "2026-10-10T06:56:30.491Z"
+    },
+    {
+      "name": "review",
+      "model": "gpt-5.6-sol",
+      "startedAt": "2026-10-10T06:57:42.318Z",
+      "result": "ok",
+      "usage": {
+        "input_tokens": 472562,
+        "cached_input_tokens": 418560,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 8872,
+        "reasoning_output_tokens": 2996
+      },
+      "finishedAt": "2026-10-10T07:00:58.261Z"
+    },
+    {
+      "name": "build",
+      "model": "gpt-6-luna",
+      "startedAt": "2026-10-10T07:04:13.112Z",
+      "result": "ok",
+      "usage": {
+        "input_tokens": 977604,
+        "cached_input_tokens": 896512,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 8996,
+        "reasoning_output_tokens": 3903
+      },
+      "finishedAt": "2026-10-10T07:07:46.412Z"
+    },
+    {
+      "name": "visual-0",
+      "model": "gpt-5.6-sol",
+      "startedAt": "2026-10-10T07:07:47.955Z",
+      "result": "ok",
+      "usage": {
+        "input_tokens": 390341,
+        "cached_input_tokens": 325888,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3507,
+        "reasoning_output_tokens": 741
+      },
+      "finishedAt": "2026-10-10T07:09:38.902Z"
+    }
+  ],
+  "visual": "MUST 0 / NICE 0; PASS",
+  "humanApproved": false,
+  "published": false,
+  "executionRepairs": [
+    "큰 이미지 JSONL 응답은 버리고 usage 이벤트만 읽도록 수정",
+    "Markdown 줄 끝 공백은 캡션 대조에서 무시"
+  ],
+  "contentEditedByDeveloper": false,
+  "pi": {
+    "filesPrepared": 57,
+    "schema": 43,
+    "jobId": 1,
+    "status": "ready",
+    "publishStatus": null,
+    "serverTestsPassed": 31,
+    "serviceRestarted": false,
+    "backupReceipt": "/home/pi/backups/galpi/cards-pre-deploy-backup.json",
+    "codeBackupReceipt": "/home/pi/backups/galpi/cards-pre-deploy-files.json"
+  }
+}

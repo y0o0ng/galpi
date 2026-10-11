@@ -46,6 +46,34 @@ self.addEventListener('push', event => {
       tag: () => 'codex-update',
     },
     // 릴스: 주제 문구는 payload에 없다(서버 계약). 어떤 편인지는 앱에서 본다.
+    cards_candidates: {
+      heading: '시온의 원리노트', body: '카드뉴스 후보가 왔어. 하나 골라줘.',
+      fallbackUrl: '/?panel=agents', tag: () => `cards-candidates:${/^\d{4}-\d{2}-\d{2}$/.test(payload.batchId) ? payload.batchId : 'unknown'}`,
+    },
+    cards_candidates_empty: {
+      heading: '시온의 원리노트', body: '이번 수집에서 주제를 찾지 못했어. 직접 주제를 제안해줘.',
+      fallbackUrl: '/?panel=agents', tag: () => `cards-candidates:${payload.batchId || 'unknown'}`,
+    },
+    cards_candidates_failed: {
+      heading: '시온의 원리노트', body: '카드뉴스 후보 수집을 완료하지 못했어. 앱에서 상태를 확인해줘.',
+      fallbackUrl: '/?panel=agents', tag: () => `cards-candidates:${payload.batchId || 'unknown'}`,
+    },
+    cards_topic_reviewed: {
+      heading: '시온의 원리노트', body: '루나의 주제 확인 결과가 왔어. 승인하거나 수정해줘.',
+      fallbackUrl: '/?panel=agents', tag: () => 'cards-topic-review',
+    },
+    cards_topic_failed: {
+      heading: '시온의 원리노트', body: '주제 확인을 완료하지 못했어. 피드백을 확인해줘.',
+      fallbackUrl: '/?panel=agents', tag: () => 'cards-topic-review',
+    },
+    cards_episode_failed: {
+      heading: '시온의 원리노트', body: '카드뉴스 제작을 완료하지 못했어. 앱에서 상태를 확인해줘.',
+      fallbackUrl: '/?panel=agents', tag: () => `cards-episode:${safeInt(payload.episodeId) ?? 'unknown'}`,
+    },
+    cards_episode: {
+      heading: '시온의 원리노트', body: '카드뉴스 제작이 완료됐어. 완성본을 확인해줘.',
+      fallbackUrl: '/?panel=agents', tag: () => `cards-episode:${safeInt(payload.episodeId) ?? 'unknown'}`,
+    },
     reels_candidates: {
       heading: '시온 릴스',
       body: '오늘의 영상 주제 후보가 왔어. 하나 골라줘.',

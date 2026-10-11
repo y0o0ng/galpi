@@ -70,6 +70,11 @@ const { createNewsStore } = require('./lib/news/store');
 const { createNewsCollector } = require('./lib/news/collect');
 const { createNewsAnalyzer } = require('./lib/news/analyze');
 const { registerNewsRoutes } = require('./lib/news/routes');
+const { cardsConfig } = require('./lib/cards/config');
+const { createCardsStore } = require('./lib/cards/store');
+const { createCardsWorker } = require('./lib/cards/worker');
+const { registerCardsRoutes } = require('./lib/cards/routes');
+const { createCardsPushService, buildCardsPushPayload, buildCardsSendOptions } = require('./lib/cards/push');
 const { createReelsStore } = require('./lib/reels/store');
 const { createReelsWorker } = require('./lib/reels/worker');
 const { registerReelsRoutes } = require('./lib/reels/routes');
@@ -1312,6 +1317,29 @@ const webService = createWebService({
     stmtAddWebSearchUsage.run(new Date().toISOString().slice(0, 7), provider, credits);
   },
 });
+
+const cardsAgentConfig = cardsConfig();
+const cardsStore = createCardsStore(db);
+const cardsPushService = (cardsAgentConfig.enabled || cardsAgentConfig.productionEnabled) && ASSISTANT_PUSH_CONFIG.enabled
+  ? createCardsPushService(db, { quietHours: () => mailStore.getMailSettings().quietHours }) : null;
+const cardsPushDispatcher = cardsPushService ? createAssistantPushDispatcher(cardsPushService, {
+  transport: createWebPushTransport(webPush, { subject: ASSISTANT_PUSH_CONFIG.subject,
+    publicKey: ASSISTANT_PUSH_CONFIG.publicKey, privateKey: ASSISTANT_PUSH_CONFIG.privateKey }),
+  buildPayload: buildCardsPushPayload, buildSendOptions: buildCardsSendOptions,
+  onError: error => console.error(`Cards push 오류: ${error?.code || 'UNKNOWN'}`),
+}) : null;
+const cardsInstagramUploader = cardsAgentConfig.uploadEnabled ? createInstagramUploader({
+  userId: process.env.REELS_INSTAGRAM_USER_ID,
+  tokens: createInstagramTokenStore({ tokenFile: process.env.REELS_INSTAGRAM_TOKEN_FILE || INSTAGRAM_TOKEN_FILE,
+    envToken: process.env.REELS_INSTAGRAM_ACCESS_TOKEN }),
+  cloudflaredBin: process.env.REELS_CLOUDFLARED_BIN || undefined,
+  tmpRoot: path.join(__dirname, 'reels', 'cards-public-tmp'),
+}) : null;
+const cardsWorker = cardsAgentConfig.enabled || cardsAgentConfig.productionEnabled || cardsAgentConfig.uploadEnabled
+  ? createCardsWorker({ store: cardsStore, config: cardsAgentConfig, web: webService,
+    pushService: cardsPushService, pushDispatcher: cardsPushDispatcher, uploader: cardsInstagramUploader,
+    onError: error => console.error(`Cards 오류: ${error?.code || 'UNKNOWN'}`),
+  }) : null;
 
 const stmtEnsureSession = db.prepare(`
   INSERT INTO sessions (id) VALUES (?)
@@ -4789,6 +4817,8 @@ registerReelsRoutes({
   onUpload: () => { void reelsProductionWorker?.tickUpload(); },
   config: { enabled: REELS_AGENT_ENABLED, productionEnabled: REELS_PRODUCTION_ENABLED, youtubeUploadEnabled: REELS_YOUTUBE_UPLOAD_ENABLED, instagramUploadEnabled: REELS_INSTAGRAM_UPLOAD_ENABLED, reelsDir: path.join(__dirname, 'reels') },
 });
+
+registerCardsRoutes({ app, store: cardsStore, config: cardsAgentConfig, onUpload: () => void cardsWorker?.tickUpload(), onTopic: () => void cardsWorker?.tickManual() });
 
 // 서버 상태도 DB도 없다. 요청 중에 좌표를 격자로 바꿔 기상청에 묻고 끝난다.
 registerWeatherRoutes({
@@ -8533,6 +8563,8 @@ const httpServer = app.listen(PORT, HOST, () => {
   if (reelsPushDispatcher) reelsPushDispatcher.start();
   reelsInstagramInsights.start();
   reelsYoutubeInsights.start();
+  cardsWorker?.start();
+  cardsPushDispatcher?.start();
   if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
     console.log('   뉴스:     홈 노출 꺼짐 (문턱 미확정, NEWS_SURFACE_ENABLED)');
   }
@@ -8608,6 +8640,8 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     reelsPushDispatcher?.stop();
     reelsInstagramInsights.stop();
     reelsYoutubeInsights.stop();
+    cardsWorker?.stop();
+    cardsPushDispatcher?.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {

@@ -262,12 +262,12 @@ async function main() {
     // Reels uses real episode states; no invented substage progress or publication success.
     await page.evaluate(() => { window.apiFailures = {}; });
     await page.locator('.agent-rail-entry').filter({ hasText: 'Reels · Shorts' }).click();
-    await page.locator('.reels-stage[aria-current="step"]').waitFor();
-    assert.equal(await page.locator('.reels-stage').count(), 4);
-    assert.equal(await page.locator('details.reels-stage').count(), 0);
-    assert.equal(await page.locator('.reels-stage img[onerror]').count(), 0);
+    await page.locator('[data-content="reels"] .reels-stage[aria-current="step"]').waitFor();
+    assert.equal(await page.locator('[data-content="reels"] .reels-stage').count(), 4);
+    assert.equal(await page.locator('[data-content="reels"] details.reels-stage').count(), 0);
+    assert.equal(await page.locator('[data-content="reels"] .reels-stage img[onerror]').count(), 0);
     await snapshotAll('reels-candidates');
-    await page.getByRole('button', { name: '이걸로' }).click();
+    await page.getByRole('button', { name: '선택', exact: true }).click();
     assert.ok(await page.evaluate(() => window.calls.some(c => c.route === '/api/reels/candidates/7/select' && c.method === 'POST')));
     for (const status of ['producing', 'revising', 'failed', 'ready', 'approved']) {
       await page.evaluate(status => {
@@ -275,9 +275,9 @@ async function main() {
         window.fixture['/api/reels/episodes/latest'].episode = { id: 9, candidateId: 7, batchId: window.fixture['/api/reels/latest'].batch.batchId, status, title: 'Fixture episode', caption: '<script>fixture</script>', videoUrl: status === 'ready' || status === 'approved' ? '/api/reels/episodes/9/video' : null, claims: [], revisions: [], attempts: 1, errorCode: status === 'failed' ? 'FIXTURE_FAILURE' : null, uploads: status === 'approved' ? [{ platform: 'youtube', status: 'failed', errorCode: 'FIXTURE_UPLOAD' }, { platform: 'instagram', status: 'done', remoteUrl: 'https://www.instagram.com/reel/fixture/' }] : [] };
       }, status);
       await refresh();
-      const step = await page.locator('.reels-stage[aria-current="step"]').getAttribute('data-step');
-      assert.equal(await page.locator('.reels-stage:not(.active) .reels-episode-card').count(), 0);
-      assert.equal(await page.locator('.reels-stage .reels-check').count(), Number(step) - 1);
+      const step = await page.locator('[data-content="reels"] .reels-stage[aria-current="step"]').getAttribute('data-step');
+      assert.equal(await page.locator('[data-content="reels"] .reels-stage:not(.active) .reels-episode-card').count(), 0);
+      assert.equal(await page.locator('[data-content="reels"] .reels-stage .reels-check').count(), Number(step) - 1);
       assert.equal(step, ['producing', 'revising', 'failed'].includes(status) ? '2' : status === 'ready' ? '3' : '4');
       assert.equal(await page.getByRole('button', { name: '승인', exact: true }).count(), status === 'ready' ? 1 : 0);
       await snapshotAll(`reels-${status}`);
@@ -297,7 +297,7 @@ async function main() {
         await page.getByText('Updated fixture caption', { exact: true }).waitFor();
 
         await page.getByRole('button', { name: '수정 요청', exact: true }).click();
-        assert.equal(await page.locator('.reels-revise textarea').isVisible(), true);
+        assert.equal(await page.locator('[data-content="reels"] .reels-revise textarea').isVisible(), true);
         await page.getByRole('button', { name: '승인', exact: true }).click();
       }
     }
@@ -318,8 +318,8 @@ async function main() {
       window.fixture['/api/reels/episodes/latest'].episode.batchId = '2000-01-01';
     });
     await refresh();
-    assert.equal(await page.locator('.reels-stage .reels-check').count(), 0);
-    assert.equal(await page.locator('.reels-stage[aria-current="step"]').getAttribute('data-step'), '1');
+    assert.equal(await page.locator('[data-content="reels"] .reels-stage .reels-check').count(), 0);
+    assert.equal(await page.locator('[data-content="reels"] .reels-stage[aria-current="step"]').getAttribute('data-step'), '1');
     await page.getByText('오늘 주제 후보를 기다리는 중이야.').waitFor();
     await snapshotAll('reels-new-cycle');
     await page.getByRole('button', { name: 'Agents로 돌아가기' }).click();
@@ -330,9 +330,9 @@ async function main() {
     });
     await refresh();
     await page.locator('.agent-rail-entry').filter({ hasText: '카드 뉴스' }).click();
-    await page.getByText('시온의 원리노트', { exact: true }).waitFor();
-    assert.equal(await page.getByRole('button', { name: '승인', exact: true }).count(), 1);
-    await page.getByRole('button', { name: '승인', exact: true }).click();
+    await page.locator('[data-content="cards"] .cards-stage[data-step="3"] .agent-summary-title').filter({ hasText: 'Fixture card job' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '확인 완료', exact: true }).count(), 1);
+    await page.getByRole('button', { name: '확인 완료', exact: true }).click();
     assert.ok(await page.evaluate(() => window.calls.some(c => c.route === '/api/cards/jobs/12/approve' && c.method === 'POST')));
     await snapshotAll('cards-existing-contract');
     assert.deepEqual(errors, []);

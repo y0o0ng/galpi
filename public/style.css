@@ -6117,6 +6117,58 @@ a.reels-claim-source { text-decoration: underline; }
 
 .cards-agent-card .reels-episode-body { min-width: 0; }
 
+/* Content workflow: two columns on Pad/Desktop, one selected workflow on Phone. */
+.content-view-selector { display: none; }
+.content-workflow-title { margin: 0 0 2px; color: var(--ai-text); font-size: 25px; font-weight: 650; }
+.reels-workspace .agent-detail-head { padding: 0; }
+.reels-workspace .reels-stage { padding: 12px 18px; }
+.reels-workspace .reels-stage.active { padding: 16px 18px; }
+.reels-workspace .reels-stage > h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0; font-size: 12px; }
+.reels-workspace .reels-stage.active > h3 { font-size: 16px; }
+.reels-stage .content-stage-status { margin: 0; flex-shrink: 0; font-size: 11px; }
+.reels-stage :is(.cards-agent-card, .reels-agent-card, .reels-episode-card) { border: 0; padding: 0; background: transparent; }
+.reels-workspace .reels-stage .agent-summary-title { display: block; font-size: 14px; }
+.reels-workspace .reels-stage .agent-summary-head p { margin-top: 8px; font-size: 11px; white-space: normal; }
+.reels-workspace .reels-stage .reels-cards { gap: 10px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.reels-workspace .reels-card { gap: 8px; padding: 12px; }
+.reels-workspace .reels-card { grid-template-columns: minmax(0, 1fr) auto; }
+.reels-workspace .reels-card > * { grid-column: 1 / -1; }
+.reels-workspace .reels-card > .reels-card-title { grid-column: 1; }
+.reels-workspace .reels-card > button { grid-column: 2; grid-row: 1; }
+.reels-workspace .reels-card details { color: var(--label); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.reels-workspace .reels-card summary { min-height: 28px; align-content: center; cursor: pointer; }
+.reels-workspace .reels-card-title { color: var(--ai-text); font-size: 12px; font-weight: 650; }
+.reels-workspace .reels-card p { overflow-wrap: anywhere; }
+.reels-workspace .reels-stage .reels-episode-body { display: flex; flex-direction: column; }
+.reels-workspace .schedule-agent-action { min-height: 36px; }
+.cards-topic-entry { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.cards-topic-entry > summary { cursor: pointer; color: var(--brand); font-size: 12px; font-weight: 650; }
+.cards-topic-dialogue { margin-top: 12px; display: grid; gap: 10px; }
+.cards-topic-dialogue > h4 { display: none; }
+.cards-topic-dialogue p { margin: 0; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.cards-topic-dialogue .agent-summary-message { margin: 0; }
+.cards-topic-dialogue .reels-revise textarea { font-size: 13px; }
+.reels-workspace .cards-carousel { background: var(--bg); border-radius: 10px; }
+.reels-workspace .reels-actions { padding-top: 12px; border-top: 1px solid var(--hairline); }
+@media (max-width: 600px) {
+  .content-view-selector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 5px; border-radius: 12px; background: var(--bg); }
+  .content-view-selector .schedule-agent-action { margin: 0; border: 1px solid transparent; background: transparent; color: var(--label); font-size: 12px; }
+  .content-view-selector [aria-pressed="true"] { background: var(--ai-bubble); border-color: var(--hairline); color: var(--brand); font-weight: 650; }
+  .reels-workspace[data-content-view="reels"] [data-content="cards"],
+  .reels-workspace[data-content-view="cards"] [data-content="reels"] { display: none; }
+  .reels-workspace .reels-workflow-columns { gap: 0; }
+  .content-workflow-title { font-size: 21px; margin: 0 0 3px; }
+  .reels-workspace .agent-detail-column { gap: 12px; }
+  .reels-workspace .reels-stage { min-height: 44px; padding: 12px 14px; }
+  .reels-workspace .reels-stage.active { padding: 16px 15px; }
+  .reels-workspace .reels-stage.active > h3 { font-size: 15px; }
+  .reels-workspace .schedule-agent-action { min-height: 44px; }
+  .reels-workspace .reels-card { grid-template-columns: minmax(0, 1fr); }
+  .reels-workspace .reels-card > button { grid-column: 1; grid-row: auto; }
+  .reels-workspace .reels-card summary { min-height: 44px; }
+  .cards-topic-entry > summary { min-height: 44px; align-content: center; }
+}
+
 :is(.instagram-insights, .youtube-insights) { min-width: 0; padding: 0 0 8px; }
 .instagram-chart-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 :is(.instagram-insights, .youtube-insights) h4 { margin: 0; font-size: 16px; font-weight: 600; order: 1; flex-shrink: 0; }

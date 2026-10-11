@@ -1,0 +1,104 @@
+{
+  "mode": "news",
+  "source": "레이아웃 샘플 · 가상 내용 · 게시용 아님",
+  "cards": [
+    {
+      "layout": "cover",
+      "eyebrow": "TECH NEWS",
+      "title": "노트봇,\n읽고 실행하다",
+      "body": "새 기능보다\n중요한 건\n맡길 수 있는 범위.",
+      "art": "device-mint.png"
+    },
+    {
+      "layout": "story",
+      "eyebrow": "TECH NEWS",
+      "title": "무슨 일이 있었나?",
+      "body": "가상의 노트봇이 문서를 읽고,\n작업 초안을 만드는 기능을 공개했어.\n실행 전에는 사용자의 확인을 받아.",
+      "art": "workflow.png",
+      "composition": "visual"
+    },
+    {
+      "layout": "points",
+      "eyebrow": "TECH NEWS",
+      "title": "달라진 건 세 가지",
+      "body": "기능 목록보다 작업 흐름의 변화를 봐.",
+      "items": [
+        {
+          "title": "읽고 정리하기",
+          "body": "문서에서 필요한 정보를 모아\n짧은 초안으로 정리해.",
+          "art": "icon-document.png"
+        },
+        {
+          "title": "도구로 이어가기",
+          "body": "확인한 내용을 작업 도구로 넘겨.\n답변 다음 단계까지 연결하는 거야.",
+          "art": "icon-terminal.png"
+        },
+        {
+          "title": "실행 전에 멈추기",
+          "body": "최종 실행은 사용자가 확인해.\n초안과 확정을 구분해.",
+          "art": "icon-shield.png"
+        }
+      ]
+    },
+    {
+      "layout": "numbers",
+      "eyebrow": "TECH NEWS",
+      "title": "숫자는 조건과 함께 읽기",
+      "body": "두 가상 버전의 시연값이야.\n실제 성능을 뜻하지 않아.",
+      "labels": [
+        "가상 버전 A",
+        "가상 버전 B"
+      ],
+      "rows": [
+        {
+          "label": "완료한 작업",
+          "values": [
+            60,
+            80
+          ],
+          "max": 100,
+          "unit": "%",
+          "criterion": "높을수록 유리"
+        },
+        {
+          "label": "평균 처리 시간",
+          "values": [
+            12,
+            8
+          ],
+          "max": 20,
+          "unit": "초",
+          "criterion": "낮을수록 유리"
+        },
+        {
+          "label": "작업당 비용",
+          "values": [
+            4,
+            3
+          ],
+          "max": 5,
+          "unit": "원",
+          "criterion": "낮을수록 유리"
+        }
+      ],
+      "note": "가상값 · 같은 조건의 두 버전 비교"
+    },
+    {
+      "layout": "story",
+      "eyebrow": "TECH NEWS",
+      "title": "아직 확인할 것도 있어",
+      "body": "발표 장면만으로 성능을 단정하지 말자.\n오류가 났을 때 복구하는 과정도 봐야 해.",
+      "composition": "text",
+      "statement": "시연과 실사용은\n다를 수 있어."
+    },
+    {
+      "layout": "closing",
+      "eyebrow": "TECH NEWS",
+      "title": "한 줄로 정리하면",
+      "statement": "맡기는 일만큼,\n확인하는 기준도\n중요해.",
+      "body": "발표와 검증된 결과를 구분하자.\n원문과 아직 모르는 점을 함께 남겨."
+    }
+  ],
+  "topic": "AI 작업 도구",
+  "date": "2026-10-10"
+}

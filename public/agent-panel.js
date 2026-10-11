@@ -18,6 +18,7 @@
     youtubeInsightsError: '',
     youtubeInsightsLoading: false,
     mode: 'summary',
+    contentView: 'reels',
     summary: null,
     reminders: [],
     taskOptions: { view: 'today' },
@@ -48,6 +49,9 @@
     returnAgent: null,
     cards: null,
     cardJob: null,
+    cardTopic: null,
+    cardTopicDraft: '',
+    cardTopicSending: false,
     cardMedia: null,
     reelsEpisode: null,
     reelsMedia: null,
@@ -1003,7 +1007,7 @@
     return line;
   }
 
-  const REELS_STATUS = { candidate: '선택 대기', held: '보류 중', selected: '선택됨', dropped: '거절됨' };
+  const REELS_STATUS = { candidate: '선택 대기', held: '보류 중', selected: '제작 대기', dropped: '거절됨' };
 
   // 후보 텍스트는 모델이 만든 비신뢰 문자열이라 textContent로만 넣는다.
   function makeReelsAgentCard() {
@@ -1011,7 +1015,7 @@
     const block = document.createElement('section');
     block.className = 'agents-operational-card reels-agent-card';
     block.appendChild(agentSummaryHead('Reels 에이전트', '오늘의 영상 주제 후보 3개 중 하나를 골라.',
-      batch ? REELS_STATUS[batch.status] : '후보 없음', refresh));
+      batch ? ({collecting:'수집 중',empty:'후보 없음',failed:'수집 실패'}[batch.status] || REELS_STATUS[batch.status]) : '후보 없음', refresh));
     if (!batch) {
       block.appendChild(agentSummaryMessage('아직 후보가 없어. 하루 한 번 저녁 7시에 올라와.'));
       return block;
@@ -1031,15 +1035,19 @@
         title.rel = 'noopener noreferrer';
       }
       title.textContent = card.title;
-      const lines = [card.why, card.everydayDoor && `일상의 문: ${card.everydayDoor}`,
-        `${card.concept}: ${card.bridge}`, `${card.template} · ${card.hookParadox} / ${card.hookTerm} / ${card.hookSubtitle}`, `위험·불확실: ${card.risk}`]
+      const lines = [card.why, card.everydayDoor && `일상의 문: ${card.everydayDoor}`, `${card.concept}: ${card.bridge}`]
         .filter(Boolean).map(text => {
           const line = document.createElement('p');
           line.textContent = text;
           return line;
         });
       item.append(title, ...lines);
-      if (open) item.appendChild(button('이걸로', () => decideReels(`/api/reels/candidates/${card.id}/select`), true));
+      const details = document.createElement('details');
+      const summary = document.createElement('summary'); summary.textContent = '주제 상세';
+      const note = document.createElement('p'); note.textContent = `${card.template} · ${card.hookParadox} / ${card.hookTerm} / ${card.hookSubtitle}
+위험·불확실: ${card.risk}`;
+      details.append(summary, note); item.appendChild(details);
+      if (open) item.appendChild(button('선택', () => decideReels(`/api/reels/candidates/${card.id}/select`), true));
       list.appendChild(item);
     });
     block.appendChild(list);
@@ -1072,8 +1080,10 @@
     const block = document.createElement('section');
     block.className = 'agents-operational-card cards-agent-card';
     block.appendChild(agentSummaryHead('카드뉴스 에이전트', '최근 일주일 기술 소식에서 한 주제를 골라.',
-      batch ? REELS_STATUS[batch.status] : '후보 없음', refresh));
-    if (!batch) { block.appendChild(agentSummaryMessage('후보는 저녁 7시에 올라와.')); return block; }
+      batch ? ({collecting:'수집 중',empty:'후보 없음',failed:'수집 실패'}[batch.status] || REELS_STATUS[batch.status]) : '후보 없음', refresh));
+    if (!batch) { block.appendChild(agentSummaryMessage('후보는 저녁 7시에 올라와. 직접 주제를 제안할 수도 있어.')); return block; }
+    if (batch.status === 'empty') block.appendChild(agentSummaryMessage('이번 수집에서 제안할 주제를 찾지 못했어. 아래에서 직접 주제를 제안해줘.'));
+    if (batch.status === 'collecting') block.appendChild(agentSummaryMessage('주제를 수집하고 순위를 매기는 중이야.'));
     const open = ['candidate', 'held'].includes(batch.status);
     const list = document.createElement('div'); list.className = 'reels-cards';
     batch.cards.forEach(row => {
@@ -1082,16 +1092,54 @@
       const title = document.createElement('p'); title.className = 'reels-card-title'; title.textContent = card.title;
       item.appendChild(title);
       for (const text of [`${card.audience === 'general' ? '일반인용' : '실무자용'} · ${card.mode === 'news' ? '뉴스 브리프' : '기술 비교'}`,
-        card.summary, card.reader_question, card.format_reason]) {
+        card.summary]) {
         const line = document.createElement('p'); line.textContent = text; item.appendChild(line);
       }
-      if (open) item.appendChild(button('이걸로', () => decideReels(`/api/cards/candidates/${row.id}/select`), true));
+      const context = document.createElement('details');
+      const contextHeading = document.createElement('summary'); contextHeading.textContent = '선정 이유·출처'; context.appendChild(contextHeading);
+      for (const text of [card.rank_reason || card.why_interest, card.reader_question, card.format_reason, card.risk]) {
+        if (!text) continue; const note = document.createElement('p'); note.textContent = text; context.appendChild(note);
+      }
+      for (const source of card.sources || []) {
+        if (!/^https?:\/\//i.test(source.url || '')) continue;
+        const link = document.createElement('a'); link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = source.title || '원문';
+        const note = document.createElement('p'); note.appendChild(link); context.appendChild(note);
+      }
+      item.appendChild(context);
+      if (card.attention) {
+        const attention = card.attention;
+        const status = { verified: '반응 근거 확인', weak: '근거 제한적', unverified: '화제성 미확인' }[attention.status] || '화제성 미확인';
+        const line = document.createElement('p');
+        const counts = attention.counts;
+        const countLabel = (value, unit) => Number.isInteger(value) && value >= 0 ? `${value}${unit}` : '미확인';
+        line.textContent = counts && attention.status !== 'unverified'
+          ? `${status} · 확인 기사 ${countLabel(counts.news_articles, '건')} / 독립 매체 ${countLabel(counts.independent_outlets, '곳')} · 커뮤니티 ${countLabel(counts.community_posts, '글')} · SNS ${countLabel(counts.sns_posts, '글')} (이번 검색의 최소 확인 건수)`
+          : `${status} · 검색에서 확인하지 못한 것은 반응이 없다는 뜻이 아니야.`;
+        item.appendChild(line);
+        const details = document.createElement('details');
+        const summary = document.createElement('summary'); summary.textContent = '화제성 확인 근거'; details.appendChild(summary);
+        for (const evidence of attention.evidence || []) {
+          if (!/^https?:\/\//i.test(evidence.url || '')) continue;
+          const source = document.createElement('p');
+          const link = document.createElement('a'); link.href = evidence.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = `${evidence.counted ? '집계' : '참고'} · ${evidence.outlet_group || '출처'}`;
+          source.appendChild(link);
+          for (const metric of evidence.metrics || []) source.appendChild(document.createTextNode(` · ${{comments:'댓글',upvotes:'추천',likes:'좋아요',reposts:'공유',views:'조회',points:'HN 점수'}[metric.name] || metric.name} ${metric.value}`));
+          if (evidence.reason) source.appendChild(document.createTextNode(` · ${evidence.reason}`));
+          details.appendChild(source);
+        }
+        if (attention.rejected_evidence?.length) { const rejected = document.createElement('p'); rejected.textContent = `검색 자료 밖 URL이나 원문과 일치하지 않는 근거 ${attention.rejected_evidence.length}개는 집계에서 제외했어.`; details.appendChild(rejected); }
+        if (attention.limits) { const limits = document.createElement('p'); limits.textContent = attention.limits; details.appendChild(limits); }
+        if (attention.checked_at) { const checked = document.createElement('p'); checked.textContent = `확인 시각: ${attention.checked_at}`; details.appendChild(checked); }
+        item.appendChild(details);
+      }
+      if (open) item.appendChild(button('선택', () => decideReels(`/api/cards/candidates/${row.id}/select`), true));
       list.appendChild(item);
     });
     block.appendChild(list);
     if (batch.shortageReason) block.appendChild(agentSummaryMessage(batch.shortageReason));
     if (batch.errorCode) block.appendChild(agentSummaryMessage('후보를 가져오지 못했어. 다음 수집 때 다시 시도해.'));
-    if (open) {
+    if (open && batch.cards.length) {
       const actions = document.createElement('div'); actions.className = 'agent-summary-actions reels-actions';
       actions.append(button('전부 거절', () => decideReels(`/api/cards/batches/${batch.batchId}/reject`)));
       if (batch.status === 'candidate') actions.appendChild(button('보류', () => decideReels(`/api/cards/batches/${batch.batchId}/hold`)));
@@ -1100,15 +1148,97 @@
     return block;
   }
 
-  function makeCardJobCard() {
+  async function cardTopicPost(action, body) {
+    state.cardTopicSending = true;
+    try {
+      const response = await state.apiFetch(`/api/cards/topic/${action}`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { state.showToast(data.code === 'CARDS_TOPIC_STALE' ? '검토본이 바뀌었어. 새로고침 후 다시 확인해줘.' : data.error || '처리하지 못했어.'); return; }
+      if (action === 'messages') state.cardTopicDraft = '';
+    } catch { state.showToast('확인 요청을 보내지 못했어. 입력은 그대로 남겨뒀어.'); }
+    finally { state.cardTopicSending = false; await refresh(); }
+  }
+
+  function makeCardTopicDialogue() {
+    const box = document.createElement('section'); box.className = 'agents-operational-card cards-agent-card cards-topic-dialogue';
+    const title = document.createElement('h4'); title.textContent = '직접 주제 제안'; box.appendChild(title);
+    const dialogue = state.cardTopic, busy = ['queued','reviewing'].includes(dialogue?.status) || state.cardTopicSending;
+    box.appendChild(agentSummaryMessage('주제나 기사 링크를 보내면 루나가 확인해줘. 피드백을 보고 수정하거나 승인해줘.'));
+    for (const message of dialogue?.messages || []) {
+      const line = document.createElement('p'); line.className = 'agent-summary-message';
+      const who = document.createElement('strong'); who.textContent = message.role === 'user' ? '나 · ' : '루나 · ';
+      line.append(who, document.createTextNode(message.text)); box.appendChild(line);
+    }
+    if (busy) box.appendChild(agentSummaryMessage('루나가 주제와 출처를 확인하는 중이야.'));
+    if (dialogue?.status === 'approved') box.appendChild(agentSummaryMessage('승인했어. 새벽 3시부터 카드 제작을 시작해.'));
+    if (dialogue?.candidate) {
+      const line = document.createElement('p'); line.textContent = `${dialogue.candidate.title} · ${dialogue.candidate.mode === 'compare' ? '기술 비교' : '뉴스 브리프'}`; box.appendChild(line);
+      for (const source of dialogue.candidate.sources || []) {
+        if (!/^https?:\/\//i.test(source.url)) continue;
+        const link = document.createElement('a'); link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = source.title;
+        const row = document.createElement('p'); row.appendChild(link); box.appendChild(row);
+      }
+    }
+    const form = document.createElement('form'); form.className = 'reels-revise';
+    const area = document.createElement('textarea'); area.rows = 3; area.maxLength = 2000; area.placeholder = '주제·기사 링크 또는 수정할 내용을 적어줘';
+    area.setAttribute('aria-label','카드뉴스 주제 제안 또는 수정 메시지'); area.value = state.cardTopicDraft; area.disabled = busy;
+    area.addEventListener('input', () => { state.cardTopicDraft = area.value; });
+    const send = document.createElement('button'); send.type = 'submit'; send.className = 'schedule-agent-action primary'; send.textContent = '루나에게 확인 요청'; send.disabled = busy;
+    form.append(area, send); form.addEventListener('submit', event => {
+      event.preventDefault(); if (!area.value.trim() || busy || state.cardTopicSending) return; send.disabled = true;
+      void cardTopicPost('messages', {message:area.value.trim(),id:dialogue?.id || null,revision:dialogue?.revision || 0});
+    }); box.appendChild(form);
+    if (dialogue?.status === 'ready') box.appendChild(button('이 주제로 승인', () => {
+      if (state.cardTopicSending || state.cardTopicDraft.trim()) { state.showToast('수정 메시지를 먼저 보내고 새 검토 결과를 확인해줘.'); return; }
+      void cardTopicPost('approve', {id:dialogue.id,revision:dialogue.revision});
+    }, true));
+    return box;
+  }
+
+  function downloadCardBlob(blob, name) {
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = name;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  async function saveCardImages(job, control, page = null) {
+    control.disabled = true;
+    const original = control.textContent;
+    try {
+      const pages = page === null ? job.downloads.map((_, i) => i) : [page];
+      const files = [];
+      for (const i of pages) {
+        control.textContent = `${i + 1} / ${job.downloads.length}장 준비 중`;
+        const response = await state.apiFetch(job.downloads[i]);
+        if (!response.ok) throw new Error('download');
+        const file = new File([await response.blob()], `sionwhy-${job.id}-${String(i+1).padStart(2,'0')}.jpg`, { type: 'image/jpeg' });
+        files.push(file);
+        if (page === null && !/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+          downloadCardBlob(file, file.name);
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
+      }
+      // iOS/PWA는 여러 자동 다운로드가 불안정해 한 번의 공유 시트에서 저장한다.
+      if (page !== null || /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        if (navigator.canShare?.({ files })) await navigator.share({ files });
+        else for (const file of files) { downloadCardBlob(file, file.name); await new Promise(resolve => setTimeout(resolve, 400)); }
+      }
+      state.showToast('이미지 저장을 요청했어. 일부만 받았다면 개별 저장을 눌러줘.');
+    } catch (error) {
+      if (error?.name !== 'AbortError') state.showToast('이미지를 받지 못했어. 개별 저장으로 다시 시도해줘.');
+    } finally { control.disabled = false; control.textContent = original; }
+  }
+
+  function makeCardJobCard(posting = false) {
     const job = state.cardJob; if (!job) { releaseCardMedia(); return null; }
-    const labels = { queued: '제작 대기', producing: '만드는 중', ready: '승인 대기', failed: '실행 중단', blocked: '수정 필요', approved: '승인됨', discarded: '폐기됨' };
-    const stages = { script: '대본 작성', review: '대본 검토', build: '이미지 조립', 'visual-0': '완성본 검토', 'visual-1': '수정본 검토', 'visual-2': '수정본 검토', 'fix-1': '이미지 수정', 'fix-2': '이미지 수정' };
+    const labels = { queued: '제작 대기', producing: '만드는 중', ready: '완성본', failed: '실행 중단', blocked: '수정 필요', approved: '확인 완료', discarded: '폐기됨' };
+    const stages = { create: '대본·카드 제작', 'source-0': '출처·문구 검토', 'source-1': '수정본 출처·문구 검토', 'source-2': '수정본 출처·문구 검토', script: '대본 작성', review: '대본 검토', build: '이미지 조립', 'visual-0': '완성본 검토', 'visual-1': '수정본 검토', 'visual-2': '수정본 검토', 'fix-1': '이미지 수정', 'fix-2': '이미지 수정' };
     const block = document.createElement('section'); block.className = 'agents-operational-card cards-agent-card';
     block.appendChild(agentSummaryHead('시온의 원리노트', job.title, labels[job.status] || job.status, refresh));
     const body = document.createElement('div'); body.className = 'reels-episode-body';
     if (job.status === 'producing') body.appendChild(agentSummaryMessage(stages[job.stage] || '제작 중이야.'));
-    if (job.images.length) {
+    if (!posting && job.images.length) {
       const holder = document.createElement('div'); holder.className = 'cards-carousel'; holder.tabIndex = 0;
       holder.setAttribute('aria-label', '카드뉴스 이미지. 옆으로 넘겨 볼 수 있어.');
       const key = `${job.id}:${job.finishedAt}`;
@@ -1128,29 +1258,51 @@
           image.src = url; image.alt = `${job.title} · ${i+1}장`; image.width = 1080; image.height = 1350; holder.appendChild(image); });
       });
       body.appendChild(holder);
-    } else releaseCardMedia();
-    if (job.caption) { const caption = document.createElement('p'); caption.className = 'reels-caption'; caption.textContent = job.caption; body.appendChild(caption); }
-    if (job.claims.length) body.appendChild(reelsClaims(job.claims));
+    } else if (!posting) releaseCardMedia();
+    if (!posting && job.caption) { const caption = document.createElement('p'); caption.className = 'reels-caption'; caption.textContent = job.caption; body.appendChild(caption); }
+    if (!posting && job.claims.length) body.appendChild(reelsClaims(job.claims));
     const actions = document.createElement('div'); actions.className = 'agent-summary-actions';
-    if (job.status === 'ready') actions.append(button('승인', () => decideReels(`/api/cards/jobs/${job.id}/approve`), true));
+    if (posting && ['ready', 'approved'].includes(job.status)) {
+      body.appendChild(agentSummaryMessage('Instagram에 직접 올려줘. 여기서는 자동 게시하지 않아.'));
+      if (job.caption) {
+        actions.append(button('캡션 복사', async () => {
+          try { await navigator.clipboard.writeText(job.caption); state.showToast('캡션을 복사했어.'); }
+          catch { state.showToast('복사하지 못했어. 캡션 다운로드를 사용해줘.'); }
+        }), button('캡션 다운로드', () => downloadCardBlob(new Blob([job.caption], { type: 'text/plain;charset=utf-8' }), `sionwhy-${job.id}-caption.txt`)));
+      }
+      if (job.downloads?.length) {
+        const save = button('이미지 다운로드', () => saveCardImages(job, save), true); actions.appendChild(save);
+        const individual = document.createElement('details');
+        const heading = document.createElement('summary'); heading.textContent = '이미지 개별 저장'; individual.appendChild(heading);
+        job.downloads.forEach((_, i) => { const saveOne = button(`${i+1}장 저장`, () => saveCardImages(job, saveOne, i)); individual.appendChild(saveOne); });
+        body.appendChild(individual);
+        body.appendChild(agentSummaryMessage('여러 파일 다운로드 허용을 요청하면 허용해줘. iPhone에서는 공유 시트로 저장해.'));
+      }
+    }
+    if (!posting && job.caption) body.appendChild(button('캡션 복사', async () => {
+      try { await navigator.clipboard.writeText(job.caption); state.showToast('캡션을 복사했어.'); }
+      catch { state.showToast('복사하지 못했어. 게시 단계의 캡션 다운로드를 사용해줘.'); }
+    }));
+    if (!posting && job.status === 'ready') actions.append(button('확인 완료', () => decideReels(`/api/cards/jobs/${job.id}/approve`)));
     if (['failed', 'blocked'].includes(job.status)) actions.append(button('다시 시도', () => decideReels(`/api/cards/jobs/${job.id}/retry`)));
-    if (['ready', 'failed', 'blocked', 'queued'].includes(job.status)) actions.append(button('폐기', () => decideReels(`/api/cards/jobs/${job.id}/discard`)));
+    if (!posting && ['ready', 'failed', 'blocked', 'queued'].includes(job.status)) actions.append(button('폐기', () => decideReels(`/api/cards/jobs/${job.id}/discard`)));
     if (job.publishStatus) {
       const labels = { pending: '게시 대기', uploading: '게시 중', done: '게시 완료', failed: '게시 실패', unknown: '게시 여부 확인 필요' };
       const line = document.createElement('p'); line.textContent = labels[job.publishStatus]; body.appendChild(line);
       if (['failed', 'unknown'].includes(job.publishStatus)) body.appendChild(agentSummaryMessage('중복 게시를 막기 위해 자동 재전송하지 않아. Instagram에서 게시 여부를 확인해줘.'));
       if (job.remoteUrl) { const link = document.createElement('a'); link.href = job.remoteUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Instagram에서 보기'; body.appendChild(link); }
     }
-    if (job.errorCode) body.appendChild(agentSummaryMessage(`실행이 멈췄어. ${job.errorCode}`));
+    if (job.errorCode && ['failed', 'blocked'].includes(job.status)) body.appendChild(agentSummaryMessage(`실행이 멈췄어. ${job.errorCode}`));
     body.appendChild(actions); block.appendChild(body); return block;
   }
 
   async function loadCards() {
-    const results = await Promise.allSettled(['/api/cards/latest', '/api/cards/jobs/latest'].map(async url => {
+    const results = await Promise.allSettled(['/api/cards/latest', '/api/cards/jobs/latest', '/api/cards/topic'].map(async url => {
       const response = await state.apiFetch(url); return response.ok ? response.json() : null;
     }));
     state.cards = results[0].status === 'fulfilled' ? results[0].value : null;
     state.cardJob = results[1].status === 'fulfilled' ? results[1].value?.job || null : null;
+    state.cardTopic = results[2].status === 'fulfilled' ? results[2].value?.dialogue || null : null;
   }
 
   // --- Reels 편 (검토 2) ------------------------------------------------------
@@ -1594,13 +1746,17 @@
     content.className = 'agent-content-rail';
     const { episode, batch } = reelsCycle();
     const reelsStatus = state.reelsError || state.reelsEpisodeError ? '확인 필요'
+      : episode?.status === 'approved' ? episode.uploads?.some(upload => upload.status === 'failed') ? '게시 실패'
+        : episode.uploads?.some(upload => upload.status === 'uploading') ? '게시 중'
+        : episode.uploads?.length && episode.uploads.every(upload => upload.status === 'done') ? '게시 완료'
+        : episode.uploads?.some(upload => upload.status === 'done') ? '일부 게시 완료' : '게시 대기'
       : episode ? EPISODE_STATUS[episode.status] || '확인 필요'
       : batch ? REELS_STATUS[batch.status] : state.reels ? '후보 없음' : '꺼짐';
     content.append(makeAgentRow({ title: 'Reels · Shorts', status: reelsStatus,
-      tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' ? 'danger' : episode?.status === 'ready' || batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
+      tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' || episode?.uploads?.some(upload => upload.status === 'failed') ? 'danger' : episode?.status === 'ready' || batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
       makeAgentRow({ title: '카드 뉴스',
-        status: state.cardJob ? ({ queued: '제작 대기', producing: '만드는 중', ready: '승인 대기', failed: '실행 중단', blocked: '수정 필요', approved: '승인됨', discarded: '폐기됨' }[state.cardJob.status] || '확인 필요')
-          : state.cards?.batch ? REELS_STATUS[state.cards.batch.status] || '확인 필요' : '미연결',
+        status: state.cardJob ? ({ queued: '제작 대기', producing: '만드는 중', ready: '완성본 검토', failed: '실행 중단', blocked: '수정 필요', approved: '수동 게시', discarded: '폐기됨' }[state.cardJob.status] || '확인 필요')
+          : state.cards?.batch ? ({empty:'후보 없음',collecting:'수집 중',failed:'수집 실패'}[state.cards.batch.status] || REELS_STATUS[state.cards.batch.status] || '확인 필요') : '미연결',
         tone: ['failed', 'blocked'].includes(state.cardJob?.status) ? 'danger' : state.cardJob?.status === 'ready' ? 'warn' : state.cards || state.cardJob ? 'ok' : 'off', onOpen: openCards }));
     rail.append(heading, makeMailRow(), makeScheduleRow(), makeCodexRow(), content);
     layout.append(board, rail);
@@ -1621,22 +1777,71 @@
     return { id, batch, episode, active };
   }
 
+  function decorateContentStage(stage) {
+    const heading = stage.querySelector('h3');
+    const status = stage.querySelector('.schedule-agent-status');
+    if (status) {
+      status.className = 'agent-rail-status content-stage-status';
+      status.classList.add(/실패|중단|필요/.test(status.textContent) ? 'danger' : /선택|검토|완성/.test(status.textContent) ? 'warn' : 'ok');
+      heading.appendChild(status);
+    }
+    const title = stage.querySelector('.agent-summary-title');
+    if (title) title.textContent = stage.classList.contains('cards-stage')
+      ? stage.dataset.step === '1' ? '오늘의 카드뉴스 주제 후보' : state.cardJob?.title || '카드뉴스 제작'
+      : stage.dataset.step === '1' ? '오늘의 영상 주제 후보' : state.reelsEpisode?.title || '영상 제작';
+  }
+
   function renderReelsDetail() {
     const previous = state.container.querySelector('.reels-workspace');
     const cycle = new Date(Date.now() - 10 * 3600000).toISOString().slice(0, 10);
-    const key = JSON.stringify([cycle, state.reels, state.reelsEpisode, state.reelsError, state.reelsEpisodeError, state.cards, state.cardJob]);
+    const key = JSON.stringify([state.contentView, cycle, state.reels, state.reelsEpisode, state.reelsError, state.reelsEpisodeError, state.cards, state.cardJob, state.cardTopic]);
     if (previous && state.reelsRenderedKey === key) return;
     const workspace = document.createElement('section');
     workspace.className = 'agent-detail-workspace reels-workspace';
-    workspace.appendChild(makeDetailHead('Reels · Shorts', 'Agents로 돌아가기'));
-    const cards = detailCard('카드 뉴스');
-    if (state.cards) cards.appendChild(makeCardsAgentCard());
-    const cardJob = makeCardJobCard();
-    if (cardJob) cards.appendChild(cardJob);
-    if (!state.cards && !cardJob) cards.appendChild(detailText('미연결'));
-    const columns = detailColumns([], [cards]);
+    const head = makeDetailHead('콘텐츠 제작', 'Agents로 돌아가기');
+    head.querySelector('.agent-detail-title-row').remove();
+    workspace.appendChild(head);
+    workspace.dataset.contentView = state.contentView;
+    const selector = document.createElement('div'); selector.className = 'content-view-selector';
+    selector.setAttribute('role', 'group'); selector.setAttribute('aria-label', '콘텐츠 종류');
+    for (const [view, label] of [['reels', 'Reels · Shorts'], ['cards', 'Card News']]) {
+      const control = button(label, () => {
+        state.contentView = view; workspace.dataset.contentView = view;
+        for (const item of selector.children) item.setAttribute('aria-pressed', String(item.dataset.view === view));
+      });
+      control.dataset.view = view; control.setAttribute('aria-pressed', String(state.contentView === view)); selector.appendChild(control);
+    }
+    workspace.appendChild(selector);
+    const columns = detailColumns([], []);
+    const cardStages = columns.lastElementChild;
+    cardStages.dataset.content = 'cards';
+    const cardTitle = document.createElement('h2'); cardTitle.className = 'content-workflow-title'; cardTitle.tabIndex = -1; cardTitle.textContent = 'Card News'; cardStages.appendChild(cardTitle);
+    const job = state.cardJob;
+    const cardActive = !job || job.status === 'discarded' ? 1 : ['queued', 'producing', 'failed', 'blocked'].includes(job.status) ? 2 : job.status === 'ready' ? 3 : 4;
+    ['주제 선정', '카드 제작', '완성본 검토', '수동 게시'].forEach((label, index) => {
+      const step = index + 1, stage = document.createElement('section');
+      stage.className = 'agent-detail-card reels-stage cards-stage'; stage.dataset.step = step;
+      const heading = document.createElement('h3'); heading.textContent = `0${step} / ${label}`; stage.appendChild(heading);
+      if (step === cardActive) {
+        stage.classList.add('active'); stage.setAttribute('aria-current', 'step');
+        if (step === 1) stage.appendChild(makeCardsAgentCard());
+        else if (step !== 4) { const content = makeCardJobCard(); if (content) stage.appendChild(content); }
+        stage.appendChild(button('새로고침', refresh));
+      }
+      if (step === 1) {
+        const proposal = document.createElement('details'); proposal.className = 'cards-topic-entry';
+        proposal.open = !!state.cardTopic && state.cardTopic.status !== 'approved';
+        const summary = document.createElement('summary'); summary.textContent = '직접 주제 제안'; proposal.append(summary, makeCardTopicDialogue()); stage.appendChild(proposal);
+      }
+      if (step === 4 && ['ready', 'approved'].includes(job?.status)) stage.appendChild(makeCardJobCard(true));
+      if (step < cardActive) heading.appendChild(svgIcon('ok'));
+      decorateContentStage(stage);
+      cardStages.appendChild(stage);
+    });
     columns.classList.add('reels-workflow-columns');
     const stages = columns.firstElementChild;
+    stages.dataset.content = 'reels';
+    const reelsTitle = document.createElement('h2'); reelsTitle.className = 'content-workflow-title'; reelsTitle.tabIndex = -1; reelsTitle.textContent = 'Reels · Shorts'; stages.appendChild(reelsTitle);
     const { batch, episode, active } = reelsCycle();
     ['주제 선정', '영상 제작', '영상 검토', '게시'].forEach((label, index) => {
       const step = index + 1;
@@ -1662,6 +1867,7 @@
       }
       if (step < active) heading.appendChild(svgIcon('ok'));
       if (step === active) stage.appendChild(button('새로고침', refresh));
+      decorateContentStage(stage);
       stages.appendChild(stage);
     });
     if (state.reelsEpisodeError) workspace.appendChild(detailCard('영상 상태 확인 필요', detailText(state.reelsEpisodeError, 'danger')));
@@ -1679,6 +1885,8 @@
       });
       const selector = '.reels-workflow-columns > .agent-detail-column:last-child';
       previous.querySelector(selector).replaceChildren(...workspace.querySelector(selector).children);
+      previous.dataset.contentView = state.contentView;
+      for (const control of previous.querySelectorAll('.content-view-selector button')) control.setAttribute('aria-pressed', String(control.dataset.view === state.contentView));
     } else {
       state.container.replaceChildren(workspace);
     }
@@ -2306,15 +2514,16 @@
   }
 
   async function openCards() {
-    await openReels();
-    state.container.querySelector('.reels-workflow-columns > .agent-detail-column:last-child')?.scrollIntoView({ block: 'start' });
+    state.contentView = 'cards';
+    await openReels('cards');
   }
 
-  async function openReels() {
+  async function openReels(view = 'reels') {
+    state.contentView = view;
     state.mode = 'reels';
     renderReelsDetail();
     await refresh();
-    if (state.mode === 'reels') state.container.querySelector('.agent-detail-head h2')?.focus();
+    if (state.mode === 'reels') state.container.querySelector(`[data-content="${state.contentView}"] h2`)?.focus();
   }
 
   function openSummary() {
@@ -2454,7 +2663,13 @@
     state.showToast = showToast;
     state.container = container;
     let cycleId = reelsCycle().id;
+    let cardPolling = false, cardPollAt = 0;
     setInterval(() => {
+      const cardPending = state.cards?.batch?.status === 'collecting' || ['queued','reviewing'].includes(state.cardTopic?.status);
+      if (state.mode === 'reels' && state.container.offsetParent !== null && cardPending && !cardPolling && Date.now() - cardPollAt >= 5000) {
+        cardPolling = true; cardPollAt = Date.now();
+        void loadCards().then(() => { if (state.mode === 'reels') renderReelsDetail(); }).finally(() => { cardPolling = false; });
+      }
       const next = reelsCycle().id;
       if (next === cycleId) return;
       cycleId = next;

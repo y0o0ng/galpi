@@ -1,0 +1,29 @@
+{
+  "change": "manual Instagram/YouTube cards; caption copy/text and ordered JPEG downloads",
+  "pi_backup": "/home/pi/backups/galpi/cards-manual-download-20261010-232017",
+  "checks": {
+    "download_ui": "2/2 PASS",
+    "manual_routes": "1/1 PASS",
+    "remaining_pipeline_tests": "27 PASS in preceding run",
+    "syntax": "local/Pi PASS"
+  },
+  "service_restarted": false,
+  "restart_blocker": "sudo requires password",
+  "iphone_physical_save_tested": false,
+  "hashes": {
+    "lib/cards/config.js": "ea8311975209bdab1a36c0413f9d78a89e05099de67aa8750639b947b30dd4c9",
+    "lib/cards/routes.js": "5a050b1315c46fe307fcfb1f72f5beb509edcf5c25d31c64c3566089a32f64be",
+    "public/agent-panel.js": "33380ec7d369ced032b6ae5ed18c48aee856df599e785d7d178ee763faeda3e0",
+    "test/cards-download-ui.test.js": "8307fb32dfc8bfa559c810de7d8af020b681dacbfafba70aec8a9b72fa403c2c"
+  },
+  "ui_recovery": {
+    "cause": "local whole-file deployment overwrote newer Pi agent UI",
+    "backup": "/home/pi/backups/galpi/cards-ui-recovery-20261010-232350",
+    "base": "/home/pi/backups/galpi/cards-manual-download-20261010-232017/public/agent-panel.js",
+    "outside_card_download_patch": "exactly matches restored newer UI",
+    "served_sha256": "fe4184f471df3aa20f72cfb414a1d2980cb87da24419d51d4b64da9fc49b303f",
+    "download_tests": "2/2 PASS",
+    "syntax": "local/Pi PASS",
+    "visual_device_check": false
+  }
+}

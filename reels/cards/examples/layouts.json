@@ -1,0 +1,177 @@
+{
+  "source": "템플릿 라이브러리 · 가상 내용 · 게시용 아님",
+  "templates": [
+    {
+      "mode": "news",
+      "card": {
+        "layout": "cover",
+        "eyebrow": "TECH NEWS",
+        "title": "노트봇,\n읽고 실행하다",
+        "body": "새 기능보다\n중요한 건\n맡길 수 있는 범위.",
+        "art": "device-mint.png"
+      }
+    },
+    {
+      "mode": "news",
+      "card": {
+        "layout": "story",
+        "eyebrow": "TECH NEWS",
+        "title": "무슨 일이 있었나?",
+        "body": "가상의 노트봇이 문서를 읽고,\n작업 초안을 만드는 기능을 공개했어.\n실행 전에는 사용자의 확인을 받아.",
+        "art": "workflow.png",
+        "composition": "visual"
+      }
+    },
+    {
+      "mode": "news",
+      "card": {
+        "layout": "points",
+        "eyebrow": "TECH NEWS",
+        "title": "달라진 건 세 가지",
+        "body": "기능 목록보다 작업 흐름의 변화를 봐.",
+        "items": [
+          {
+            "title": "읽고 정리하기",
+            "body": "문서에서 필요한 정보를 모아\n짧은 초안으로 정리해.",
+            "art": "icon-document.png"
+          },
+          {
+            "title": "도구로 이어가기",
+            "body": "확인한 내용을 작업 도구로 넘겨.\n답변 다음 단계까지 연결하는 거야.",
+            "art": "icon-terminal.png"
+          },
+          {
+            "title": "실행 전에 멈추기",
+            "body": "최종 실행은 사용자가 확인해.\n초안과 확정을 구분해.",
+            "art": "icon-shield.png"
+          }
+        ]
+      }
+    },
+    {
+      "mode": "news",
+      "card": {
+        "layout": "numbers",
+        "eyebrow": "TECH NEWS",
+        "title": "숫자는 조건과 함께 읽기",
+        "body": "두 가상 버전의 시연값이야.\n실제 성능을 뜻하지 않아.",
+        "labels": [
+          "가상 버전 A",
+          "가상 버전 B"
+        ],
+        "rows": [
+          {
+            "label": "완료한 작업",
+            "values": [
+              60,
+              80
+            ],
+            "max": 100,
+            "unit": "%",
+            "criterion": "높을수록 유리"
+          },
+          {
+            "label": "평균 처리 시간",
+            "values": [
+              12,
+              8
+            ],
+            "max": 20,
+            "unit": "초",
+            "criterion": "낮을수록 유리"
+          },
+          {
+            "label": "작업당 비용",
+            "values": [
+              4,
+              3
+            ],
+            "max": 5,
+            "unit": "원",
+            "criterion": "낮을수록 유리"
+          }
+        ],
+        "note": "가상값 · 같은 조건의 두 버전 비교"
+      }
+    },
+    {
+      "mode": "compare",
+      "card": {
+        "layout": "compare",
+        "eyebrow": "TECH COMPARE",
+        "title": "한눈에 보는\n두 가지 방향",
+        "columns": [
+          {
+            "name": "도구 A",
+            "art": "cube-mint.png",
+            "body": "짧은 작업을\n빠르게 반복하는\n가상 도구야."
+          },
+          {
+            "name": "도구 B",
+            "art": "cube-purple.png",
+            "body": "복잡한 작업을\n충분히 검토하는\n가상 도구야."
+          }
+        ]
+      }
+    },
+    {
+      "mode": "news",
+      "card": {
+        "layout": "closing",
+        "eyebrow": "TECH NEWS",
+        "title": "한 줄로 정리하면",
+        "statement": "맡기는 일만큼,\n확인하는 기준도\n중요해.",
+        "body": "발표와 검증된 결과를 구분하자.\n원문과 아직 모르는 점을 함께 남겨."
+      }
+    },
+    {
+      "mode": "news",
+      "card": {
+        "layout": "stat",
+        "eyebrow": "TECH NEWS",
+        "title": "하나의 숫자로 보는 변화",
+        "value": "2.4",
+        "label": "작업 처리량",
+        "body": "숫자 하나에 초점을 맞출 때.\n비교 기준과 측정 조건도 함께 적어.",
+        "note": "가상 수치 · 같은 조건의 이전 버전 대비",
+        "unit": "배"
+      }
+    },
+    {
+      "mode": "news",
+      "card": {
+        "layout": "steps",
+        "eyebrow": "TECH NEWS",
+        "title": "어떻게 이어지나?",
+        "body": "순서가 중요한 작업이나 원리를\n한 장에서 따라가게 해.",
+        "items": [
+          {
+            "title": "맥락 모으기",
+            "body": "입력과 필요한 정보를 함께 확인해."
+          },
+          {
+            "title": "초안 만들기",
+            "body": "모은 정보를 다음 작업으로 연결해."
+          },
+          {
+            "title": "사용자가 확인하기",
+            "body": "실행 전에 결과와 조건을 검토해."
+          }
+        ]
+      }
+    },
+    {
+      "mode": "news",
+      "card": {
+        "layout": "quote",
+        "eyebrow": "TECH NEWS",
+        "title": "발표에서 짚어볼 문장",
+        "statement": "“할 수 있는 일보다,\n확인할 수 있는 일이\n더 중요하다.”",
+        "attribution": "가상 발언 · 발언 주체와 날짜",
+        "body": "인용과 우리의 해석을 구분해.\n실제 제작에서는 원문과 맥락을 확인해."
+      }
+    }
+  ],
+  "topic": "기술 뉴스 템플릿",
+  "date": "2026-10-10"
+}

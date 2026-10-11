@@ -44,3 +44,6 @@ reels/media/
 reels/px/fonts/*.ttf
 reels/work/
 reels/public-tmp/
+reels/cards-public-tmp/
+
+reels/px/fonts/*.otf
