@@ -37,7 +37,8 @@ FONT = {k: ImageFont.truetype(str(D / "fonts" / f), s) for k, (f, s) in
 BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
 CARD_BOX = (10, 252, 170, 290)     # x0,y0,x1,y1 (포함)
 CARD_INNER_W = 148
-CARD_FONT, CARD_LINE_GAP, CARD_TOP = "label", 14, 8   # 자막 카드: 갈무리9 10px, 줄당 한글 14자
+CARD_CHAR_LIMIT = 22               # 대본의 카드당 공백 제외 상한; 실제 폭·줄바꿈도 통과해야 한다
+CARD_FONT, CARD_LINE_GAP, CARD_TOP = "body", 16, 6   # 새 제작 자막: 갈무리11 Regular 12px, 줄당 한글 최대 12자
 
 
 def background():
@@ -147,6 +148,9 @@ def split_cards(sentence):
     cards = []
     for seg in sentence.split(" / "):
         lines = split_lines(seg, font=CARD_FONT)
+        for line in lines:
+            if text_w(line, CARD_FONT) > CARD_INNER_W:
+                raise ValueError(f"자막 줄 폭 초과: {line!r} ({text_w(line, CARD_FONT)} > {CARD_INNER_W}px)")
         cards += [lines[i:i + 2] for i in range(0, len(lines), 2)]
     return cards
 
@@ -193,7 +197,7 @@ def char_times(card, start, dur):
 
 
 CARD_POP = (0.6, 1.08, 1.0)        # 장면 첫 카드가 튀어나오는 크기(24fps 3프레임); 글자는 그 뒤부터 보인다
-CURSOR_W = 5                       # 타이핑 커서 폭(글자 폭의 절반)
+CURSOR_W = 6                       # 타이핑 커서 폭(글자 폭의 절반)
 
 
 def draw_card(img, card, typed, scale=1.0, cursor=False):
@@ -228,7 +232,7 @@ def draw_card(img, card, typed, scale=1.0, cursor=False):
         ty += CARD_LINE_GAP
     if cursor and cur:                                    # 상자 안(오른쪽 테두리 앞)을 넘지 않게
         x = min(cur[0], x1 - 1 - CURSOR_W)
-        d.rectangle((x, cur[1] + 1, x + CURSOR_W - 1, cur[1] + 9), fill=INK)
+        d.rectangle((x, cur[1] + 1, x + CURSOR_W - 1, cur[1] + 11), fill=INK)
 
 
 def to_output(img):
