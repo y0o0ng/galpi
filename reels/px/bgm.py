@@ -68,7 +68,7 @@ def _cafe_arp(add, bt, chords, nxt, BEAT, bi):
 
 
 CALM = dict(BRIGHT, bpm=100, riff=None, arp_fn=_cafe_arp, comp=(0, 6, 8, 14), clave=False,
-            gain={"drum": 0.6, "arp": 0.8, "ep": 1.2},
+            gain={"drum": 0.6, "arp": 0.8, "ep": 1.2 * 10 ** (-5 / 20)},
             A=[[ch("F", "maj9")], [ch("D", "m9")], [ch("A#", "maj9")], [ch("C", "9")]] * 2,
             B=[[ch("A#", "maj9")], [ch("A", "m7")], [ch("G", "m9")], [ch("C", "sus4"), ch("C", "9")]] * 2,
             intro=[[ch("F", "maj9")], [ch("D", "m9")], [ch("A#", "maj9")], [ch("C", "9")]],
