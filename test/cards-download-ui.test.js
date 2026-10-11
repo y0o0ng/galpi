@@ -25,7 +25,7 @@ test('iPhone은 한 번의 공유 시트에 순서대로 모으고 다운로드 
 test('재시도 대기 중에는 지난 오류를 숨기고 실제 실패 상태에서만 표시한다',()=>{
  const fn=source.slice(source.indexOf('  function makeCardJobCard('),source.indexOf('  async function loadCards('));
  function render(status){const messages=[];const context={state:{cardJob:{id:2,title:'카드',status,images:[],claims:[],caption:'',errorCode:'CARDS_BUILD_BLOCKED'}},document:{createElement:()=>({appendChild(){},append(){}})},refresh(){},releaseCardMedia(){},agentSummaryHead(){return {};},agentSummaryMessage(text){messages.push(text);return {};},button(){return {};}};
- vm.createContext(context);vm.runInContext(fn,context);context.makeCardJobCard();return messages;}
+ context.cardsCycle=()=>({job:context.state.cardJob});vm.createContext(context);vm.runInContext(fn,context);context.makeCardJobCard();return messages;}
  assert.equal(render('queued').some(text=>text.includes('CARDS_BUILD_BLOCKED')),false);
  assert.equal(render('producing').some(text=>text.includes('CARDS_BUILD_BLOCKED')),false);
  assert.equal(render('blocked').some(text=>text.includes('CARDS_BUILD_BLOCKED')),true);

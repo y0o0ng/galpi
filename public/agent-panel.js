@@ -1076,7 +1076,7 @@
   }
 
   function makeCardsAgentCard() {
-    const batch = state.cards?.batch;
+    const batch = cardsCycle().batch;
     const block = document.createElement('section');
     block.className = 'agents-operational-card cards-agent-card';
     block.appendChild(agentSummaryHead('카드뉴스 에이전트', '최근 일주일 기술 소식에서 한 주제를 골라.',
@@ -1231,7 +1231,7 @@
   }
 
   function makeCardJobCard(posting = false) {
-    const job = state.cardJob; if (!job) { releaseCardMedia(); return null; }
+    const job = cardsCycle().job; if (!job) { releaseCardMedia(); return null; }
     const labels = { queued: '제작 대기', producing: '만드는 중', ready: '완성본', failed: '실행 중단', blocked: '수정 필요', approved: '확인 완료', discarded: '폐기됨' };
     const stages = { create: '대본·카드 제작', 'source-0': '출처·문구 검토', 'source-1': '수정본 출처·문구 검토', 'source-2': '수정본 출처·문구 검토', script: '대본 작성', review: '대본 검토', build: '이미지 조립', 'visual-0': '완성본 검토', 'visual-1': '수정본 검토', 'visual-2': '수정본 검토', 'fix-1': '이미지 수정', 'fix-2': '이미지 수정' };
     const block = document.createElement('section'); block.className = 'agents-operational-card cards-agent-card';
@@ -1752,12 +1752,13 @@
         : episode.uploads?.some(upload => upload.status === 'done') ? '일부 게시 완료' : '게시 대기'
       : episode ? EPISODE_STATUS[episode.status] || '확인 필요'
       : batch ? REELS_STATUS[batch.status] : state.reels ? '후보 없음' : '꺼짐';
+    const cards = cardsCycle();
     content.append(makeAgentRow({ title: 'Reels · Shorts', status: reelsStatus,
       tone: state.reelsError || state.reelsEpisodeError || episode?.status === 'failed' || episode?.uploads?.some(upload => upload.status === 'failed') ? 'danger' : episode?.status === 'ready' || batch?.status === 'candidate' ? 'warn' : !state.reels && !episode ? 'off' : 'ok', onOpen: openReels }),
       makeAgentRow({ title: '카드 뉴스',
-        status: state.cardJob ? ({ queued: '제작 대기', producing: '만드는 중', ready: '완성본 검토', failed: '실행 중단', blocked: '수정 필요', approved: '수동 게시', discarded: '폐기됨' }[state.cardJob.status] || '확인 필요')
-          : state.cards?.batch ? ({empty:'후보 없음',collecting:'수집 중',failed:'수집 실패'}[state.cards.batch.status] || REELS_STATUS[state.cards.batch.status] || '확인 필요') : '미연결',
-        tone: ['failed', 'blocked'].includes(state.cardJob?.status) ? 'danger' : state.cardJob?.status === 'ready' ? 'warn' : state.cards || state.cardJob ? 'ok' : 'off', onOpen: openCards }));
+        status: cards.job ? ({ queued: '제작 대기', producing: '만드는 중', ready: '완성본 검토', failed: '실행 중단', blocked: '수정 필요', approved: '수동 게시', discarded: '폐기됨' }[cards.job.status] || '확인 필요')
+          : cards.batch ? ({empty:'후보 없음',collecting:'수집 중',failed:'수집 실패'}[cards.batch.status] || REELS_STATUS[cards.batch.status] || '확인 필요') : state.cards ? '후보 대기' : '미연결',
+        tone: ['failed', 'blocked'].includes(cards.job?.status) ? 'danger' : cards.job?.status === 'ready' ? 'warn' : state.cards || cards.job ? 'ok' : 'off', onOpen: openCards }));
     rail.append(heading, makeMailRow(), makeScheduleRow(), makeCodexRow(), content);
     layout.append(board, rail);
     state.container.appendChild(layout);
@@ -1777,6 +1778,15 @@
     return { id, batch, episode, active };
   }
 
+  function cardsCycle(now = Date.now()) {
+    const id = reelsCycle(now).id;
+    const batch = state.cards?.batch?.batchId === id ? state.cards.batch : null;
+    const jobDay = Number.isFinite(state.cardJob?.createdAt)
+      ? new Date(state.cardJob.createdAt * 1000 - 10 * 3600000).toISOString().slice(0, 10) : null;
+    const job = jobDay === id ? state.cardJob : null;
+    return { id, batch, job };
+  }
+
   function decorateContentStage(stage) {
     const heading = stage.querySelector('h3');
     const status = stage.querySelector('.schedule-agent-status');
@@ -1787,7 +1797,7 @@
     }
     const title = stage.querySelector('.agent-summary-title');
     if (title) title.textContent = stage.classList.contains('cards-stage')
-      ? stage.dataset.step === '1' ? '오늘의 카드뉴스 주제 후보' : state.cardJob?.title || '카드뉴스 제작'
+      ? stage.dataset.step === '1' ? '오늘의 카드뉴스 주제 후보' : cardsCycle().job?.title || '카드뉴스 제작'
       : stage.dataset.step === '1' ? '오늘의 영상 주제 후보' : state.reelsEpisode?.title || '영상 제작';
   }
 
@@ -1816,7 +1826,7 @@
     const cardStages = columns.lastElementChild;
     cardStages.dataset.content = 'cards';
     const cardTitle = document.createElement('h2'); cardTitle.className = 'content-workflow-title'; cardTitle.tabIndex = -1; cardTitle.textContent = 'Card News'; cardStages.appendChild(cardTitle);
-    const job = state.cardJob;
+    const job = cardsCycle().job;
     const cardActive = !job || job.status === 'discarded' ? 1 : ['queued', 'producing', 'failed', 'blocked'].includes(job.status) ? 2 : job.status === 'ready' ? 3 : 4;
     ['주제 선정', '카드 제작', '완성본 검토', '수동 게시'].forEach((label, index) => {
       const step = index + 1, stage = document.createElement('section');
@@ -2674,6 +2684,7 @@
       if (next === cycleId) return;
       cycleId = next;
       releaseReelsMedia();
+      releaseCardMedia();
       if (['summary', 'reels'].includes(state.mode) && state.container.offsetParent !== null) void refresh();
     }, 1000);
     state.initialized = true;

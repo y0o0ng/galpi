@@ -401,3 +401,15 @@ test('CLI 작업 폴더가 Git checkout 안이면 공용 코드 쓰기 권한을
  assert.throws(()=>validateAgentResult({status:'blocked',message:'원문 없음'}),{code:'CARDS_AGENT_BLOCKED'});
  for(const value of [null,[],{},'ok',{status:'READY_FOR_REVIEW',message:''},{status:'ok'},{status:'ok',message:1},{status:'ok',message:'',extra:true}])assert.throws(()=>validateAgentResult(value),{code:'CARDS_AGENT_RESPONSE'});
  });
+
+test('19시 경계는 새벽 강제 수집과 저녁 정규 수집을 다른 회차로 구분한다',async t=>{
+  const {store,now,setTime}=setup(t);const days=[];
+  const worker=createCardsWorker({store,now,config:{enabled:true,productionEnabled:false,workRoot:temp(t)},
+    collect:async()=>[],select:async({today})=>{days.push(today);return {candidates:[candidate],shortageReason:''};}});
+  setTime(Date.parse('2026-10-11T00:45:00+09:00')/1000);await worker.collectNow();
+  assert.equal(store.latestBatch().batchId,'2026-10-10');
+  setTime(Date.parse('2026-10-11T18:59:59+09:00')/1000);await worker.tick();
+  assert.equal(days.length,1);
+  setTime(Date.parse('2026-10-11T19:00:00+09:00')/1000);await worker.tick();await worker.tick();
+  assert.deepEqual(days,['2026-10-10','2026-10-11']);
+});

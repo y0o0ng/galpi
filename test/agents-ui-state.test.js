@@ -92,7 +92,7 @@ test('native calendar swipe loads the previous week from schedule detail', () =>
 
 test('Reels resets at 19:00 KST and never completes steps from another daily batch', () => {
   const state = { reels: { batch: { batchId: '2026-10-09', status: 'selected' } }, reelsEpisode: { batchId: '2026-10-09', status: 'approved' } };
-  const cycle = helper('reelsCycle', 'function decorateContentStage', { state, Date });
+  const cycle = helper('reelsCycle', 'function cardsCycle', { state, Date });
   assert.equal(cycle(Date.parse('2026-10-10T18:59:59+09:00')).active, 4);
   const reset = cycle(Date.parse('2026-10-10T19:00:00+09:00'));
   assert.equal(reset.id, '2026-10-10');
@@ -103,4 +103,15 @@ test('Reels resets at 19:00 KST and never completes steps from another daily bat
   assert.equal(cycle(Date.parse('2026-10-11T09:00:00+09:00')).active, 3);
   state.reelsEpisode.batchId = undefined;
   assert.equal(cycle(Date.parse('2026-10-11T09:00:00+09:00')).episode, null);
+});
+
+test('카드뉴스도 19시에 이전 후보·제작·게시 상태를 초기화한다',()=>{
+  const state={cards:{batch:{batchId:'2026-10-10',status:'selected'}},cardJob:{id:2,status:'approved',createdAt:Date.parse('2026-10-11T00:50:00+09:00')/1000}};
+  const reels=source.slice(source.indexOf('  function reelsCycle('),source.indexOf('  function cardsCycle('));
+  const cards=source.slice(source.indexOf('  function cardsCycle('),source.indexOf('  function decorateContentStage('));
+  const cycle=vm.runInNewContext(reels+cards+'\ncardsCycle',{state,Date});
+  assert.equal(cycle(Date.parse('2026-10-11T18:59:59+09:00')).job.id,2);
+  const reset=cycle(Date.parse('2026-10-11T19:00:00+09:00'));
+  assert.equal(reset.job,null);assert.equal(reset.batch,null);
+  assert.equal(state.cardJob.id,2);
 });

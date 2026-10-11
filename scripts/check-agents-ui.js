@@ -326,7 +326,7 @@ async function main() {
     await page.locator('.agents-dashboard').waitFor();
     await page.evaluate(() => {
       window.fixture['/api/cards/latest'] = { batch: null };
-      window.fixture['/api/cards/jobs/latest'] = { job: { id: 12, status: 'ready', title: 'Fixture card job', images: [], claims: [], caption: 'Fixture caption', finishedAt: 123 } };
+      window.fixture['/api/cards/jobs/latest'] = { job: { id: 12, createdAt: Math.floor(Date.now()/1000), status: 'ready', title: 'Fixture card job', images: [], claims: [], caption: 'Fixture caption', finishedAt: 123 } };
     });
     await refresh();
     await page.locator('.agent-rail-entry').filter({ hasText: '카드 뉴스' }).click();
