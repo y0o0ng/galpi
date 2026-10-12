@@ -170,8 +170,9 @@ test('저장소·워커: 사람 선택 전 미제작, 시간 창, 승인 전 미
 
 test('카드 후보 탐색은 릴스와 동일하게 저녁 7시부터 시작한다',async t=>{
   const {store,now,setTime}=setup(t);let collections=0;
-  const worker=createCardsWorker({store,now,config:{enabled:true,productionEnabled:false,uploadEnabled:false,workRoot:temp(t)},
-    collect:async()=>{collections++;return [];},select:async()=>({candidates:[],shortageReason:'시험'})});
+  const config={enabled:true,productionEnabled:false,uploadEnabled:false,workRoot:temp(t),naverClientId:'id',naverClientSecret:'secret'};
+  const worker=createCardsWorker({store,now,config,
+    collect:async args=>{assert.equal(args.config,config);collections++;return [];},select:async()=>({candidates:[],shortageReason:'시험'})});
   setTime(Date.parse('2026-10-11T09:59:59Z')/1000);await worker.tick();assert.equal(collections,0);
   setTime(Date.parse('2026-10-11T10:00:00Z')/1000);await worker.tick();assert.equal(collections,1);
   await worker.tick();assert.equal(collections,1);

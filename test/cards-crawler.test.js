@@ -54,3 +54,31 @@ test('선택 CLI는 읽기 전용·검색 비활성이고 제작 기본 권한�
 test('모든 소스 접근 실패를 후보 없음으로 숨기지 않는다',async()=>{
  await assert.rejects(collectCrawlerItems({now:NOW,fetchImpl:async()=>{throw new Error('OFFLINE');}}),{code:'CARDS_COLLECTION_FAILED'});
 });
+
+test('네이버는 원문 URL·최근 제공 날짜만 수집하고 검색 전체 건수를 반응 수치로 쓰지 않는다',async()=>{
+ let calls=0;
+ const config=cardsConfig({NAVER_CLIENT_ID:'test-id',NAVER_CLIENT_SECRET:'test-secret'});
+ const items=await collectCrawlerItems({now:NOW,config,fetchImpl:async(url,options)=>{
+  if(!url.startsWith('https://openapi.naver.com/')){assert.equal(options.headers,undefined);throw new Error('OFFLINE');}
+  calls++;assert.equal(options.headers['X-Naver-Client-Secret'],'test-secret');
+  assert.equal(new URL(url).searchParams.get('sort'),'date');
+  return response({total:999999,items:[
+   {title:'새로운 <b>AI</b> 앱 &quot;출시&quot;',originallink:'https://example.kr/new',link:'https://n.news.naver.com/new',description:'<b>새</b> 기능',pubDate:'Sun, 11 Oct 2026 10:00:00 +0900'},
+   {title:'오래된 기사',originallink:'https://example.kr/old',pubDate:'Sun, 01 Feb 2026 10:00:00 +0900'},
+   {title:'잘못된 날짜',originallink:'https://example.kr/invalid',pubDate:'bad'},
+  ]});
+ }});
+ assert.equal(calls,6);assert.equal(items.length,1);assert.equal(items[0].url,'https://example.kr/new');
+ assert.equal(items[0].title,'새로운 AI 앱 "출시"');assert.equal(items[0].date_kind,'naver_provided');
+ assert.equal(items[0].attention.counts.news_articles,1);assert.equal(items[0].attention.observed_outlets,1);
+ assert.equal(items.collectionReport.filter(r=>r.source==='Naver News'&&r.count===1).length,6);
+});
+
+test('네이버 인증 리다이렉트는 키를 전달하지 않고 실패로 기록한다',async()=>{
+ let requests=0;
+ await assert.rejects(collectCrawlerItems({now:NOW,config:{naverClientId:'id',naverClientSecret:'secret'},fetchImpl:async url=>{
+  if(!url.startsWith('https://openapi.naver.com/'))throw new Error('OFFLINE');
+  requests++;return {ok:false,status:302,headers:{get:()=> 'https://other.example/steal'}};
+ }}),{code:'CARDS_COLLECTION_FAILED'});
+ assert.equal(requests,6);
+});
