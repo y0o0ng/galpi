@@ -26,7 +26,10 @@ function fixture({ factcheck = '1 rows, 0 missing' } = {}) {
   fs.mkdirSync(path.join(reelsDir, '.venv', 'bin'), { recursive: true });
   const py = path.join(reelsDir, '.venv', 'bin', 'python');
   const ok = factcheck.includes(', 0 missing');
-  fs.writeFileSync(py, `#!/bin/sh\necho '${factcheck}'\nexit ${ok ? 0 : 1}\n`, { mode: 0o755 });
+  const report = { version: 1, rows: 1, sources: ['https://e.com/a'], fetch_errors: [],
+    claims: [{ row: '1', claim: 'test claim', quote: 'a source quotation long enough to check',
+      source: '[A]', url: 'https://e.com/a', sources: ['https://e.com/a'], found: ok, status: ok ? 'matched' : 'mismatch' }] };
+  fs.writeFileSync(py, `#!/bin/sh\necho '${JSON.stringify(report)}'\nexit ${ok ? 0 : 1}\n`, { mode: 0o755 });
   return { repo, reelsDir, workDir: path.join(reelsDir, 'work', '2026-10-04-c7') };
 }
 
@@ -43,11 +46,12 @@ function fakeSpawn(handler, { stdout = JSON.stringify({ result: 'ok', total_cost
     const call = { bin, args, options, stdin: '' };
     child.stdin = Object.assign(new EventEmitter(), { end: text => { call.stdin = text; } });
     calls.push(call);
-    setImmediate(() => {
+    // Linux 파일 시각 해상도보다 느리게 가짜 제작을 끝내 실제 단계 순서를 유지한다.
+    setTimeout(() => {
       handler(call, calls.length);
       child.stdout.emit('data', stdout);
       child.emit('close', code);
-    });
+    }, 20);
     return child;
   };
   spawn.calls = calls;
@@ -159,6 +163,45 @@ test('factcheck가 0 missing이 아니면 검토 단계에서 멈춘다', async 
   const record = await run(f, fakeSpawn(happy(f)));
   assert.equal(record.stages[1].code, 'REELS_FACTCHECK');
   assert.equal(record.stages.length, 2);
+});
+
+test('대본 재작성에는 DB 실패 근거와 보존한 이전 최종본이 대본·검토 양쪽에 전달된다', async () => {
+  const f = fixture();
+  write(path.join(f.workDir, 'final.md'), FINAL);
+  const old = { stages: [{ stage: 'review', result: 'failed', factcheck: { rewrite: true,
+    excludedSources: ['https://blocked.example/source'], fetch_errors: [{ url: 'https://blocked.example/source', reason: 'HTTP 403 forbidden' }],
+    mismatches: [{ row: '3', claim: 'remove this claim', quote: 'absent quote' }] } }] };
+  const spawn = fakeSpawn(happy(f));
+  const record = await produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake', spawn, previousRecord: old });
+  assert.equal(record.outcome, 'ok');
+  assert.equal(fs.readFileSync(record.retryFeedback.previousFinal, 'utf8'), FINAL);
+  for (const call of spawn.calls.slice(0, 2)) {
+    assert.match(call.stdin, /https:\/\/blocked.example\/source/);
+    assert.match(call.stdin, /remove this claim/);
+    assert.match(call.stdin, /HTTP 403 forbidden/);
+    assert.match(call.stdin, /인용만 교체하지 말고 대본에서 제외/);
+    assert.ok(call.stdin.includes(record.retryFeedback.previousFinal));
+  }
+  const repeated = await produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake',
+    spawn: fakeSpawn(happy(f)), previousRecord: record });
+  assert.deepEqual(repeated.retryFeedback.excludedSources, ['https://blocked.example/source']);
+});
+
+test('실행 오류 소진은 기존 출처 전체 교체를 명시하며 오래된 초안을 재사용하지 않는다', async () => {
+  const f = fixture();
+  write(path.join(f.workDir, 'draft.md'), 'old draft');
+  fs.utimesSync(path.join(f.workDir, 'draft.md'), 1, 1);
+  write(path.join(f.workDir, 'final.md'), FINAL);
+  const spawn = fakeSpawn(() => {});
+  const record = await produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake', spawn, from: 'review',
+    previousRecord: { stages: [{ stage: 'review', result: 'failed', factcheck: {
+      rewrite: true, excludeAllSources: true, excludedSources: ['https://e.com/a'], mismatches: [],
+    } }] } });
+  assert.equal(record.outcome, 'failed');
+  assert.equal(record.stages[0].stage, 'script');
+  assert.match(record.stages[0].reason, /새로 작성되지/);
+  assert.match(spawn.calls[0].stdin, /이전 최종본의 모든 출처를 제외/);
+  assert.match(spawn.calls[0].stdin, /"excludeAllSources":true/);
 });
 
 test('build는 단계 시작 이전에 있던 mp4를 성공으로 치지 않는다', async () => {

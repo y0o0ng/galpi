@@ -181,7 +181,7 @@ test('push: 조용한 시간이면 미뤄지고, payload 키는 고정이며, �
   ctx.db.close();
 });
 
-test('실패 → failed, 1시간 뒤 실패한 단계부터 재시도, 3번이 한도', async () => {
+test('실패 → failed, 15분 뒤 실패한 단계부터 재시도, 3번이 한도', async () => {
   const ctx = setup();
   selectCandidate(ctx.store);
   const produce = fakeProduce({ fail: 'REELS_NO_MP4' });
@@ -191,9 +191,9 @@ test('실패 → failed, 1시간 뒤 실패한 단계부터 재시도, 3번이 �
   assert.deepEqual([row.status, row.attempts, row.error_code, row.error_detail], ['failed', 1, 'REELS_NO_MP4', 'boom']);
   assert.equal(ctx.db.prepare('SELECT COUNT(*) AS n FROM reels_push_deliveries').get().n, 0);
 
-  ctx.clock.now += HOUR - 1;
+  ctx.clock.now += 15 * 60 - 1;
   await w.tick();
-  assert.equal(produce.calls.length, 1); // 1시간 전
+  assert.equal(produce.calls.length, 1); // 15분 전
   ctx.clock.now += 1;
   await w.tick();
   assert.equal(produce.calls.length, 2);
@@ -207,6 +207,38 @@ test('실패 → failed, 1시간 뒤 실패한 단계부터 재시도, 3번이 �
   ctx.clock.now += HOUR;
   await w.tick();
   assert.equal(produce.calls.length, 3); // 3번을 다 썼다
+  ctx.db.close();
+});
+
+test('팩트 체크 재작성은 script부터 시작하고 DB의 이전 기록을 전달한다', async () => {
+  const ctx = setup();
+  selectCandidate(ctx.store);
+  const calls = [];
+  const failure = { outcome: 'failed', stages: [{ stage: 'script', result: 'ok' },
+    { stage: 'review', result: 'failed', code: 'REELS_FACTCHECK_SOURCE', factcheck: {
+      rewrite: true, excludedSources: ['https://blocked.example/source'], mismatches: [{ row: '2', claim: 'bad claim' }],
+    } }] };
+  const w = worker(ctx, { produce: async args => { calls.push(args); return failure; } });
+  await w.tick();
+  ctx.clock.now += 15 * 60;
+  await w.tick();
+  assert.equal(calls[1].from, 'script');
+  assert.deepEqual(calls[1].previousRecord, failure);
+  ctx.db.close();
+});
+
+test('검토가 검사한 claims를 저장하며 게시 전 원문을 다시 받지 않는다', async () => {
+  const ctx = setup();
+  selectCandidate(ctx.store);
+  const produce = fakeProduce();
+  const checked = [{ row: '1', found: true, quote: 'verified quotation' }];
+  await worker(ctx, { produce: async args => {
+    const record = await produce(args);
+    record.stages[1].factcheck = { claims: checked, rewrite: false };
+    return record;
+  }, claims: async () => { throw new Error('must not fetch again'); } }).tick();
+  assert.equal(ctx.episodes.latestEpisode().status, 'ready');
+  assert.deepEqual(JSON.parse(ctx.episodes.latestEpisode().claims_json), checked);
   ctx.db.close();
 });
 
