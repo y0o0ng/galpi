@@ -59,8 +59,8 @@ test('네이버는 원문 URL·최근 제공 날짜만 수집하고 검색 전�
  let calls=0;
  const config=cardsConfig({NAVER_CLIENT_ID:'test-id',NAVER_CLIENT_SECRET:'test-secret'});
  const items=await collectCrawlerItems({now:NOW,config,fetchImpl:async(url,options)=>{
-  if(!url.startsWith('https://openapi.naver.com/')){assert.equal(options.headers,undefined);throw new Error('OFFLINE');}
-  calls++;assert.equal(options.headers['X-Naver-Client-Secret'],'test-secret');
+  if(!url.startsWith('https://naverapihub.apigw.ntruss.com/')){assert.equal(options.headers,undefined);throw new Error('OFFLINE');}
+  calls++;assert.equal(options.headers['X-NCP-APIGW-API-KEY'],'test-secret');
   assert.equal(new URL(url).searchParams.get('sort'),'date');
   return response({total:999999,items:[
    {title:'새로운 <b>AI</b> 앱 &quot;출시&quot;',originallink:'https://example.kr/new',link:'https://n.news.naver.com/new',description:'<b>새</b> 기능',pubDate:'Sun, 11 Oct 2026 10:00:00 +0900'},
@@ -77,7 +77,7 @@ test('네이버는 원문 URL·최근 제공 날짜만 수집하고 검색 전�
 test('네이버 인증 리다이렉트는 키를 전달하지 않고 실패로 기록한다',async()=>{
  let requests=0;
  await assert.rejects(collectCrawlerItems({now:NOW,config:{naverClientId:'id',naverClientSecret:'secret'},fetchImpl:async url=>{
-  if(!url.startsWith('https://openapi.naver.com/'))throw new Error('OFFLINE');
+  if(!url.startsWith('https://naverapihub.apigw.ntruss.com/'))throw new Error('OFFLINE');
   requests++;return {ok:false,status:302,headers:{get:()=> 'https://other.example/steal'}};
  }}),{code:'CARDS_COLLECTION_FAILED'});
  assert.equal(requests,6);

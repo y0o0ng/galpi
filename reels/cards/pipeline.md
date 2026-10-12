@@ -29,7 +29,7 @@ URL·확실히 동일한 제목만 코드로 묶는다. 다른 제목의 동일 
 
 ### 네이버 국내 뉴스 보충
 
-`NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`이 모두 설정된 경우 검색 API의 `news.json`을 사용한다. 인공지능·로봇·반도체·소프트웨어·사이버 보안·신기술 6개 검색어를 최신순으로 각50개 조회하고 제공 날짜가 최근7일인 기사만 합친다. 원문 `originallink`를 우선하며 제목·요약의 HTML 강조를 제거한다. `pubDate`는 원문 발표일이 아니라 네이버 제공 시각일 수 있으므로 `date_kind:naver_provided`로 남긴다. 전체 검색 건수 `total`은 기간 제한이 없고 반응 수치도 아니므로 사용하지 않는다. 여러 검색어에 걸린 동일 기사 URL은 기존 묶기에서 중복 제거한다. 관측 매체는 원문 호스트로 집계하고 독립 보도 여부는 추정하지 않는다. 인증 키가 없으면 `skipped/credentials_missing`, 조회 실패는 검색어별 `failed`로 기록하고 다른 소스는 유지한다. 키를 포함한 요청의 리다이렉트는 차단한다. 검색 API 사용 권한을 켠 네이버 개발자 앱과 서버 재시작이 필요하다. 데이터랩·동일 사건 의미 묶기는 이번 범위에 포함하지 않는다.
+`NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`이 모두 설정된 경우 NAVER API HUB의 `https://naverapihub.apigw.ntruss.com/search/v1/news`를 사용하고 `X-NCP-APIGW-API-KEY-ID`·`X-NCP-APIGW-API-KEY` 헤더로 인증한다. 구형 Developers Center 주소·헤더는 API HUB 키와 호환되지 않는다. 인공지능·로봇·반도체·소프트웨어·사이버 보안·신기술 6개 검색어를 최신순으로 각50개 조회하고 제공 날짜가 최근7일인 기사만 합친다. 원문 `originallink`를 우선하며 제목·요약의 HTML 강조를 제거한다. `pubDate`는 원문 발표일이 아니라 네이버 제공 시각일 수 있으므로 `date_kind:naver_provided`로 남긴다. 전체 검색 건수 `total`은 기간 제한이 없고 반응 수치도 아니므로 사용하지 않는다. 여러 검색어에 걸린 동일 기사 URL은 기존 묶기에서 중복 제거한다. 관측 매체는 원문 호스트로 집계하고 독립 보도 여부는 추정하지 않는다. 인증 키가 없으면 `skipped/credentials_missing`, 조회 실패는 검색어별 `failed`로 기록하고 다른 소스는 유지한다. 키를 포함한 요청의 리다이렉트는 차단한다. 뉴스 검색을 켠 NAVER API HUB 앱과 서버 재시작이 필요하다. 데이터랩·동일 사건 의미 묶기는 이번 범위에 포함하지 않는다.
 
 ## 직접 제안·수정 대화
 
