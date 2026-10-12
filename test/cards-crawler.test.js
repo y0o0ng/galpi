@@ -29,10 +29,11 @@ test('URL 변형은 합치지만 제목이 다른 사건의 기사 수·독립�
 });
 test('선택 호출은 정확히 한 번·읽기 전용이며 수집 근거는 서버가 붙이고 자료 밖 URL은 거부한다',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'cards-crawler-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
- const items=groupItems([item],NOW),candidate={selected_id:0,title:'새 앱',summary:'기기 안에서 처리해요.',audience:'general',mode:'news',format_reason:'새 앱 소식',reader_question:'무엇을 할 수 있나요?',why_interest:'직접 써볼 수 있어요.',attention_query:'new app',anchor_url:item.url,announced_at:'',sources:[{title:item.title,url:item.url,published_at:null}],compare_targets:[],compare_axes:[],risk:'피드 요약만 확인했어요.'};let calls=0;
+ const items=groupItems([item],NOW),candidate={selected_id:0,same_event:[],title:'새 앱',summary:'기기 안에서 처리해요.',audience:'general',mode:'news',format_reason:'새 앱 소식',reader_question:'무엇을 할 수 있나요?',why_interest:'직접 써볼 수 있어요.',attention_query:'new app',anchor_url:item.url,announced_at:'',sources:[{title:item.title,url:item.url,published_at:null}],compare_targets:[],compare_axes:[],risk:'피드 요약만 확인했어요.'};let calls=0;
  const runner=async args=>{calls++;assert.equal(args.selectionOnly,true);assert.ok(args.prompt.length<10000);return {response:{candidates:[candidate],shortage_reason:'한 개만 확보'},usage:{input_tokens:100}};};
  const result=await selectCrawlerCandidates({config:cardsConfig({}),items,today:'2026-10-12',now:NOW,cwd:root,runner});
- assert.equal(calls,1);assert.deepEqual(result.candidates[0].attention,items[0].attention);
+ assert.equal(calls,1);assert.deepEqual(result.candidates[0].attention.evidence,items[0].attention.evidence);
+ assert.deepEqual(result.candidates[0].attention.grouping,{method:'model_selected_event',anchor_id:0,matches:[]});
  candidate.sources[0].url='https://invented.example/story';
  await assert.rejects(selectCrawlerCandidates({config:cardsConfig({}),items,today:'2026-10-12',now:NOW,cwd:root,runner}),{code:'CARDS_CANDIDATE_SOURCE'});
  calls=0;await selectCrawlerCandidates({config:cardsConfig({}),items:[],today:'2026-10-12',now:NOW,cwd:root,runner});assert.equal(calls,0);
@@ -49,6 +50,29 @@ test('선택 CLI는 읽기 전용·검색 비활성이고 제작 기본 권한�
   assert.equal(args[args.indexOf('--sandbox')+1],selectionOnly?'read-only':'workspace-write');
   assert.ok(args.includes(`web_search="${selectionOnly?'disabled':'live'}"`));
  }
+});
+
+test('선택된 사건의 근거만 합쳐 기사·매체·HN을 집계하고 잘못된 ID·중복 후보는 거부한다',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'cards-event-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const news={...item,role:'original_news',source:'News',url:'https://press-a.example/new'};
+ const items=groupItems([news,{...news,title:'다른 제목으로 보도한 동일한 앱 출시',url:'https://press-b.example/new'},
+  {...news,title:'같은 업체의 별개 제품 출시 소식',url:'https://press-a.example/other'}],NOW);
+ const hn={url:'https://news.ycombinator.com/item?id=1',role:'community_post',outlet_group:'Hacker News',published_at:item.published_at,metrics:[{name:'points',value:20},{name:'comments',value:0}]};
+ items[0].attention.evidence.push(hn);items[1].attention.evidence.push(hn,{...items[0].attention.evidence[0],url:news.url+'?utm_source=x'});
+ const candidate={selected_id:0,same_event:[{id:1,reason:'동일 앱의 같은 출시를 보도해요.'}],title:'새 앱 출시',summary:'동일 사건이에요.',audience:'general',mode:'news',format_reason:'출시 소식',reader_question:'무엇이 바뀌었나요?',why_interest:'새 기능',attention_query:'앱 출시',anchor_url:news.url,announced_at:'',sources:[{title:news.title,url:news.url,published_at:null},{title:items[1].title,url:items[1].url,published_at:null}],compare_targets:[],compare_axes:[],risk:'요약 기준'};
+ let rows=[candidate],calls=0;
+ const run=()=>selectCrawlerCandidates({config:cardsConfig({}),items,today:'2026-10-12',now:NOW,cwd:root,runner:async()=>{calls++;return {response:{candidates:rows,shortage_reason:'두 후보 미확보'}};}});
+ const result=await run(),attention=result.candidates[0].attention;
+ assert.equal(calls,1);assert.equal(attention.counts.news_articles,2);assert.equal(attention.observed_outlets,2);
+ assert.equal(attention.counts.community_posts,1);assert.equal(attention.counts.independent_outlets,null);
+ assert.deepEqual(attention.evidence.find(e=>e.role==='community_post').metrics,hn.metrics);
+ assert.equal(items[0].attention.evidence.length,2);assert.ok(!attention.evidence.some(e=>e.url===items[2].url));
+ for(const same_event of [[null],[{id:99,reason:'없는 ID'}],[{id:0,reason:'기준 ID 반복'}],[{id:1,reason:' '}],[{id:1,reason:'동일 사건'},{id:1,reason:'중복'}]]){
+  rows=[{...candidate,same_event}];await assert.rejects(run(),{code:'CARDS_EVENT_GROUP_INVALID'});
+ }
+ rows=[{...candidate,same_event:[]}];await assert.rejects(run(),{code:'CARDS_CANDIDATE_SOURCE'});
+ rows=[candidate,{...candidate,selected_id:1,same_event:[],anchor_url:items[1].url}];
+ await assert.rejects(run(),{code:'CARDS_CANDIDATE_DUPLICATE'});
 });
 
 test('모든 소스 접근 실패를 후보 없음으로 숨기지 않는다',async()=>{
