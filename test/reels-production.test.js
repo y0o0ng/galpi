@@ -98,7 +98,7 @@ test('다섯 단계가 순서대로 돌고 단계마다 같은 안전 인자와 
   assert.equal(record.outcome, 'ok');
   assert.deepEqual(record.stages.map(s => [s.stage, s.result]), [['script', 'ok'], ['review', 'ok'], ['build', 'ok'], ['visual', 'ok'], ['fix', 'ok']]);
   assert.equal(record.stages[0].total_cost_usd, 1.5);
-  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--model')), ['opus', 'sonnet', 'opus', 'opus', 'sonnet']);
+  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--model')), ['opus', 'sonnet', 'opus', 'sonnet', 'sonnet']);
   assert.deepEqual(spawn.calls.map(c => flag(c.args, '--effort')), ['medium', 'medium', 'medium', 'medium', 'medium']);
   for (const call of spawn.calls) {
     for (const a of ['-p', '--restricted', '--no-session-persistence', '--strict-mcp-config']) assert.ok(call.args.includes(a), a);
@@ -348,7 +348,7 @@ test('수정: fix(사람 의견) → visual → MUST가 있으면 fix 한 번 �
   const record = await revise(f, spawn);
   assert.equal(record.outcome, 'ok');
   assert.deepEqual(record.stages.map(s => [s.stage, s.result]), [['fix', 'ok'], ['visual', 'ok'], ['fix', 'ok']]);
-  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--model')), ['sonnet', 'opus', 'sonnet']);
+  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--model')), ['sonnet', 'sonnet', 'sonnet']);
   assert.equal(reviews[0], 'MUST 1 / NICE 0\n- [MUST] 사람 검토 의견: 제목이 작아요\n');
   assert.ok(spawn.calls[0].stdin.includes(path.join(f.workDir, 'human_review_1.md')));
   assert.ok(spawn.calls[2].stdin.includes(path.join(f.workDir, 'visual_review.md')));

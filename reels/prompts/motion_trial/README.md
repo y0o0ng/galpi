@@ -35,7 +35,7 @@
 
 ## 운영 반영(이미 Pi·main)
 
-- **2026-10-14: 5회차 방식을 운영에 넣었다.** `script`(Opus medium, 문장+근거 행만, 새 대본 규칙) → `review`(Sonnet medium, 문장-근거 대조) → `build`(Opus medium, 확정 문장으로 설계·그리기) → `visual`(Opus medium) → `fix`(Sonnet medium), 모두 `--effort medium` 명시. 움직임 문법은 handoff 절이 정본이고 이 폴더의 `grammar.md`는 시험 기록이다. 위 "다음 작업" 3·4번(움직임 띠·재검토 루프·Sonnet 시각 검토)은 아직이다.
+- **2026-10-14: 5회차 방식을 운영에 넣었다.** `script`(Opus medium, 문장+근거 행만, 새 대본 규칙) → `review`(Sonnet medium, 문장-근거 대조) → `build`(Opus medium, 확정 문장으로 설계·그리기) → `visual`(Sonnet medium — 사용량 때문에) → `fix`(Sonnet medium), 모두 `--effort medium` 명시. 움직임 문법은 handoff 절이 정본이고 이 폴더의 `grammar.md`는 시험 기록이다. 위 "다음 작업" 4번 중 움직임 띠·재검토 루프는 아직이다(Sonnet 시각 검토는 반영됨). **사용량이 가장 큰 문제다** — 한 편 비용은 전 약 12.8달러, 새 방식은 Opus 빌드(6.83) 때문에 14~15달러(시각 검토를 Sonnet으로 내리면 12달러 안팎). 첫 운영 편의 실측으로 빌드 모델을 다시 정한다.
 
 - 실제 색 예외: 사람 몸(손·손가락·피부)은 `PEOPLE_COLORS`, 불은 새 `FIRE_COLORS` 세 단. 그 밖은 의미 색(`fb8dcea`, 정본은 handoff 팔레트 절).
 - 자막 11px를 시도했다가 사용자 결정으로 12px로 되돌렸다(`0744a48` → `2faa533`). **현재 12px.**
