@@ -27,7 +27,7 @@ test('URL 변형은 합치지만 제목이 다른 사건의 기사 수·독립�
  assert.equal(result[0].attention.counts.community_posts,null);
  assert.equal(groupItems([{...item,url:'http://127.0.0.1/private'}],NOW).length,0);
 });
-test('선택 호출은 정확히 한 번·읽기 전용이며 수집 근거는 서버가 붙이고 자료 밖 URL은 거부한다',async t=>{
+test('선택 호출은 한 번·읽기 전용이며 뉴스 출처는 선택 ID로 확정하고 비교의 자료 밖 URL은 거부한다',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'cards-crawler-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const items=groupItems([item],NOW),candidate={selected_id:0,same_event:[],title:'새 앱',summary:'기기 안에서 처리해요.',audience:'general',mode:'news',format_reason:'새 앱 소식',reader_question:'무엇을 할 수 있나요?',why_interest:'직접 써볼 수 있어요.',attention_query:'new app',anchor_url:item.url,announced_at:'',sources:[{title:item.title,url:item.url,published_at:null}],compare_targets:[],compare_axes:[],risk:'피드 요약만 확인했어요.'};let calls=0;
  const runner=async args=>{calls++;assert.equal(args.selectionOnly,true);assert.ok(args.prompt.length<10000);return {response:{candidates:[candidate],shortage_reason:'한 개만 확보'},usage:{input_tokens:100}};};
@@ -35,6 +35,11 @@ test('선택 호출은 정확히 한 번·읽기 전용이며 수집 근거는 �
  assert.equal(calls,1);assert.deepEqual(result.candidates[0].attention.evidence,items[0].attention.evidence);
  assert.deepEqual(result.candidates[0].attention.grouping,{method:'model_selected_event',anchor_id:0,matches:[]});
  candidate.sources[0].url='https://invented.example/story';
+ const recovered=await selectCrawlerCandidates({config:cardsConfig({}),items,today:'2026-10-12',now:NOW,cwd:root,runner});
+ assert.deepEqual(recovered.candidates[0].sources,[{title:item.title,url:item.url,published_at:item.published_at}]);
+ candidate.mode='compare';candidate.compare_targets=['새 앱','다른 앱'];candidate.compare_axes=['실행 방식','지원 기기'];
+ await assert.rejects(selectCrawlerCandidates({config:cardsConfig({}),items,today:'2026-10-12',now:NOW,cwd:root,runner}),{code:'CARDS_CANDIDATE_SOURCE'});
+ candidate.selected_id=99;
  await assert.rejects(selectCrawlerCandidates({config:cardsConfig({}),items,today:'2026-10-12',now:NOW,cwd:root,runner}),{code:'CARDS_CANDIDATE_SOURCE'});
  calls=0;await selectCrawlerCandidates({config:cardsConfig({}),items:[],today:'2026-10-12',now:NOW,cwd:root,runner});assert.equal(calls,0);
 });
@@ -70,9 +75,24 @@ test('선택된 사건의 근거만 합쳐 기사·매체·HN을 집계하고 �
  for(const same_event of [[null],[{id:99,reason:'없는 ID'}],[{id:0,reason:'기준 ID 반복'}],[{id:1,reason:' '}],[{id:1,reason:'동일 사건'},{id:1,reason:'중복'}]]){
   rows=[{...candidate,same_event}];await assert.rejects(run(),{code:'CARDS_EVENT_GROUP_INVALID'});
  }
- rows=[{...candidate,same_event:[]}];await assert.rejects(run(),{code:'CARDS_CANDIDATE_SOURCE'});
+ rows=[{...candidate,same_event:[]}];
+ const ungrouped=await run();assert.deepEqual(ungrouped.candidates[0].sources.map(s=>s.url),[news.url]);
+ assert.deepEqual(ungrouped.candidates[0].attention.grouping.matches,[]);
  rows=[candidate,{...candidate,selected_id:1,same_event:[],anchor_url:items[1].url}];
  await assert.rejects(run(),{code:'CARDS_CANDIDATE_DUPLICATE'});
+});
+
+test('뉴스의 출처 목록 불일치는 사건 묶음으로 해결하고 기준 자료 우선 최대 6개만 전달한다',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'cards-source-group-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const items=groupItems(Array.from({length:8},(_,i)=>({...item,title:'서로 다른 제목의 기사 '+i,url:`https://press-${i}.example/event`,role:'original_news',date_kind:i===1?'naver_provided':i===2?'submission':'feed'})),NOW);
+ const candidate={selected_id:0,same_event:items.slice(1,7).map(i=>({id:i.id,reason:'같은 사건의 기사'})),title:'새 앱',summary:'확인된 소식',audience:'general',mode:'news',format_reason:'새 앱 소식',reader_question:'무엇이 달라졌나요?',why_interest:'새 기능',attention_query:'new app',anchor_url:'https://invented.example/anchor',announced_at:'',sources:[{title:'묶음에서 빠진 출처',url:items[7].url,published_at:'2099-01-01'}],compare_targets:[],compare_axes:[],risk:'요약 기준'};
+ let calls=0;const result=await selectCrawlerCandidates({config:cardsConfig({}),items,today:'2026-10-12',now:NOW,cwd:root,runner:async()=>{calls++;return {response:{candidates:[candidate],shortage_reason:'한 개만 확보'}};}});
+ const saved=result.candidates[0];assert.equal(calls,1);assert.equal(saved.anchor_url,items[0].url);
+ assert.deepEqual(saved.sources.map(s=>s.url),items.slice(0,6).map(i=>i.url));
+ assert.equal(saved.sources[0].title,items[0].title);assert.equal(saved.sources[0].published_at,item.published_at);
+ assert.equal(saved.sources[1].published_at,null);assert.equal(saved.sources[2].published_at,null);
+ assert.equal(saved.attention.counts.news_articles,7);assert.ok(!saved.attention.evidence.some(e=>e.url===items[7].url));
+ assert.equal(candidate.sources[0].url,items[7].url);
 });
 
 test('모든 소스 접근 실패를 후보 없음으로 숨기지 않는다',async()=>{
