@@ -14,14 +14,15 @@ from px import engine as E, lint
 
 class SubtitleTest(unittest.TestCase):
     def test_measured_width_and_script_gate(self):
-        for text, width in [("가", 12), (" ", 5), (",", 4), (".", 4)]:
+        for text, width in [("가", 11), (" ", 5), (",", 4), (".", 4)]:
             self.assertEqual(E.text_w(text, E.CARD_FONT), width)
         cases = [
             ("기어 위치로 숫자를 기억해요.", 0, "PASS"),
             ("가" * 11 + " / " + "나" * 11 + ".", 0, "PASS"),
-            ("길이가 서로 다른 톱니 아홉 개를 계단처럼 붙였죠.", 1, "NEEDS_SPLIT"),
-            ("가" * 12 + " " + "나" * 12, 1, "NEEDS_SPLIT"),
-            ("가" * 13, 1, "자막 줄 폭 초과"),
+            ("가" * 13 + " " + "나" * 9, 0, "PASS"),   # 한 줄 13자 + 공백이 148px에 딱 맞는다
+            ("가" * 7 + " " + "나" * 7 + " " + "다" * 7, 1, "NEEDS_SPLIT"),   # 21자여도 낱말 경계로 세 줄 = 두 카드
+            ("가" * 13 + " " + "나" * 13, 1, "NEEDS_SPLIT"),
+            ("가" * 14, 1, "자막 줄 폭 초과"),
         ]
         for sentence, code, message in cases:
             with self.subTest(sentence=sentence):
@@ -30,7 +31,7 @@ class SubtitleTest(unittest.TestCase):
                 self.assertEqual(result.returncode, code)
                 self.assertIn(message, result.stdout + result.stderr)
         with self.assertRaises(ValueError):
-            E.split_cards("가" * 13)
+            E.split_cards("가" * 14)
 
     def test_existing_scripts_fit_without_changing_words(self):
         count = 0
@@ -54,10 +55,10 @@ class SubtitleTest(unittest.TestCase):
 
     def test_two_lines_and_cursor_stay_inside_box(self):
         self.assertEqual(E.FONT[E.CARD_FONT].getname(), ("Galmuri11", "Regular"))
-        card = ["가" * 12, "힣" * 12]
+        card = ["가" * 13, "힣" * 13]
         base = E.background()
         E.draw_card(base, [], 0)
-        for typed in (0, 12, 13, 24):
+        for typed in (0, 13, 14, 26):
             image = E.background()
             E.draw_card(image, card, typed, cursor=True)
             yy, xx = np.where(np.any(np.asarray(image) != np.asarray(base), axis=2))
