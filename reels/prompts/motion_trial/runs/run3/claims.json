@@ -1,0 +1,38 @@
+{
+  "hook": {"title": "물에 불어서만이 아니라, 속이 줄어서 쭈글해진다", "sub": "물에 오래 닿은 손끝이 주름지는 이유", "facts": ["1", "2", "11"]},
+  "principle": {"lines": ["혈관이 조여", "속살이 줄면", "피부가 접힌다"], "label": "WATER-INDUCED WRINKLING", "facts": ["1", "6", "7"]},
+  "sentences": [
+    {"scene": "hook", "text": "목욕을 오래 하고 나오면 / 손끝이 쭈글쭈글해져요.", "kind": "fact", "facts": ["1"]},
+    {"scene": "hook", "text": "흔히 물에 불어서라고 하지만, / 그게 다가 아니에요.", "kind": "fact", "facts": ["2"]},
+    {"scene": "clue", "text": "그런데 신경이 다친 손가락은 / 물에 똑같이 담가도 / 거의 쭈글해지지 않아요.", "kind": "fact", "facts": ["3"]},
+    {"scene": "clue", "text": "물에 불어서만 생기는 주름이라면 / 이 손가락도 쭈글해져야 하죠.", "kind": "fact", "facts": ["4"]},
+    {"scene": "clue", "text": "주름은 신경이 일으키는 반응이에요.", "kind": "fact", "facts": ["4"]},
+    {"scene": "inside", "text": "물에 오래 닿으면, / 신경이 손끝 혈관을 조여요.", "kind": "fact", "facts": ["5"]},
+    {"scene": "inside", "text": "혈관이 조이면 / 손끝 속살의 부피가 줄어요.", "kind": "fact", "facts": ["6"]},
+    {"scene": "inside", "text": "연구자들은 줄어든 속살이 / 겉피부를 안쪽으로 당겨서 / 주름이 진다고 설명해요.", "kind": "fact", "facts": ["7"]},
+    {"scene": "pillow", "text": "속이 줄어든 베개 겉감이 / 쭈글해지는 것과 비슷해요.", "kind": "analogy", "facts": []},
+    {"scene": "proof", "text": "물 대신 혈관을 조이는 크림을 / 손끝에 발랐더니, / 물에 담갔을 때와 거의 같은 / 주름이 생겼어요.", "kind": "fact", "facts": ["8"]},
+    {"scene": "proof", "text": "손끝 혈류가 줄어든 정도도 / 거의 같았어요.", "kind": "fact", "facts": ["9"]},
+    {"scene": "finale", "text": "그래서 이 주름은 / 신경 기능 검사에도 쓰여요.", "kind": "fact", "facts": ["10"]},
+    {"scene": "finale", "text": "손끝 주름은 물에 불어서만이 아니라, / 신경이 혈관을 조여서 생겨요.", "kind": "fact", "facts": ["11"]}
+  ],
+  "screen_text": [
+    {"text": "WRINKLING", "facts": ["1"]},
+    {"text": "WATER-INDUCED WRINKLING", "facts": ["1"]},
+    {"text": "NERVE OK", "facts": ["3"]},
+    {"text": "NERVE DAMAGED", "facts": ["3"]},
+    {"text": "?", "facts": ["4"]},
+    {"text": "NERVE", "facts": ["5"]},
+    {"text": "VESSEL", "facts": ["5"]},
+    {"text": "PULP", "facts": ["6"]},
+    {"text": "SKIN", "facts": ["7"]},
+    {"text": "WATER", "facts": ["8"]},
+    {"text": "EMLA", "facts": ["8"]},
+    {"text": "NO WATER", "facts": ["8"]},
+    {"text": "FLOW", "facts": ["9", "G1"]},
+    {"text": "-2.29 cm/s", "facts": ["9", "G1"]},
+    {"text": "-2.01 cm/s", "facts": ["9", "G1"]},
+    {"text": "n = 25", "facts": ["G1"]},
+    {"text": "WRINKLE TEST", "facts": ["10"]}
+  ]
+}

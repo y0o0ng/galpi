@@ -1,0 +1,40 @@
+{
+  "hook": {"title": "같은 물에 담갔는데, 어떤 손가락은 매끈하다", "sub": "물에 오래 닿은 손끝이 쭈글해지는 이유", "facts": ["1", "3"]},
+  "principle": {"lines": ["신경이 혈관을", "조여 속이 줄면", "주름이 진다"], "label": "WATER-INDUCED WRINKLING", "facts": ["5", "6", "7", "11"]},
+  "sentences": [
+    {"scene": "hook", "text": "목욕을 오래 하고 나오면 / 손끝이 쭈글쭈글해져요.", "kind": "fact", "facts": ["1"]},
+    {"scene": "hook", "text": "흔히 물에 불어서 그렇다고들 하지만, / 그게 전부는 아니에요.", "kind": "fact", "facts": ["2"]},
+    {"scene": "clue", "text": "같은 물에 담가도 / 신경이 다친 손가락은 / 주름이 거의 안 생겨요.", "kind": "fact", "facts": ["3"]},
+    {"scene": "clue", "text": "물에 불기만 해서 생기는 거라면 / 이 손가락도 쭈글해졌을 거예요.", "kind": "fact", "facts": ["4"]},
+    {"scene": "clue", "text": "그러니 주름은 / 신경이 일으키는 반응이에요.", "kind": "fact", "facts": ["4"]},
+    {"scene": "inside", "text": "그럼 신경은 손끝에서 / 무슨 일을 하는 걸까요?", "kind": "link", "facts": []},
+    {"scene": "inside", "text": "물에 오래 닿으면 / 교감신경이 손끝 혈관을 조여요.", "kind": "fact", "facts": ["5"]},
+    {"scene": "inside", "text": "혈관이 가늘어지면 / 손끝 속살의 부피가 줄어요.", "kind": "fact", "facts": ["6"]},
+    {"scene": "fold", "text": "연구자들은 이렇게 설명해요. / 줄어든 속살이 겉피부를 안쪽으로 / 끌어당겨서 주름이 진다고요.", "kind": "fact", "facts": ["7"]},
+    {"scene": "proof", "text": "물 없이도 주름이 지는지 / 확인한 실험이 있어요.", "kind": "link", "facts": []},
+    {"scene": "proof", "text": "물 대신 혈관을 조이는 크림을 / 손끝에 발랐더니, / 주름이 물에 담갔을 때와 거의 같았어요.", "kind": "fact", "facts": ["8"]},
+    {"scene": "proof", "text": "손끝 혈류가 줄어든 정도도 거의 같았어요. / 혈관 수축이 주름의 원인이라는 근거예요.", "kind": "fact", "facts": ["9", "G1"]},
+    {"scene": "finale", "text": "신경이 일으키는 반응이어서 / 신경 기능을 살피는 검사에도 쓰여요.", "kind": "fact", "facts": ["10"]},
+    {"scene": "finale", "text": "손끝 주름은 신경이 제대로 일하는지 / 보여 주는 표시이기도 해요.", "kind": "fact", "facts": ["10"]}
+  ],
+  "screen_text": [
+    {"text": "WRINKLING", "facts": ["1"]},
+    {"text": "NERVE OK", "facts": ["3"]},
+    {"text": "NERVE DAMAGED", "facts": ["3"]},
+    {"text": "?", "facts": ["4"]},
+    {"text": "NERVE", "facts": ["5"]},
+    {"text": "VESSEL", "facts": ["5"]},
+    {"text": "PULP", "facts": ["6"]},
+    {"text": "SKIN", "facts": ["7"]},
+    {"text": "FOLD", "facts": ["7"]},
+    {"text": "WATER", "facts": ["8"]},
+    {"text": "EMLA", "facts": ["8"]},
+    {"text": "NO WATER", "facts": ["8"]},
+    {"text": "FLOW", "facts": ["9"]},
+    {"text": "-2.29 cm/s", "facts": ["9", "G1"]},
+    {"text": "-2.01 cm/s", "facts": ["9", "G1"]},
+    {"text": "n = 25", "facts": ["G1"]},
+    {"text": "WRINKLE TEST", "facts": ["10"]},
+    {"text": "WATER-INDUCED WRINKLING", "facts": ["1"]}
+  ]
+}
