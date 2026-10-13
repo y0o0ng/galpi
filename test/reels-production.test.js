@@ -98,7 +98,8 @@ test('다섯 단계가 순서대로 돌고 단계마다 같은 안전 인자와 
   assert.equal(record.outcome, 'ok');
   assert.deepEqual(record.stages.map(s => [s.stage, s.result]), [['script', 'ok'], ['review', 'ok'], ['build', 'ok'], ['visual', 'ok'], ['fix', 'ok']]);
   assert.equal(record.stages[0].total_cost_usd, 1.5);
-  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--model')), ['opus', 'opus', 'sonnet', 'opus', 'sonnet']);
+  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--model')), ['opus', 'sonnet', 'opus', 'opus', 'sonnet']);
+  assert.deepEqual(spawn.calls.map(c => flag(c.args, '--effort')), ['medium', 'medium', 'medium', 'medium', 'medium']);
   for (const call of spawn.calls) {
     for (const a of ['-p', '--restricted', '--no-session-persistence', '--strict-mcp-config']) assert.ok(call.args.includes(a), a);
     assert.equal(flag(call.args, '--output-format'), 'json');
@@ -262,7 +263,7 @@ test('from: 앞 단계 결과가 남아 있으면 그 단계부터 다시 돌고
   assert.equal(record.outcome, 'ok');
   assert.deepEqual(record.stages.map(s => s.result), ['kept', 'kept', 'ok', 'ok', 'ok']);
   assert.equal(spawn.calls.length, 3);
-  assert.equal(flag(spawn.calls[0].args, '--model'), 'sonnet');
+  assert.equal(flag(spawn.calls[0].args, '--model'), 'opus');
   assert.ok(fs.readdirSync(f.workDir).some(n => /^production-\d+\.json$/.test(n)));
 });
 
