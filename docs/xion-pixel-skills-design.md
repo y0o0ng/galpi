@@ -145,7 +145,7 @@ reels/media/frames/epNN_px/
 
 ## 3. 역할별 효과음 스케줄링
 
-미구현. 현재 `place_sfx`는 `SFX_EXEMPT`(`jingle`·`stamp`)를 뺀 모든 효과음에 1초 간격을 적용하고 `(시각, 종류)`만 남긴다. 필요한 것: 역할 인자, 강조음만 2초, 채택·누락 이벤트를 역할과 함께 기록, 이전 편 소리 해시 불변.
+구현됐다. 정본은 Production Contract 소리 절의 배치 API다. 남은 것은 위 전처리기가 kept/dropped 이벤트를 manifest에 옮기는 일뿐이다.
 
 ## 4. 검토 자료 완전성 검사
 

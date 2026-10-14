@@ -9,6 +9,8 @@ SR = 44100
 BGM_VOL, SFX_VOL, TYPE_VOL = 0.14, 0.11, 0.05   # 진폭(피크 기준). BGM > 효과음 ≥ 타자음은 RMS로 확인한다
 SFX_GAP = 1.0                                    # 효과음 최소 간격(초; 도트 트랙)
 SFX_EXEMPT = ("jingle", "stamp")                 # 엔딩 도장 장면 전용: SFX_GAP 규칙에서 빠진다(다른 소리에 밀려 사라지면 안 된다)
+ACCENT_GAP = 2.0                                 # 강조음(accent)끼리 최소 간격(초)
+SFX_ROLES = ("motion", "event", "accent")        # 동작음·사건음은 간격 없이 항상, 강조음만 ACCENT_GAP
 
 
 def _sq(f, n, duty=0.5):
@@ -207,19 +209,25 @@ def sfx(kind):
 
 
 def place_sfx(events, secs):
-    """events: [(시각, 종류)]. 최소 간격 SFX_GAP 안의 것은 버린다(SFX_EXEMPT 종류는 항상 넣고 간격 계산에도 안 쓴다)."""
-    out, last = np.zeros(int(secs * SR)), -99
+    """events: [(시각, 종류)] 또는 [(시각, 종류, 역할)]. 남긴 이벤트를 받은 모양 그대로 돌려준다.
+    역할 motion·event는 항상 넣고, accent는 앞 accent와 ACCENT_GAP 안이면 버린다.
+    역할이 없으면 옛 규칙: 앞의 역할 없는 소리와 SFX_GAP 안이면 버린다(SFX_EXEMPT 종류는 항상 넣고 간격 계산에도 안 쓴다)."""
+    out, last = np.zeros(int(secs * SR)), {None: -99, "accent": -99}
     kept = []
-    for t, kind in sorted(events):
-        exempt = kind in SFX_EXEMPT
-        if t - last < SFX_GAP and not exempt:
+    for ev in sorted(events):
+        t, kind, role = ev[0], ev[1], (ev[2] if len(ev) > 2 else None)
+        if role is not None and role not in SFX_ROLES:
+            raise ValueError(f"효과음 역할은 {SFX_ROLES} 중 하나: {ev}")
+        gap = {None: SFX_GAP, "accent": ACCENT_GAP}.get(role)
+        exempt = kind in SFX_EXEMPT or gap is None
+        if not exempt and t - last[role] < gap:
             continue
         s = sfx(kind)
         i = int(t * SR)
         out[i:i + len(s)] += s[:len(out) - i]
         if not exempt:
-            last = t
-        kept.append((t, kind))
+            last[role] = t
+        kept.append(ev)
     return out, kept
 
 

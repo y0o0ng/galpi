@@ -27,7 +27,7 @@ class Scene:
             t += E.sentence_secs(s)
         self.sdur = [E.sentence_secs(s) for s in sents]
         self.length = max(t + E.TAIL, minlen)
-        self.sfx = []                                  # (장면 시각, 종류)
+        self.sfx = []                                  # (장면 시각, 종류) 또는 (장면 시각, 종류, 역할)
 
 
 @lru_cache(None)
@@ -110,19 +110,19 @@ class Episode:
 
     # ---- 효과음에 맞춘 화면 반응(sfx_react): place_sfx가 실제로 남긴 소리만 ----
     def _sfx_plan(self):
-        """(효과음 합성 배열, 남은 소리 [(절대 시각, 종류)], 전체 이벤트). 장면 함수가 T.sfx를 채우도록 장면 가운데를 한 번씩 그린다."""
+        """(효과음 합성 배열, 남은 소리 [(절대 시각, 종류[, 역할])], 전체 이벤트). 장면 함수가 T.sfx를 채우도록 장면 가운데를 한 번씩 그린다."""
         if self._plan is None:
             self._probing, events = True, []
             for T, off in zip(self.scenes, self.starts):
                 self.frame(round((off + T.length / 2) * E.FPS_OUT))
-                events += [(off + t, k) for t, k in T.sfx]
+                events += [(off + t, *rest) for t, *rest in T.sfx]
             self._probing = False
             self._plan = (*audio.place_sfx(events, self.total), events)
         return self._plan
 
     def _react_danger(self, arr, i):
         """danger 소리 시각부터 2프레임, 출력 전체를 5px 좌우로 흔든다((5,0) → (-5,0))."""
-        for t, kind in self._sfx_plan()[1]:
+        for t, kind, *_ in self._sfx_plan()[1]:
             k = i - math.ceil(t * E.FPS_OUT - 1e-9)
             if kind == "danger" and k in (0, 1):
                 return np.roll(arr, E.SCALE * (1, -1)[k], axis=1)
@@ -132,7 +132,7 @@ class Episode:
         """sparkle 소리 시각부터 0.5초, 그 프레임에 붙인 마스코트 둘레에 십자 반짝이 4개를 12fps로 깜빡인다(마스코트가 없으면 없음)."""
         if not MASCOT_POS:
             return
-        for t, kind in self._sfx_plan()[1]:
+        for t, kind, *_ in self._sfx_plan()[1]:
             if kind == "sparkle" and 0 <= t_abs - t + 1e-9 < 0.5 and int((t_abs - t + 1e-9) * E.FPS_ANIM) % 2 == 0:
                 d = ImageDraw.Draw(img)
                 x, y = MASCOT_POS[0]
@@ -219,8 +219,8 @@ class Episode:
             for card, start, dur in T.plan:
                 print(f"   card {card!r} start {start:.2f}s dur {dur:.2f}s")
         self.cover()
-        print("sfx kept", [(round(t, 2), k) for t, k in kept])
-        print("sfx dropped", [(round(t, 2), k) for t, k in sorted(events) if (t, k) not in kept])
+        print("sfx kept", [(round(e[0], 2), *e[1:]) for e in kept])
+        print("sfx dropped", [(round(e[0], 2), *e[1:]) for e in sorted(events) if e not in kept])
         for name, x in (("bgm", b), ("typing", ty), ("sfx", sf)):
             print(f"{name}: rms whole {audio.rms_db(x):.1f} dB, active {audio.rms_db(x, True):.1f} dB")
 
