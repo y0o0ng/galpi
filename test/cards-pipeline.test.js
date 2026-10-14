@@ -207,7 +207,7 @@ deck.cards.forEach(card=>{card.eyebrow='TECH NEWS';});
 const quote='This release is a public preview of our new model.';
 function manuscript(){return `## 조립 원고\n\n\`\`\`json\n${JSON.stringify(deck)}\n\`\`\`\n\n## 게시 캡션\n설명해요.  \n원문: ${URL}\n\n## 사실 확인 목록\n| ID | 주장 | 출처 | 인용 |\n| C1 | 발표 | ${URL} | "${quote}" |\n\n## 검토 결과\n판정: PASS\n`;}
 
-function integratedRunner(t,{sourceFix=false,imageFix=false,interrupt=false,blocked=false,mutateReview=false,alwaysFix=false,photo=false,agentBlocked=false,report="READY_FOR_REVIEW\n"}={}){
+function integratedRunner(t,{sourceFix=false,imageFix=false,interrupt=false,blocked=false,visualBlocked=false,sourceCarryBlock=false,mutateReview=false,alwaysFix=false,photo=false,agentBlocked=false,report="READY_FOR_REVIEW\n"}={}){
   const root=temp(t),config=cardsConfig({},path.resolve(__dirname,'..'));
   const workDir=path.join(root,'work'),outDir=path.join(root,'images'),calls=[];
   let firstInterruption=interrupt;
@@ -244,11 +244,17 @@ function integratedRunner(t,{sourceFix=false,imageFix=false,interrupt=false,bloc
         const input=JSON.parse(fs.readFileSync(path.join(args.cwd,'input','deck.json')));assert.equal(input.cards[0].layout,undefined);assert.equal(input.cards[0].title,deck.cards[0].title);
         assert.equal(fs.existsSync(path.join(args.cwd,'input','art.py')),false);
         const metadata=JSON.parse(fs.readFileSync(path.join(args.cwd,'input','assets.json')));assert.ok(metadata.every(asset=>!['file','kind','purpose'].some(key=>Object.hasOwn(asset,key))));if(photo===true)assert.equal(metadata[0].source_url,URL);
-      } else assert.equal(args.images.length,8);
+      } else {
+        assert.equal(args.images.length,8);
+        if(sourceCarryBlock&&sourceFix&&name==='visual-0'&&!args.prompt.includes('출처 NEEDS_FIX는 시각 BLOCKED 사유가 아니다')) {
+          fs.writeFileSync(path.join(args.cwd,'review.md'),'판정: BLOCKED\nMUST 1 / NICE 0\n### V1 — MUST\n출처 수정이 미해결');
+          return {response:{status:'blocked',message:'출처 수정이 미해결'}};
+        }
+      }
       if(mutateReview)fs.appendFileSync(path.join(workDir,'assembly','caption.txt'),'changed');
       const needs=(sourceFix&&name==='source-0')||(imageFix&&name==='visual-0')||(alwaysFix&&name.startsWith('visual'));
       const prefix=name.startsWith('source')?'S':'V';
-      fs.writeFileSync(path.join(args.cwd,'review.md'),blocked?'판정: BLOCKED\nMUST 0 / NICE 0':needs?`판정: NEEDS_FIX\nMUST 1 / NICE 0\n### ${prefix}1 — MUST\n수정`:'판정: PASS\nMUST 0 / NICE 1\n### N1 — NICE\n선택 개선');
+      fs.writeFileSync(path.join(args.cwd,'review.md'),blocked||(visualBlocked&&name.startsWith('visual'))?'판정: BLOCKED\nMUST 0 / NICE 0':needs?`판정: NEEDS_FIX\nMUST 1 / NICE 0\n### ${prefix}1 — MUST\n수정`:'판정: PASS\nMUST 0 / NICE 1\n### N1 — NICE\n선택 개선');
     }
     return {response:{status:agentBlocked&&name==='create'?'blocked':'ok',message:'test'},usage:{input_tokens:1,output_tokens:1}};
   };
@@ -270,6 +276,24 @@ test('문구만 수정하면 출처만 새로 검토하고 동일 bitmap 시각 
   assert.ok(record.caption.includes('조건을 확인해요.'));assert.ok(record.reviews.visual.report.includes('visual-0'));
 });
 
+test('출처 NEEDS_FIX를 시각 BLOCKED로 넘기지 않고 수정·출처 재검토까지 이어간다',async t=>{
+  const job=integratedRunner(t,{sourceFix:true,sourceCarryBlock:true}),record=await job.run();
+  assert.deepEqual(job.calls.map(call=>call.name),['create','source-0','visual-0','fix-1','source-1']);
+  assert.equal(record.outcome,'ok');assert.ok(record.caption.includes('조건을 확인해요.'));
+  const visual=job.calls.find(call=>call.name==='visual-0');
+  assert.ok(visual.args.prompt.includes('원고 보완으로 해결 가능한 문제는 NEEDS_FIX'));
+  assert.ok(visual.args.prompt.includes('보고서를 완료했으면 최종 JSON status는 ok'));
+});
+
+test('이전 판정 범위의 시각 검토만 다시 받고 생성·출처 결과는 그대로 재사용한다',async t=>{
+  const job=integratedRunner(t),record=await job.run();
+  record.outcome='failed';delete record.stages.find(s=>s.kind==='visual').policySha256;
+  fs.writeFileSync(path.join(job.workDir,'production.json'),JSON.stringify(record));
+  const resumed=await job.run();assert.equal(resumed.outcome,'ok');
+  assert.deepEqual(job.calls.map(call=>call.name),['create','source-0','visual-0','visual-0']);
+  assert.ok(resumed.stages.at(-1).policySha256);verifySnapshot(resumed.snapshot);
+});
+
 test('이미지만 수정하면 출처 PASS를 재사용하고 시각 검토를 다시 받는다',async t=>{
   const job=integratedRunner(t,{imageFix:true});const record=await job.run();
   assert.deepEqual(job.calls.map(call=>call.name),['create','source-0','visual-0','fix-1','visual-1']);
@@ -287,6 +311,11 @@ test('출처 BLOCKED는 시각이나 제작 완료로 덮지 않고 검토의 �
   const blocked=integratedRunner(t,{blocked:true});await assert.rejects(blocked.run(),{code:'CARDS_SOURCE_BLOCKED'});
   assert.deepEqual(blocked.calls.map(call=>call.name),['create','source-0']);
   const changed=integratedRunner(t,{mutateReview:true});await assert.rejects(changed.run(),{code:'CARDS_ARTIFACT_CHANGED'});
+});
+
+test('시각 자료를 확인할 수 없는 BLOCKED는 자동 수정이나 완료로 넘기지 않는다',async t=>{
+  const job=integratedRunner(t,{visualBlocked:true});await assert.rejects(job.run(),{code:'CARDS_VISUAL_BLOCKED'});
+  assert.deepEqual(job.calls.map(call=>call.name),['create','source-0','visual-0']);
 });
 
 test('통합 판정은 S/V MUST 개수와 NICE를 구분하고 사진 경로/메타데이터를 검사한다',t=>{
