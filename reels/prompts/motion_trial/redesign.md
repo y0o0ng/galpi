@@ -6,7 +6,7 @@ XION Reels {{episode}}편의 **장면 설계만 다시 써라.** 이 편은 이�
 - 원래 확정 대본: `{{original_final}}`. 0절(검토 결과)·1절(훅 카드)·2절(오늘의 원리·배경음악)·4절(사실 확인 목록)·`## 게시 문구`와 3절의 **내레이션 칸**은 확정이다.
 - 원래 영상의 시각 검토: `{{original_review}}`(이 원본이 화면에서 어디가 약했는지).
 - 참고 영상 정지 화면: `{{reference_dir}}`의 PNG(같은 계열의 잘 된 도트 영상 세 편을 1초 간격으로 이어 붙인 것). 카메라가 대부분 서 있는 채로 무대 안의 현상이 진행형으로 변하는 방식을 본다. 그림을 베끼지 않는다.
-- 도트 트랙 규칙 정본: `{{repo}}/reels/px/reels-pixel-handoff.md`
+- 도트 트랙 규칙 정본: `https://github.com/y0o0ng/galpi/blob/49facc0044ded4055479d72f9a3c479e5c1d0f8a/reels/px/reels-pixel-handoff.md`
 - 구현(참고, 수정 금지): `{{repo}}/reels/px/templates.py`, `{{repo}}/reels/px/timeline.py`, `{{repo}}/reels/episodes/*_px/scene.py`. 엔진이 무엇을 할 수 있는지 보고 설계한다. 엔진은 장면마다 장면 함수 `(img, d, t, ta, T)`를 부르고 장면 사이를 그냥 이어 붙인다. 장면 사이 카메라 연속은 편 코드가 앞 장면 끝 화면에서 다음 장면을 시작하는 식으로 만든다(공용 코드는 고치지 않는다).
 
 ## 바꾸지 않는 것

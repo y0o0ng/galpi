@@ -6,7 +6,7 @@
 - 프레임: `{{frames_dir}}`의 PNG **전부**(장면마다 mid·end와 주요 순간; 파일 이름이 장면·순간이다). 하나도 건너뛰지 말고 직접 열어 본다.
 - 제작 보고(장면 길이, 카드 표, 효과음 kept/dropped, 확신 없는 곳): `{{build_report}}`
 - 확정 대본: `{{final_path}}`(시간|화면|내레이션 표, 사실 확인 목록, **제작 제약**, **화면 글자 목록**). 영상의 문장은 `{{episode_path}}/narration.ko.json`.
-- 도트 트랙 규칙 정본: `{{handoff_path}}` (읽는 법 절부터 — 예시는 정답이 아니고, 승인된 앞 편 화면이 가장 확실한 기준)
+- 도트 트랙 규칙 정본: `https://github.com/y0o0ng/galpi/blob/49facc0044ded4055479d72f9a3c479e5c1d0f8a/reels/px/reels-pixel-handoff.md` (읽는 법 절부터 — 예시는 정답이 아니고, 승인된 앞 편 화면이 가장 확실한 기준)
 - **움직임 띠: `{{frames_dir}}/motion/`의 PNG 전부.** 실행기가 mp4에서 0.25초 간격으로 뽑아 2초씩 가로로 이어 붙인 것이다(`strip_NNN_시작초.png`, 한 칸이 0.25초). 정지 프레임으로는 움직임을 볼 수 없으니, 움직임 판단(체크 7·12·13)은 반드시 이 띠로 한다.
 - 멈춤 측정: `{{frames_dir}}/motion/stillness.md`(실행기가 잰 그림 영역의 정지 구간). 숫자는 보조이고 판단은 띠로 한다.
 - 원본 13편의 시각 검토(원본이 어디가 약했는지): `{{frames_dir}}/motion/original_review.md`

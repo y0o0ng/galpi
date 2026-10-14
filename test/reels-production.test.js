@@ -251,6 +251,8 @@ test('실제 프롬프트 다섯 개의 칸이 단계 값과 정확히 맞는다
     assert.ok(text.length > 100);
   }
   assert.ok(claudeArgs(defs.script).includes('--restricted'));
+  const real = planPaths({ card: CARD, reelsDir: path.dirname(REAL_PROMPTS), workDir: f.workDir });
+  for (const k of ['pixelSkill', 'reviewSkill', 'contract']) assert.ok(fs.existsSync(real[k]), k);
 });
 
 test('from: 앞 단계 결과가 남아 있으면 그 단계부터 다시 돌고 옛 기록은 남긴다', async () => {

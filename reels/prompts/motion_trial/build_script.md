@@ -6,7 +6,7 @@
 
 ## 먼저 읽을 것
 1. **사실 묶음(유일한 사실 정본): `{{facts_path}}`** — 주제, 검증된 사실 확인 목록(행 번호 1~11, G1), 그림 조건. 사실 주장은 이 표의 "주장" 칸 범위 안에서만 쓴다.
-2. `reels/px/reels-pixel-handoff.md` — 도트 트랙 규칙 정본(읽는 법 절부터). 자막·시간·소리·엔딩 규칙이 여기 있다.
+2. `https://github.com/y0o0ng/galpi/blob/49facc0044ded4055479d72f9a3c479e5c1d0f8a/reels/px/reels-pixel-handoff.md` — 도트 트랙 규칙 정본(읽는 법 절부터). 자막·시간·소리·엔딩 규칙이 여기 있다.
 3. `reels/px/templates.py`, `reels/px/timeline.py`와 앞 편 `scene.py`·`art.py` — 구조 기준.
 
 ## 대본은 확정이다

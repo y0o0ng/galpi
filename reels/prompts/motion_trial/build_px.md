@@ -6,7 +6,7 @@
 
 ## 먼저 읽을 것
 1. **확정 대본(유일한 내용 정본): `{{final_path}}`** — 훅 카드, 시간|화면|내레이션 표, 사실 확인 목록, **제작 제약**(물리·논리 조건, 그리면 안 되는 것, 화면 글자 목록, 뜻 있는 효과음). 문장·화면 글자를 바꾸지 않는다. 그림으로 안 되는 게 있으면 바꾸지 말고 보고하라.
-2. `reels/px/reels-pixel-handoff.md` — 도트 트랙 규칙 정본(읽는 법 절부터)
+2. `https://github.com/y0o0ng/galpi/blob/49facc0044ded4055479d72f9a3c479e5c1d0f8a/reels/px/reels-pixel-handoff.md` — 도트 트랙 규칙 정본(읽는 법 절부터)
 3. `reels/px/templates.py`와 앞 편 도트판 `scene.py`·`art.py` — 구조 기준
 
 ## 만들 것
