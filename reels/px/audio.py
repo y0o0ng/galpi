@@ -7,7 +7,7 @@ from .bgm import SONGS, song
 
 SR = 44100
 BGM_VOL, SFX_VOL, TYPE_VOL = 0.14, 0.11, 0.05   # 진폭(피크 기준). BGM > 효과음 ≥ 타자음은 RMS로 확인한다
-SFX_GAP = 2.0                                    # 효과음 최소 간격(초; 도트 트랙)
+SFX_GAP = 1.0                                    # 효과음 최소 간격(초; 도트 트랙). 2.0 → 1.0은 2026-10-14 사용자 결정, 다음 편부터(앞 편은 다시 렌더하지 않는다)
 SFX_EXEMPT = ("jingle", "stamp")                 # 엔딩 도장 장면 전용: SFX_GAP 규칙에서 빠진다(다른 소리에 밀려 사라지면 안 된다)
 
 
