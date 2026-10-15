@@ -37,7 +37,7 @@ GPT-6.1 Sol의 독립 세션이다. 선택된 후보 {{candidate_card}}를 대�
 편 전용 `render_episode.py`는 생성·수정 에이전트의 Codex sandbox 안에서 다음 명령으로 현재 manuscript/deck/자산을 렌더할 수 있어야 한다:
 `{{python}} {{work_dir}}/render_episode.py --out {{out_dir}} --font {{font_path}} --bold-font {{bold_font_path}}`
 편 전용 코드는 서버가 sandbox 밖에서 직접 실행하지 않는다. 서버는 신뢰된 공용 `finalize_integrated.py`만 실행해 생성된 PNG의 헤더/푸터·preview·mobile·JPEG를 동기화한다. 직접 확인할 때도 이 최종 합성 결과를 연다.
-`manuscript.md`에 기존 대본과 같은 `## 조립 원고` JSON, `## 게시 캡션`, `## 사실 확인 목록` C번호/주장/원URL/원문 인용 표를 반드시 남긴다. deck/caption과 같아야 하며 그림 파일·사진은 편 폴더 내부 경로만 사용한다.
+`manuscript.md`에 기존 대본과 같은 `## 조립 원고` JSON, `## 게시 캡션`, `## 사실 확인 목록` C번호/주장/원URL/원문 인용 표를 반드시 남긴다. `## 게시 캡션`의 마지막 줄은 해시태그 정확히 5개다: `#시온의원리노트` → 주제 태그 2개(편의 핵심 대상을 사람들이 실제로 검색하는 넓은 말로, 편에서만 쓰는 전문용어 금지. 예: `#반도체` `#메모리`) → 범용 태그 2개(`#과학` `#상식` `#IT` `#테크` 중에서만 고른다). deck/caption과 같아야 하며 그림 파일·사진은 편 폴더 내부 경로만 사용한다.
 
 ## 최종 응답 JSON — 고정 계약
 
