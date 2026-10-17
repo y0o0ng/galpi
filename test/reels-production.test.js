@@ -255,6 +255,47 @@ test('실제 프롬프트 다섯 개의 칸이 단계 값과 정확히 맞는다
   for (const k of ['pixelSkill', 'reviewSkill', 'contract']) assert.ok(fs.existsSync(real[k]), k);
 });
 
+function renderedPrompts() {
+  const f = fixture();
+  const p = planPaths({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir });
+  const defs = stageDefs({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, p });
+  const { renderPrompt } = require('../lib/reels/candidates');
+  return Object.fromEntries(Object.entries(defs).map(([name, def]) =>
+    [name, renderPrompt(fs.readFileSync(path.join(REAL_PROMPTS, `${def.template}.md`), 'utf8'), def.values)]));
+}
+
+test('신규 형식 2: 대본 단계는 전달할 내용·화면 문구·제작 제약 표를 요구하고 문장 글자 수 규칙을 쓰지 않는다', () => {
+  const { script, review } = renderedPrompts();
+  for (const text of [script, review]) {
+    assert.ok(text.includes('장면 | 전달할 내용 | 화면 문구 | 근거 행 | 제작 제약'));
+    assert.ok(text.includes('## 게시 문구') || text.includes('사실 확인'));
+  }
+  assert.ok(!script.includes('secs.py'));                                // 문장별 카드·읽기 시간 검사는 옛 5px 형식
+  assert.ok(!/px\/secs\.py "문장"/.test(review));
+  assert.ok(script.includes('factcheck.py') && review.includes('factcheck.py') && review.includes('## 게시 문구'));   // 사실 확인·게시 문구는 그대로
+  assert.ok(script.includes('시각적 사건 설계·좌표·카메라·시간은 쓰지 않는다'));     // 장면 설계는 대본이 아니라 build 몫
+  assert.ok(!script.includes('시각적 사건 |'));
+});
+
+test('신규 형식 2: build는 format_version·타임라인·승인 문구 헬퍼·확장색 선언을, visual·fix는 4px 계약을 받는다', () => {
+  const { build, visual, fix } = renderedPrompts();
+  for (const key of ['format_version', '"duration"', 'T.say', '"palette"', '4×4', '하단 자막 박스', '90초']) assert.ok(build.includes(key), key);
+  assert.ok(!build.includes('secs.py'));
+  assert.ok(build.includes('reels/px/') && build.includes('읽기 전용'));    // 공용 코드 수정 금지 유지
+  assert.ok(build.includes('hook`·`band`·`steps`·`compare`·`kicker`·`chip`·`cardt`는 옛 자막 형식 부품'));
+  assert.ok(visual.includes('하단 고정 자막 박스') && visual.includes('MUST') && visual.includes('확장색'));
+  assert.ok(fix.includes('palette') && fix.includes('T.say') && fix.includes('90초') && fix.includes('[NICE]'));
+  assert.ok(!fix.includes('secs.py'));
+});
+
+test('기존 5px 에피소드는 새 형식으로 변환되지 않았다(format_version 표기 없음)', () => {
+  const episodes = path.join(__dirname, '..', 'reels', 'episodes');
+  const files = fs.readdirSync(episodes).filter(n => n.endsWith('_px'))
+    .map(n => path.join(episodes, n, 'narration.ko.json')).filter(fs.existsSync);
+  assert.ok(files.length > 0);
+  for (const file of files) assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).format_version, undefined, file);
+});
+
 test('from: 앞 단계 결과가 남아 있으면 그 단계부터 다시 돌고 옛 기록은 남긴다', async () => {
   const f = fixture();
   write(path.join(f.workDir, 'draft.md')); write(path.join(f.workDir, 'final.md'), FINAL);
