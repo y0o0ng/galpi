@@ -56,6 +56,26 @@ SCENE_AREAS = ("환경", "물체·재질", "구조·연결부", "정보 비교",
 MAX_TOTAL = 90.0                                    # 엔딩 포함 영상 길이 상한(초)
 
 
+def _check_hook(nar):
+    """훅 질문(hook)과 큰 글자 줄(hook_words 1~4줄, 선택 hook_sub)을 검증하고 승인 문구(줄·부제)를 돌려준다. hook2가 그린다."""
+    words, sub = nar.get("hook_words"), nar.get("hook_sub")
+    if not isinstance(nar.get("hook"), str) or not nar["hook"].strip():
+        raise ValueError("hook(훅 질문 문자열)이 있어야 한다")
+    if not isinstance(words, list) or not 1 <= len(words) <= 4 or not all(isinstance(x, str) and x.strip() for x in words):
+        raise ValueError("hook_words는 비지 않은 문자열 1~4줄이어야 한다")
+    if " ".join(" ".join(words).split()) != " ".join(nar["hook"].split()):
+        raise ValueError(f"hook_words를 공백으로 이으면 hook과 같아야 한다: {' '.join(words)!r} != {nar['hook']!r}")
+    if sub is not None and (not isinstance(sub, str) or not sub.strip()):
+        raise ValueError("hook_sub는 비지 않은 문자열이어야 한다")
+    lo, hi = E.TEXT_SAFE[0], E.TEXT_SAFE[2]
+    for line, font, scale in [(x, "bold", 2) for x in words] + ([(sub, "label", 1)] if sub else []):
+        w = E.text_w(line, font, scale)
+        x = E.W // 2 - w // 2
+        if x < lo or x + w - 1 > hi:
+            raise ValueError(f"훅 줄이 글자 안전 영역 폭({hi - lo + 1}px)을 넘는다: {line!r} ({w}px)")
+    return {*words, *([sub] if sub else [])}
+
+
 def load_v2(nar, scenes_json, ids):
     """형식 2 데이터 검증(필수 정보가 없거나 어긋나면 ValueError, 렌더 전에): 장면 내용(narration)과 타임라인(scenes.json)을
     ids와 대조해 [SceneV2]와 승인 문구 집합을 돌려준다. 장면 하나가 빠지거나 duration·표시 구간이 잘못되면 실패."""
@@ -67,8 +87,7 @@ def load_v2(nar, scenes_json, ids):
         if not isinstance(c, dict) or not isinstance(c.get("screen_text"), list) or not all(isinstance(x, str) and x for x in c["screen_text"]):
             raise ValueError(f"[{sid}] 형식 2 장면은 screen_text(승인된 화면 문구 목록)가 있는 객체여야 한다")
         approved |= set(c["screen_text"])
-    if not isinstance(nar.get("hook"), str) or nar["hook"] not in approved:
-        raise ValueError("hook(훅 질문)이 있어야 하고 어느 장면의 screen_text에 들어 있어야 한다")
+    approved |= _check_hook(nar)
     if not isinstance(scenes_json, list) or [e.get("id") for e in scenes_json] != list(ids):
         raise ValueError(f"scenes.json의 장면 순서가 {list(ids)}와 같아야 한다")
     out = []
@@ -91,6 +110,10 @@ def load_v2(nar, scenes_json, ids):
                 raise ValueError(f"[{sid}] 화면 문구 표시 구간이 장면 0~{dur} 안이어야 한다: {s!r} {a}~{b}")
             texts.append((s, a, b))
         out.append(SceneV2(sid, float(dur), texts, events))
+    if not out:
+        raise ValueError("장면이 하나 이상이어야 한다")
+    if out[0].length < HOOK_END - 1e-9:
+        raise ValueError(f"첫 장면(훅)은 마스코트 반짝이 끝나는 {HOOK_END:.1f}초 이상이어야 한다(커버가 훅 끝 프레임): {out[0].length}")
     return out, approved
 
 
@@ -287,6 +310,7 @@ class Episode:
         """훅 끝 무렵(전부 나온 뒤) 자막 카드 없이 media/<out>_cover.png(1080x1920)와
         _cover_grid.png(가운데 3:4, 1080x1440)로 쓴다. 출력 배치(위 여백 200px)에서 그림이 격자 y 240~1680에 든다."""
         i = round(self.scenes[0].length * E.FPS_OUT) - 1
+        self._sfx_plan()                                 # 효과음 계획의 첫 계산이 장면 가운데를 그리며 MASCOT_POS를 비우므로 먼저 해 둔다(--cover 단독 실행)
         out = self.frame(i, card=False)
         assert not E.lint.check_canvas(out, self.palette or E.PALETTE, ignore=(E.BG, E.DITHER))[0]
         assert E.glow_share(out, self.glow) <= E.GLOW_MAX_SHARE + E._EPS
@@ -429,6 +453,26 @@ def hook(img, d, t, ta, T, title, words, art, extra_sfx=()):
         art(img, d, t, ta)
     if t >= T_SPRITE:
         HOOK_MASCOT.paste(img, t - T_SPRITE, (131, 193))
+
+
+HOOK_END = T_SPRITE + sum(HOOK_MASCOT.durs[:-1])  # hook2: 마스코트 반짝이 끝나는 장면 시각 = 훅 장면 최소 길이
+HOOK2_Y, HOOK2_GAP, HOOK2_MASCOT = 14, 28, (176, 334)   # 큰 글자 첫 줄 y·줄 간격(96px 글자 = 24도트 + 4), 마스코트 발밑 가운데(오른쪽 아래, HUD 띠 y 338 위)
+
+
+def hook2(img, d, t, ta, T, nar, art, extra_sfx=()):
+    """형식 2 훅: 옛 hook과 같은 구성·타이밍·소리. nar의 hook_words(1~4줄)가 큰 글자(Galmuri11-Bold 2배, 가운데)로 0.3초 간격 차례로 즉시 뜨고,
+    hook_sub는 그 아래 라벨 한 줄. art(img, d, t, ta): 마지막 줄 0.3초 뒤부터 남은 무대(큰 글자 아래)에 그린다. 마스코트는 T_SPRITE에 튀어나온다."""
+    words = nar["hook_words"]
+    T.sfx = [(T_BIG, "pop"), (T_SPRITE, "sparkle"), *extra_sfx]
+    for i, w in enumerate(words):
+        if t >= T_BIG + 0.3 * i:
+            E.say(img, w, "number", (E.W // 2, HOOK2_Y + HOOK2_GAP * i))
+    if nar.get("hook_sub") and t >= T_BIG + 0.3 * (len(words) - 1):
+        E.say(img, nar["hook_sub"], "label", (E.W // 2, HOOK2_Y + HOOK2_GAP * len(words)))
+    if t >= T_BIG + 0.3 * len(words):
+        art(img, d, t, ta)
+    if t >= T_SPRITE:
+        HOOK_MASCOT.paste(img, t - T_SPRITE, HOOK2_MASCOT)
 
 
 BAND_MAX_W = 168                     # 소주제 위 띠 글자 폭 한계(px): bold 한글 12px·공백 5px → 공백 없이 한글 14자

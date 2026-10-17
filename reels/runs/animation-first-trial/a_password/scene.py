@@ -7,7 +7,7 @@ HERE = Path(__file__).parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT))
 from px import engine as E  # noqa: E402
-from px.templates import SPARKLE_MASCOT, Episode, dotted_rect, pointer  # noqa: E402
+from px.templates import Episode, dotted_rect, hook2, pointer  # noqa: E402
 from px.timeline import span, tween  # noqa: E402
 
 DRAW = {}
@@ -32,20 +32,20 @@ def cells(d, x0, y0, n_cols, n_rows, pitch, size, on, col, off=E.DEEP):
 
 def hook(img, d, t, ta, T):
     ev = T.events
-    T.say(img, t, "비밀번호는 한 자리 늘면 얼마나 어려워질까?")
-    xs = [30, 66, 102, 138]
-    for k, x in enumerate(xs):
-        box(d, x, 150, 30, 40, E.INK)
-        star(d, x + 15, 170, E.INK if (int(ta * 12) // 6 + k) % 2 else E.TEXT)
-    if t >= ev["fifth_box"]:
-        u = span(ta, ev["fifth_box"], ev["fifth_box"] + 0.5)
-        w = max(2, round(30 * u))
-        box(d, 174, 150, w, 40, E.PURPLE)
-        if u >= 1:
-            star(d, 189, 170, E.PURPLE)
-    if t >= ev["mascot"]:
-        SPARKLE_MASCOT.paste(img, t - ev["mascot"], (112, 290))
-    T.sfx = [(ev["fifth_box"], "pop", "event"), (ev["mascot"], "sparkle", "accent")]
+
+    def art(img, d, t, ta):
+        xs = [30, 66, 102, 138]
+        for k, x in enumerate(xs):
+            box(d, x, 150, 30, 40, E.INK)
+            star(d, x + 15, 170, E.INK if (int(ta * 12) // 6 + k) % 2 else E.TEXT)
+        if t >= ev["fifth_box"]:
+            u = span(ta, ev["fifth_box"], ev["fifth_box"] + 0.5)
+            w = max(2, round(30 * u))
+            box(d, 174, 150, w, 40, E.PURPLE)
+            if u >= 1:
+                star(d, 189, 170, E.PURPLE)
+
+    hook2(img, d, t, ta, T, ep.nar, art, extra_sfx=[(ev["fifth_box"], "pop", "event")])
 
 
 DRAW["hook"] = hook

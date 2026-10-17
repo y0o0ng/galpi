@@ -1,6 +1,6 @@
 [
-  {"id": "hook", "duration": 6.0, "events": {"fifth_box": 2.6, "mascot": 3.6},
-   "texts": [{"text": "비밀번호는 한 자리 늘면 얼마나 어려워질까?", "start": 0.3, "end": 6.0}]},
+  {"id": "hook", "duration": 6.0, "events": {"fifth_box": 2.6},
+   "texts": []},
   {"id": "grow", "duration": 10.0, "events": {"row": 0.4, "grid": 3.0, "stack": 6.0},
    "texts": [
      {"text": "1자리", "start": 0.4, "end": 10.0}, {"text": "10가지", "start": 1.6, "end": 10.0},

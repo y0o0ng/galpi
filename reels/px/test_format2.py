@@ -16,9 +16,9 @@ sys.path.insert(0, str(ROOT))
 from px import engine as E, lint, templates as T  # noqa: E402
 from px.timeline import tween  # noqa: E402
 
-NAR = {"format_version": 2, "hook": "질문", "palette": [], "principle": ["가나다", "라마바"], "bgm": "bright",
+NAR = {"format_version": 2, "hook": "첫 훅", "hook_words": ["첫", "훅"], "palette": [], "principle": ["가나다", "라마바"], "bgm": "bright",
        "scenes": {"a": {"screen_text": ["질문", "라벨"]}, "b": {"screen_text": ["수치"]}}}
-SCN = [{"id": "a", "duration": 3.0, "events": {"hit": 1.0}, "texts": [{"text": "질문", "start": 0.2, "end": 3.0}]},
+SCN = [{"id": "a", "duration": 4.0, "events": {"hit": 1.0}, "texts": [{"text": "질문", "start": 0.2, "end": 3.0}]},
        {"id": "b", "duration": 2.0, "texts": [{"text": "수치", "start": 0.5, "end": 1.5}]}]
 
 
@@ -32,6 +32,7 @@ def make(nar=None, scn=None, draw=None, ids=("a", "b"), media=None):
 
 
 def scene_a(img, d, t, ta, S):
+    T.hook2(img, d, t, ta, S, NAR, lambda *a: None)
     S.say(img, t, "질문")
     E.say(img, "라벨", "label", (112, 200))
 
@@ -171,10 +172,10 @@ class TimelineTest(Base):
         short, long_ = copy.deepcopy(NAR), copy.deepcopy(NAR)
         long_["scenes"]["a"]["screen_text"] = ["질문", "라벨", "아주 아주 긴 설명 문구가 여기에 들어 있어도 장면 시간은 그대로다"]
         a, b = make(short), make(long_)
-        self.assertEqual([s.length for s in a.scenes], [3.0, 2.0, T.END_LEN])
+        self.assertEqual([s.length for s in a.scenes], [4.0, 2.0, T.END_LEN])
         self.assertEqual([s.length for s in b.scenes], [s.length for s in a.scenes])
-        self.assertAlmostEqual(a.total, 3.0 + 2.0 + 4.2)
-        self.assertEqual(a.starts, [0, 3.0, 5.0])
+        self.assertAlmostEqual(a.total, 4.0 + 2.0 + 4.2)
+        self.assertEqual(a.starts, [0, 4.0, 6.0])
 
     def test_no_cards_and_no_body_typing(self):
         ep = make()
@@ -190,11 +191,11 @@ class TimelineTest(Base):
         no_dur = [{k: v for k, v in SCN[0].items() if k != "duration"}, SCN[1]]
         self.assertIn("duration", self.fails(scn=no_dur))
         self.assertIn("min", self.fails(scn=[dict(SCN[0], min=3.0), SCN[1]]))      # 구버전 min과 혼동하지 않는다
-        self.assertIn("events", self.fails(scn=[dict(SCN[0], events={"hit": 3.5}), SCN[1]]))
+        self.assertIn("events", self.fails(scn=[dict(SCN[0], events={"hit": 4.5}), SCN[1]]))
 
     def test_text_windows_stay_inside_scene_and_approved(self):
         win = lambda **kw: [dict(SCN[0], texts=[dict(SCN[0]["texts"][0], **kw)]), SCN[1]]
-        self.assertIn("표시 구간", self.fails(scn=win(end=3.5)))
+        self.assertIn("표시 구간", self.fails(scn=win(end=4.5)))
         self.assertIn("표시 구간", self.fails(scn=win(start=-0.1)))
         self.assertIn("표시 구간", self.fails(scn=win(start=2.0, end=2.0)))
         self.assertIn("승인 문구", self.fails(scn=win(text="승인 안 됨")))
@@ -202,7 +203,7 @@ class TimelineTest(Base):
     def test_scene_set_and_hook_must_match(self):
         self.assertIn("장면", self.fails(scn=[SCN[0]]))
         self.assertIn("scenes", self.fails(nar=dict(NAR, scenes={"a": NAR["scenes"]["a"]})))
-        self.assertIn("hook", self.fails(nar=dict(NAR, hook="어디에도 없는 질문")))
+        self.assertIn("hook", self.fails(nar=dict(NAR, hook="어디에도 없는 질문")))   # hook_words를 이은 것과 다르다
         legacy_style = dict(NAR, scenes={"a": ["문장."], "b": ["문장."]})
         self.assertIn("screen_text", self.fails(nar=legacy_style))
 
@@ -211,7 +212,7 @@ class TimelineTest(Base):
 
     def test_sfx_times_must_be_inside_scene(self):
         def late(img, d, t, ta, S):
-            S.sfx = [(S.events["hit"], "pop", "event"), (3.5, "pop", "event")]
+            S.sfx = [(S.events["hit"], "pop", "event"), (4.5, "pop", "event")]
         ep = make(draw={"a": late, "b": scene_b})
         with self.assertRaises(ValueError):
             ep.sound()
@@ -265,6 +266,118 @@ class RenderGateTest(Base):
     def test_empty_episode_fails(self):
         with self.assertRaises(ValueError):
             make(dict(NAR, scenes={}), [], ids=())
+
+
+class HookTest(Base):
+    """hook2: 큰 한국어 질문 줄(hook_words)·부제·마스코트·소리·승인 게이트·커버."""
+
+    def fails(self, **kw):
+        with self.assertRaises(ValueError) as cm:
+            make(dict(NAR, **kw))
+        return str(cm.exception)
+
+    def test_hook_words_validation_fails_closed(self):
+        no_words = {k: v for k, v in NAR.items() if k != "hook_words"}
+        with self.assertRaises(ValueError) as cm:
+            make(no_words)
+        self.assertIn("hook_words", str(cm.exception))
+        for bad in ([], "첫 훅", ["첫", ""], ["첫", 3]):
+            self.assertIn("hook_words", self.fails(hook_words=bad))
+        five = ["가", "나", "다", "라", "마"]
+        self.assertIn("1~4줄", self.fails(hook=" ".join(five), hook_words=five))
+        self.assertIn("hook", self.fails(hook_words=["첫", "다름"]))                      # 이은 것이 hook과 다르다
+        self.assertIn("hook_sub", self.fails(hook_sub=""))
+        make(dict(NAR, hook="  첫   훅 ", hook_sub="부제"))                                   # 공백 정규화 뒤 같으면 통과
+
+    def test_line_width_must_fit_text_safe(self):
+        ok = "가" * 8                                                                        # 192px: 한글 8자까지
+        make(dict(NAR, hook=ok, hook_words=[ok]))
+        wide = "가" * 9
+        msg = self.fails(hook=wide, hook_words=[wide])
+        self.assertIn(wide, msg)
+        self.assertIn(str(E.text_w(wide, "bold", 2)), msg)
+        self.assertIn("부제", self.fails(hook_sub="가" * 20 + "부제"))                         # 부제도 안전 폭 검사
+
+    def test_hook_scene_must_outlast_the_mascot_sparkle(self):
+        self.assertAlmostEqual(T.HOOK_END, T.T_SPRITE + 1.5)                                 # 놀람·반짝 12칸 + 등장 6칸
+        short = [dict(SCN[0], duration=T.HOOK_END - 0.1), SCN[1]]
+        with self.assertRaises(ValueError) as cm:
+            make(scn=short)
+        self.assertIn("훅", str(cm.exception))
+        make(scn=[dict(SCN[0], duration=T.HOOK_END), SCN[1]])                                # 경계 통과
+
+    def test_hook_question_need_not_be_a_scene_statement(self):
+        make()                                                                                # NAR의 screen_text에 hook이 없다
+
+    def region_ink(self, frame, y):
+        a = np.asarray(frame)[y:y + 24]
+        return int((a == np.array([int(E.INK[i:i + 2], 16) for i in (1, 3, 5)])).all(-1).sum())
+
+    def test_lines_appear_every_third_of_a_second_without_typing(self):
+        words = dict(NAR, hook="가 나 다 라", hook_words=["가", "나", "다", "라"])
+        ep = make(words, draw={"a": lambda img, d, t, ta, S: T.hook2(img, d, t, ta, S, words, lambda *a: None), "b": scene_b})
+        T0, STEP = T.T_BIG, 0.3
+        for k in range(4):
+            y = T.HOOK2_Y + T.HOOK2_GAP * k
+            first = math.ceil((T0 + STEP * k) * 24 - 1e-9)
+            self.assertEqual(self.region_ink(ep.frame(first - 1), y), 0)
+            full = self.region_ink(ep.frame(first), y)
+            self.assertGreater(full, 0)                                                      # 나타나는 첫 프레임에 글자가 전부(타자기 없음)
+            self.assertEqual(self.region_ink(ep.frame(first + 6), y), full)
+
+    def test_mascot_pops_out_at_t_sprite_inside_safe_area_and_above_hud(self):
+        ep = make()
+        ep.sound()                                                                            # 효과음 계획(장면 가운데 시험 그리기)을 먼저 끝내 둔다
+        box = (135, 255, 222, 337)
+        crop = lambda i: np.asarray(ep.frame(i))[box[1]:box[3], box[0]:box[2]]
+        first = math.ceil(T.T_SPRITE * 24 - 1e-9)
+        self.assertTrue((crop(first - 1) == crop(0)).all())
+        self.assertFalse((crop(first) == crop(0)).all())
+        lo, hi = E.TEXT_SAFE[0], E.TEXT_SAFE[2]
+        for k in range(40):
+            f, (x, y) = T.HOOK_MASCOT.frame_at(k / 12, T.HOOK2_MASCOT)
+            self.assertTrue(x >= lo and x + f.width - 1 <= hi and y + f.height - 1 < T.HUD_V2["box"][1], (k, x, y, f.size))
+
+    def test_sounds_match_the_legacy_hook(self):
+        ep = make()
+        ep.frame(round(ep.scenes[0].length / 2 * 24))
+        self.assertEqual(ep.scenes[0].sfx, [(T.T_BIG, "pop"), (T.T_SPRITE, "sparkle")])
+        self.assertEqual((T.T_BIG, T.T_SPRITE), (0.3, 2.4))
+        extra = make(draw={"a": lambda img, d, t, ta, S: T.hook2(img, d, t, ta, S, NAR, lambda *a: None, extra_sfx=[(1.0, "thud")]), "b": scene_b})
+        extra.frame(round(extra.scenes[0].length / 2 * 24))
+        self.assertEqual(extra.scenes[0].sfx[-1], (1.0, "thud"))
+
+    def test_art_starts_after_the_last_line(self):
+        calls = []
+        ep = make(draw={"a": lambda img, d, t, ta, S: T.hook2(img, d, t, ta, S, NAR, lambda *a: calls.append(a[2])), "b": scene_b})
+        ep.sound()
+        calls.clear()
+        for i in range(0, 60):
+            ep.frame(i)
+        self.assertAlmostEqual(min(calls), T.T_BIG + 0.3 * 2, delta=1 / 24)
+
+    def test_undrawn_hook_line_fails_the_render_gate(self):
+        def no_hook(img, d, t, ta, S):
+            S.say(img, t, "질문"), E.say(img, "라벨", "label", (112, 200))
+        failed, exists, _ = RenderGateTest.render(self, {"a": no_hook, "b": scene_b_with_number})
+        self.assertIn("첫", failed or "")
+        self.assertFalse(exists)
+
+    def test_cover_shows_big_text_and_mascot(self):
+        with tempfile.TemporaryDirectory() as media:
+            ep = make(dict(NAR, hook_sub="부제"), media=media)
+            ep.cover()                                                                        # sound() 없이도(--cover 단독) 마스코트가 있는 커버를 쓴다
+            self.assertTrue((Path(media) / "ep98_test_cover.png").exists())
+            last = ep.frame(round(ep.scenes[0].length * 24) - 1, card=False)
+            for k in range(2):
+                self.assertGreater(self.region_ink(last, T.HOOK2_Y + T.HOOK2_GAP * k), 0)
+            box = (135, 255, 222, 337)
+            crop = lambda f: np.asarray(f)[box[1]:box[3], box[0]:box[2]]
+            self.assertFalse((crop(last) == crop(ep.frame(0, card=False))).all())
+
+
+def scene_b_with_number(img, d, t, ta, S):
+    S.say(img, t, "수치", "number")
 
 
 class PaletteTest(Base):

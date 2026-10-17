@@ -7,7 +7,7 @@ HERE = Path(__file__).parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT))
 from px import draw, engine as E  # noqa: E402
-from px.templates import Episode  # noqa: E402
+from px.templates import Episode, hook2  # noqa: E402
 from px.timeline import ease_in_out, ease_out, span, tween  # noqa: E402
 
 SKY, SOIL, CRUST, ROCK, ASH, GAS, MAGMA, MAGMA_HI, MAGMA_GLOW = "#26324A", "#4D3B2C", "#7A6350", "#3A3F4F", "#8A8478", "#CFE9F2", "#8F3A27", "#B8573A", "#D0703F"
@@ -72,12 +72,12 @@ def bubbles(d, ta, top, t0):
 
 
 def hook(img, d, t, ta, T):
-    ev = T.events
-    stage(img, d, ta)
-    T.say(img, t, "화산은 왜 갑자기 터질까?")
-    T.say(img, t, "마그마방", "label", (190, 324))
-    T.say(img, t, "지각", "label", (44, 268))
-    T.sfx = [(0.3, "pop", "event")]
+    def art(img, d, t, ta):
+        stage(img, d, ta)
+        T.say(img, t, "마그마방", "label", (112, 358))
+        T.say(img, t, "지각", "label", (44, 268))
+
+    hook2(img, d, t, ta, T, ep.nar, art)
 
 
 DRAW["hook"] = hook
