@@ -22,13 +22,13 @@ SCN = [{"id": "a", "duration": 3.0, "events": {"hit": 1.0}, "texts": [{"text": "
        {"id": "b", "duration": 2.0, "texts": [{"text": "수치", "start": 0.5, "end": 1.5}]}]
 
 
-def make(nar=None, scn=None, draw=None, ids=("a", "b")):
+def make(nar=None, scn=None, draw=None, ids=("a", "b"), media=None):
     """임시 폴더에 형식 2 편을 만들어 Episode를 돌려준다(폴더는 호출 동안만 있으면 된다 — 데이터는 생성자가 다 읽는다)."""
     with tempfile.TemporaryDirectory() as tmp:
         here = Path(tmp)
         (here / "narration.ko.json").write_text(json.dumps(NAR if nar is None else nar))
         (here / "scenes.json").write_text(json.dumps(SCN if scn is None else scn))
-        return T.Episode(here, ids, draw or {"a": scene_a, "b": scene_b}, "ep98_test")
+        return T.Episode(here, ids, draw or {"a": scene_a, "b": scene_b}, "ep98_test", media=media)
 
 
 def scene_a(img, d, t, ta, S):
@@ -222,6 +222,49 @@ class TimelineTest(Base):
         ep = make(draw={"a": hit, "b": scene_b})
         kept = ep.sound()[3]
         self.assertIn((1.0, "thud", "event"), [e[:3] for e in kept])
+
+
+class RenderGateTest(Base):
+    """main()의 렌더 끝 검사: 승인된 문구가 한 번도 안 그려졌으면 실패하고 mp4를 남기지 않는다(ffmpeg 없이 encode를 바꿔 끼워 확인)."""
+
+    def render(self, draw):
+        real, calls = E.encode, []
+
+        def fake(frame_fn, n, wav, out, palette=None):
+            for i in range(0, n, 12):
+                frame_fn(i)
+            calls.append(palette)
+            Path(out).write_bytes(b"x")
+            return 0, 0
+        E.encode = fake
+        try:
+            with tempfile.TemporaryDirectory() as media:
+                ep = make(draw=draw, media=media)
+                try:
+                    ep.main()
+                    failed = None
+                except SystemExit as error:
+                    failed = str(error)
+                return failed, (Path(media) / "ep98_test.mp4").exists(), calls
+        finally:
+            E.encode = real
+
+    def test_missing_approved_text_fails_and_removes_mp4(self):
+        def only_question(img, d, t, ta, S):
+            S.say(img, 1.0, "질문"), E.say(img, "라벨", "label", (112, 200))
+        failed, exists, calls = self.render({"a": only_question, "b": lambda *a: None})
+        self.assertIn("수치", failed or "")
+        self.assertFalse(exists)
+
+    def test_all_texts_drawn_keeps_mp4_and_passes_palette(self):
+        failed, exists, calls = self.render({"a": scene_a, "b": lambda img, d, t, ta, S: S.say(img, t, "수치", "number")})
+        self.assertIsNone(failed)
+        self.assertTrue(exists)
+        self.assertEqual(calls, [tuple(E.PALETTE)])                          # 선언한 확장색이 없으면 공용 팔레트 그대로
+
+    def test_empty_episode_fails(self):
+        with self.assertRaises(ValueError):
+            make(dict(NAR, scenes={}), [], ids=())
 
 
 class PaletteTest(Base):
