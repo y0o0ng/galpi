@@ -1,4 +1,5 @@
-"""도트 트랙 공통 부품: 장면 실행기(Episode), chip·kicker·마스코트·pointer, hook 배치, cardt·blinking·dotted_rect·cutaway. 편마다 다른 것은 인자로 받는다."""
+"""도트 트랙 공통 부품: 장면 실행기(Episode), chip·kicker·마스코트·pointer, hook 배치, cardt·blinking·dotted_rect·cutaway. 편마다 다른 것은 인자로 받는다.
+narration.ko.json에 format_version 2가 있으면 애니메이션 중심 4px 형식(SceneV2·scenes.json duration·승인 문구 say·확장색 선언)이고, 없으면 옛 5px 형식이다."""
 import json
 import math
 import re
@@ -30,6 +31,69 @@ class Scene:
         self.sfx = []                                  # (장면 시각, 종류) 또는 (장면 시각, 종류, 역할)
 
 
+class SceneV2:
+    """형식 2 장면: 길이는 scenes.json의 duration(글자 수와 무관), 자막 카드 없음. texts는 그 장면의 [(문구, 시작, 끝)] 표시 구간,
+    events는 제작이 정한 시각적 사건의 장면 시각({이름: 초}) — 효과음과 연출이 같은 표를 읽는다."""
+
+    def __init__(self, sid, duration, texts, events):
+        self.id, self.length, self.texts, self.events = sid, duration, texts, events
+        self.sents, self.plan, self.sfx = [], [], []
+
+    def visible(self, t, s):
+        """s가 이 장면의 표시 구간에 t가 드는가. 이 장면의 문구 목록에 없으면 ValueError(승인되지 않은 문구)."""
+        spans = [(a, b) for x, a, b in self.texts if x == s]
+        if not spans:
+            raise ValueError(f"[{self.id}] 장면 타임라인에 없는 화면 문구: {s!r}")
+        return any(a - 1e-9 <= t < b - 1e-9 for a, b in spans)
+
+    def say(self, img, t, s, *args, **kw):
+        """타임라인상 표시 구간에 t가 들 때만 E.say로 그린다(구간 밖이면 아무것도 안 그린다)."""
+        if self.visible(t, s):
+            E.say(img, s, *args, **kw)
+
+
+SCENE_AREAS = ("환경", "물체·재질", "구조·연결부", "정보 비교", "핵심 변화", "강조")
+MAX_TOTAL = 90.0                                    # 엔딩 포함 영상 길이 상한(초)
+
+
+def load_v2(nar, scenes_json, ids):
+    """형식 2 데이터 검증(필수 정보가 없거나 어긋나면 ValueError, 렌더 전에): 장면 내용(narration)과 타임라인(scenes.json)을
+    ids와 대조해 [SceneV2]와 승인 문구 집합을 돌려준다. 장면 하나가 빠지거나 duration·표시 구간이 잘못되면 실패."""
+    if not isinstance(nar.get("scenes"), dict) or set(nar["scenes"]) != set(ids):
+        raise ValueError(f"narration.scenes가 장면 {list(ids)}와 같아야 한다")
+    approved, content = set(), nar["scenes"]
+    for sid in ids:
+        c = content[sid]
+        if not isinstance(c, dict) or not isinstance(c.get("screen_text"), list) or not all(isinstance(x, str) and x for x in c["screen_text"]):
+            raise ValueError(f"[{sid}] 형식 2 장면은 screen_text(승인된 화면 문구 목록)가 있는 객체여야 한다")
+        approved |= set(c["screen_text"])
+    if not isinstance(nar.get("hook"), str) or nar["hook"] not in approved:
+        raise ValueError("hook(훅 질문)이 있어야 하고 어느 장면의 screen_text에 들어 있어야 한다")
+    if not isinstance(scenes_json, list) or [e.get("id") for e in scenes_json] != list(ids):
+        raise ValueError(f"scenes.json의 장면 순서가 {list(ids)}와 같아야 한다")
+    out = []
+    for e in scenes_json:
+        sid = e["id"]
+        if "min" in e:
+            raise ValueError(f"[{sid}] 형식 2의 scenes.json은 min이 아니라 실제 길이 duration을 쓴다")
+        dur = e.get("duration")
+        if isinstance(dur, bool) or not isinstance(dur, (int, float)) or not dur > 0:
+            raise ValueError(f"[{sid}] duration(초)이 양수여야 한다: {dur!r}")
+        events = e.get("events", {})
+        if not isinstance(events, dict) or not all(isinstance(v, (int, float)) and 0 <= v <= dur for v in events.values()):
+            raise ValueError(f"[{sid}] events의 시각은 0~{dur} 안의 숫자여야 한다")
+        texts = []
+        for x in e.get("texts", []):
+            s, a, b = x.get("text"), x.get("start"), x.get("end")
+            if s not in content[sid]["screen_text"]:
+                raise ValueError(f"[{sid}] 타임라인의 화면 문구가 그 장면의 승인 문구가 아니다: {s!r}")
+            if not (isinstance(a, (int, float)) and isinstance(b, (int, float)) and 0 <= a < b <= dur):
+                raise ValueError(f"[{sid}] 화면 문구 표시 구간이 장면 0~{dur} 안이어야 한다: {s!r} {a}~{b}")
+            texts.append((s, a, b))
+        out.append(SceneV2(sid, float(dur), texts, events))
+    return out, approved
+
+
 @lru_cache(None)
 def _bg():
     return E.background()
@@ -38,16 +102,37 @@ def _bg():
 END_LEN, T_STAMP = 4.2, 2.3                         # 엔딩 도장 장면 길이, 도장이 찍히는 장면 시각
 T_JINGLE, T_TYPED, T_LABEL = 1.55, 1.4, 1.5          # 완성 징글 / 세 줄 타이핑이 끝나는 / 영문 라벨이 뜨는 장면 시각
 STAMP_BOX = (98, 214, 62, 34)                        # 도장 x, y, 폭, 높이
+# 엔딩 배치(장면 좌표). 형식 2는 같은 4px 격자에서 도트 수를 늘려 형식 1과 비슷한 물리 크기·위치로 맞춘다(구성·시각·소리·4.2초는 그대로).
+ENDING = {
+    1: dict(stamp=STAMP_BOX, mascot=(50, 267), label_y=52, line_y=72, line_gap=32, en_y=176, name=(11, 6), num=(21, 19),
+            dust=lambda sw, sh: ((-7, 6), (sw + 6, 10), (-5, 40), (sw + 8, 44), (40, -7), (70, sh + 6), (20, sh + 7))),
+    2: dict(stamp=(123, 268, 78, 42), mascot=(62, 334), label_y=65, line_y=90, line_gap=40, en_y=220, name=(14, 7), num=(26, 24),
+            dust=lambda sw, sh: ((-9, 8), (sw + 8, 12), (-6, 50), (sw + 10, 55), (50, -9), (88, sh + 8), (25, sh + 9))),
+}
 
 
 class Episode:
     """here: 편 폴더(narration.ko.json·scenes.json), ids: 장면 순서, draw: {id: 장면 함수(img, d, t, ta, T)}(나중에 채워도 된다), out: 출력 이름.
     narration.ko.json의 선택 필드 principle(1~3줄)이 있으면 마지막 장면 뒤에 엔딩 도장 장면을 자동으로 붙인다(principle_label 선택)."""
 
-    def __init__(self, here, ids, draw, out):
+    def __init__(self, here, ids, draw, out, media=None):
+        """media: 결과물 폴더(기본 reels/media). 시험 렌더가 게시물과 섞이지 않게 바꿀 때만 쓴다."""
         self.nar = json.loads((here / "narration.ko.json").read_text())
-        self.mins = {s["id"]: s["min"] for s in json.loads((here / "scenes.json").read_text())}
-        self.scenes = [Scene(k, self.nar["scenes"][k], self.mins[k]) for k in ids]
+        self.version = self.nar.get("format_version", 1)   # 버전 표기가 없으면 옛 5px 형식
+        E.use_format(self.version)                        # 1 또는 2가 아니면 ValueError
+        _bg.cache_clear()
+        scenes_json = json.loads((here / "scenes.json").read_text())
+        self.media = Path(media) if media else ROOT / "media"
+        self.palette = None
+        if self.version == 2:
+            self.scenes, approved = load_v2(self.nar, scenes_json, ids)
+            self.mins = {T.id: T.length for T in self.scenes}
+            E.start_texts(approved)
+            self.palette = (*E.PALETTE, *E.declare_colors(self.nar.get("palette", [])))
+        else:
+            E.start_texts(None)
+            self.mins = {s["id"]: s["min"] for s in scenes_json}
+            self.scenes = [Scene(k, self.nar["scenes"][k], self.mins[k]) for k in ids]
         self.draw, self.out = draw, out
         self.ending = None
         self.bgm = self.nar.get("bgm", "bright")
@@ -59,6 +144,8 @@ class Episode:
             self._check_principle()
         self.starts = [sum(s.length for s in self.scenes[:i]) for i in range(len(self.scenes))]
         self.total = sum(s.length for s in self.scenes)
+        if self.version == 2 and self.total > MAX_TOTAL + 1e-9:
+            raise ValueError(f"영상 길이 {self.total:.1f}초가 상한 {MAX_TOTAL}초를 넘는다")
         self._plan, self._probing = None, False
 
     def _check_principle(self):
@@ -80,7 +167,11 @@ class Episode:
         img = _bg().copy()
         d = ImageDraw.Draw(img)
         MASCOT_POS.clear()
-        (self._ending_scene if T is self.ending else self.draw[T.id])(img, d, t, ta, T)
+        if T is self.ending:
+            with E.trusted():                               # 엔딩 글자는 엔진이 그린다(원리 줄은 narration.principle)
+                self._ending_scene(img, d, t, ta, T)
+        else:
+            self.draw[T.id](img, d, t, ta, T)
         if not self._probing:
             self._react_sparkle(img, i / E.FPS_OUT)
         for card, start, dur in (T.plan if card else ()):
@@ -105,7 +196,7 @@ class Episode:
         arr = E.to_output(new)
         arr = self._react_danger(arr, i)
         if T is self.ending and T_STAMP - 1e-9 <= t < T_STAMP + 2 / E.FPS_OUT - 1e-9:
-            arr = np.roll(arr, (E.SCALE, E.SCALE), axis=(0, 1))     # 도장 순간 2프레임 흔들림: 출력 전체를 한 도트(5px) 이동
+            arr = np.roll(arr, (E.SCALE, E.SCALE), axis=(0, 1))     # 도장 순간 2프레임 흔들림: 출력 전체를 한 도트(SCALE px) 이동
         return [new], arr
 
     # ---- 효과음에 맞춘 화면 반응(sfx_react): place_sfx가 실제로 남긴 소리만 ----
@@ -115,13 +206,15 @@ class Episode:
             self._probing, events = True, []
             for T, off in zip(self.scenes, self.starts):
                 self.frame(round((off + T.length / 2) * E.FPS_OUT))
+                if self.version == 2 and any(not 0 <= t <= T.length for t, *_ in T.sfx):
+                    raise ValueError(f"[{T.id}] 효과음 시각이 장면 0~{T.length}초 밖이다: {T.sfx}")
                 events += [(off + t, *rest) for t, *rest in T.sfx]
             self._probing = False
             self._plan = (*audio.place_sfx(events, self.total), events)
         return self._plan
 
     def _react_danger(self, arr, i):
-        """danger 소리 시각부터 2프레임, 출력 전체를 5px 좌우로 흔든다((5,0) → (-5,0))."""
+        """danger 소리 시각부터 2프레임, 출력 전체를 한 도트(SCALE px) 좌우로 흔든다."""
         for t, kind, *_ in self._sfx_plan()[1]:
             k = i - math.ceil(t * E.FPS_OUT - 1e-9)
             if kind == "danger" and k in (0, 1):
@@ -141,35 +234,37 @@ class Episode:
                     d.point([(sx, sy - 1), (sx - 1, sy), (sx, sy), (sx + 1, sy), (sx, sy + 1)], fill=E.TEXT)
 
     def _ending_scene(self, img, d, t, ta, T):
-        """엔딩 도장 장면: "오늘의 원리" → 원리 줄 타이핑 → 영문 라벨 → 도장 + 먼지 + 시온 점프·반짝."""
+        """엔딩 도장 장면: "오늘의 원리" → 원리 줄 타이핑 → 영문 라벨 → 도장 + 먼지 + 시온 점프·반짝. 배치는 ENDING[형식]."""
+        g_ = ENDING[self.version]
         T.sfx = [(T_JINGLE, "jingle"), (T_STAMP, "stamp")]
         lines = self.nar["principle"]
-        E.center_text(img, 52, "오늘의 원리", "label", E.LABEL)
-        shown, y = int(min(1, t / T_TYPED) * sum(map(len, lines))), 72
+        E.center_text(img, g_["label_y"], "오늘의 원리", "label", E.LABEL)
+        shown, y = int(min(1, t / T_TYPED) * sum(map(len, lines))), g_["line_y"]
         for k, line in enumerate(lines):
             part, shown = line[:max(0, shown)], shown - len(line)
             if part:
                 E.text(img, ((E.W - E.text_w(line, "bold", 2)) // 2, y), part, "bold", E.INK if k == len(lines) - 1 else E.TEXT, scale=2)
-            y += 32
+            y += g_["line_gap"]
         if t >= T_LABEL and self.nar.get("principle_label"):
-            E.center_text(img, 176, self.nar["principle_label"], "label", E.LABEL)
+            E.center_text(img, g_["en_y"], self.nar["principle_label"], "label", E.LABEL)
         if t < T_STAMP:
             return
-        sx, sy, sw, sh = STAMP_BOX
+        sx, sy, sw, sh = g_["stamp"]
         g = 3 if t < T_STAMP + 2 / E.FPS_OUT else 0       # 찍히는 순간 3도트 크게
         for inset in (0, 2):                              # 이중 테두리, 안은 비운다
             d.rectangle((sx - g + inset, sy - g + inset, sx + sw + g - inset, sy + sh + g - inset), outline=E.DANGER)
         num = re.match(r"ep(\d+)_", self.out).group(1)
-        E.text(img, (sx + 11, sy + 6), "원리노트", "label", E.DANGER, shadow=False)
-        E.text(img, (sx + 21, sy + 19), f"#{num}", "bold", E.DANGER, shadow=False)
+        E.text(img, (sx + g_["name"][0], sy + g_["name"][1]), "원리노트", "label", E.DANGER, shadow=False)
+        E.text(img, (sx + g_["num"][0], sy + g_["num"][1]), f"#{num}", "bold", E.DANGER, shadow=False)
         if t < T_STAMP + 6 / E.FPS_OUT:                   # 먼지
-            for dx, dy in ((-7, 6), (sw + 6, 10), (-5, 40), (sw + 8, 44), (40, -7), (70, sh + 6), (20, sh + 7)):
+            for dx, dy in g_["dust"](sw, sh):
                 d.point((sx + dx, sy + dy), fill=E.LABEL)
         sp = sprite("sparkle" if t >= T_STAMP + 0.3 else "base")
         k = int((t - T_STAMP) * 12) if t < T_STAMP + 0.6 else 6
-        (sx_, sy_), dy = HOP[min(6, k)]                   # 점프: 발밑 가운데 (50, 267)를 기준으로 찌그러졌다 펴진다
+        (sx_, sy_), dy = HOP[min(6, k)]                   # 점프: 발밑 가운데를 기준으로 찌그러졌다 펴진다
         sp = squashed(sp, sx_, sy_)
-        img.paste(sp, (50 - sp.width // 2, 267 + dy - sp.height), sp)
+        mx, my = g_["mascot"]
+        img.paste(sp, (mx - sp.width // 2, my + dy - sp.height), sp)
 
     def sound(self):
         typed = []
@@ -192,11 +287,11 @@ class Episode:
         _cover_grid.png(가운데 3:4, 1080x1440)로 쓴다. 출력 배치(위 여백 200px)에서 그림이 격자 y 240~1680에 든다."""
         i = round(self.scenes[0].length * E.FPS_OUT) - 1
         out = self.frame(i, card=False)
-        assert not E.lint.check_canvas(out, E.PALETTE, ignore=(E.BG, E.DITHER))[0]
+        assert not E.lint.check_canvas(out, self.palette or E.PALETTE, ignore=(E.BG, E.DITHER))[0]
         arr = E.to_output(out)
         assert E.lint.check_output(arr, E.SCALE)
         pic = Image.fromarray(arr)
-        base_path = ROOT / "media" / self.out
+        base_path = self.media / self.out
         pic.save(f"{base_path}_cover.png")
         top = (arr.shape[0] - arr.shape[1] * 4 // 3) // 2
         pic.crop((0, top, arr.shape[1], top + arr.shape[1] * 4 // 3)).save(f"{base_path}_cover_grid.png")
@@ -206,13 +301,18 @@ class Episode:
             self.out = sys.argv[sys.argv.index("--out") + 1]
         if "--cover" in sys.argv:
             return self.cover()
-        out = ROOT / "media" / f"{self.out}.mp4"
+        out = self.media / f"{self.out}.mp4"
+        out.parent.mkdir(parents=True, exist_ok=True)
         b, ty, sf, kept, events = self.sound()
         wav = out.with_suffix(".wav")
         audio.write_wav(wav, b + ty + sf)
-        iso_max, iso_sum = E.encode(self.compose, round(self.total * E.FPS_OUT), wav, out)
+        iso_max, iso_sum = E.encode(self.compose, round(self.total * E.FPS_OUT), wav, out, self.palette)
         wav.unlink()
-        print(f"lint OK (팔레트 밖 0, 5x5 블록 균일); 고립 1px 점: 프레임당 최대 {iso_max}, 합계 {iso_sum}")
+        missing = E.undrawn_texts()                      # 형식 2: 승인됐는데 한 번도 안 그려진 화면 문구 = 실패
+        if missing:
+            out.unlink(missing_ok=True)
+            raise SystemExit(f"승인된 화면 문구가 렌더 전체에서 한 번도 안 그려졌다: {missing}")
+        print(f"lint OK (팔레트 밖 0, {E.SCALE}x{E.SCALE} 블록 균일); 고립 1px 점: 프레임당 최대 {iso_max}, 합계 {iso_sum}")
         print("total", round(self.total, 2), "s; frames", round(self.total * E.FPS_OUT))
         for T, off in zip(self.scenes, self.starts):
             print(f"[{T.id}] start {off:.2f} length {T.length:.2f} (min {self.mins[T.id]})")
@@ -343,6 +443,9 @@ def band(img, text):
 
 
 HUD_BOX = (4, 222, 175, 250)         # HUD 한 줄(선택): 자막 상자 CARD_BOX (10,252,170,290) 바로 위. HUD가 없는 장면은 화면 전체를 쓴다
+# 형식 2: 자막 상자가 없으니 진술 자리(위)와 겹치지 않는 하단 띠에 둔다(플랫폼 UI 가림 y>377 위). label 12px·bold 12px라 한 줄이 더 높다
+HUD_V2 = dict(box=(10, 338, 214, 372), name_y=3, value_y=17, flash=(16, 30), dot_y=20)
+HUD_V1 = dict(box=HUD_BOX, name_y=3, value_y=14, flash=(13, 26), dot_y=17)
 
 
 def _dot(d, x, y, color):
@@ -352,29 +455,34 @@ def _dot(d, x, y, color):
 
 
 def hud(img, items, t=0.0, changed_at=None):
-    """HUD 한 줄(선택; 자막 상자 바로 위, 그 장면 그림은 y 221 위에서 끝나야 한다). items: [(이름, 값)] 또는 [(이름, 값, 색)] 1~3개 — 색이 있으면
+    """HUD 한 줄(선택; 형식 1은 자막 상자 바로 위 y 222~250, 형식 2는 하단 띠 y 338~372). items: [(이름, 값)] 또는 [(이름, 값, 색)] 1~3개 — 색이 있으면
     값 앞에 ● 점과 그 색(상태 값; 예: INK 정상, DANGER 위험). 이름은 label LABEL, 값은 bold(상태는 그 색, 아니면 TEXT).
-    changed_at: 항목별 값이 바뀐 장면 시각(리스트 또는 {번호: 시각}) — 그 순간부터 0.3초 그 값만 반전한다. 열 폭은 172/개수(3개면 57px: 값은 한글 4자 안팎)."""
+    changed_at: 항목별 값이 바뀐 장면 시각(리스트 또는 {번호: 시각}) — 그 순간부터 0.3초 그 값만 반전한다. 열 폭은 폭/개수(3개면 값은 한글 4자 안팎).
+    형식 2에서는 이름·값이 모두 승인된 화면 문구여야 한다(아니면 ValueError)."""
     assert 1 <= len(items) <= 3, "HUD는 1~3개"
+    L = HUD_V2 if E.FORMAT == 2 else HUD_V1
     d = ImageDraw.Draw(img)
-    x0, y0, x1, y1 = HUD_BOX
-    d.rectangle(HUD_BOX, fill=E.CARD)
+    x0, y0, x1, y1 = L["box"]
+    for item in items:
+        E.approve(item[0]), E.approve(item[1])
+    d.rectangle(L["box"], fill=E.CARD)
     col_w = (x1 - x0 + 1) // len(items)
     ch = dict(enumerate(changed_at)) if isinstance(changed_at, (list, tuple)) else (changed_at or {})
-    for k, item in enumerate(items):
-        name, value = item[0], item[1]
-        color = item[2] if len(item) > 2 else None
-        x = x0 + k * col_w + 4
-        E.text(img, (x, y0 + 3), name, "label", E.LABEL, shadow=False)
-        vx = x + (6 if color else 0)
-        w = E.text_w(value, "bold")
-        flash = ch.get(k) is not None and 0 <= t - ch[k] < 0.3
-        paint = color or E.TEXT
-        if flash:
-            d.rectangle((x - 2, y0 + 13, vx + w + 1, y0 + 26), fill=paint)
-        if color:
-            _dot(d, x, y0 + 17, E.BG if flash else color)
-        E.text(img, (vx, y0 + 14), value, "bold", E.BG if flash else paint, shadow=False)
+    with E.trusted():
+        for k, item in enumerate(items):
+            name, value = item[0], item[1]
+            color = item[2] if len(item) > 2 else None
+            x = x0 + k * col_w + 4
+            E.text(img, (x, y0 + L["name_y"]), name, "label", E.LABEL, shadow=False)
+            vx = x + (6 if color else 0)
+            w = E.text_w(value, "bold")
+            flash = ch.get(k) is not None and 0 <= t - ch[k] < 0.3
+            paint = color or E.TEXT
+            if flash:
+                d.rectangle((x - 2, y0 + L["flash"][0], vx + w + 1, y0 + L["flash"][1]), fill=paint)
+            if color:
+                _dot(d, x, y0 + L["dot_y"], E.BG if flash else color)
+            E.text(img, (vx, y0 + L["value_y"]), value, "bold", E.BG if flash else paint, shadow=False)
 
 
 def compare(img, d, t, ta, rows, t1, t0=0.3):
