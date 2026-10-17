@@ -373,6 +373,17 @@ class HookTest(Base):
             ep.frame(i)
         self.assertAlmostEqual(min(calls), T.T_BIG + 0.3 * 2, delta=1 / 24)
 
+    def test_art_is_clipped_to_the_hook_box(self):
+        from PIL import Image
+        img = Image.new("RGB", (E.W, E.H), E.BG)
+        T.hook2(img, None, 2.0, 2.0, type("S", (), {})(), NAR, lambda im, d, t, ta: d.rectangle((0, 0, E.W - 1, E.H - 1), fill=E.PURPLE))
+        x0, y0, x1, y1 = T.HOOK2_ART
+        px = img.load()
+        self.assertEqual(px[x0, y0], px[x1, y1])
+        self.assertEqual(px[x0, y0], tuple(int(E.PURPLE[i:i + 2], 16) for i in (1, 3, 5)))
+        self.assertNotEqual(px[x1 + 1, y1], px[x1, y1])                       # 상자 밖은 그대로
+        self.assertNotEqual(px[x0, y1 + 1], px[x0, y1])
+
     def test_undrawn_hook_line_fails_the_render_gate(self):
         def no_hook(img, d, t, ta, S):
             S.say(img, t, "질문"), E.say(img, "라벨", "label", (112, 200))

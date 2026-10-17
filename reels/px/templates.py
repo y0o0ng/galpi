@@ -460,11 +460,13 @@ def hook(img, d, t, ta, T, title, words, art, extra_sfx=()):
 
 HOOK_END = T_SPRITE + sum(HOOK_MASCOT.durs[:-1])  # hook2: 마스코트 반짝이 끝나는 장면 시각 = 훅 장면 최소 길이
 HOOK2_Y, HOOK2_GAP, HOOK2_MASCOT = 14, 28, (176, 334)   # 큰 글자 첫 줄 y·줄 간격(96px 글자 = 24도트 + 4), 마스코트 발밑 가운데(오른쪽 아래, HUD 띠 y 338 위)
+HOOK2_ART = (10, 150, 140, 300)    # 훅 그림 상자(포함 좌표): 옛 hook처럼 큰 글자 아래 왼쪽의 간단한 그림 하나. 마스코트는 그 오른쪽
 
 
 def hook2(img, d, t, ta, T, nar, art, extra_sfx=()):
     """형식 2 훅: 옛 hook과 같은 구성·타이밍·소리. nar의 hook_words(1~4줄)가 큰 글자(Galmuri11-Bold 2배, 가운데)로 0.3초 간격 차례로 즉시 뜨고,
-    hook_sub는 그 아래 라벨 한 줄. art(img, d, t, ta): 마지막 줄 0.3초 뒤부터 남은 무대(큰 글자 아래)에 그린다. 마스코트는 T_SPRITE에 튀어나온다."""
+    hook_sub는 그 아래 라벨 한 줄. art(img, d, t, ta): 마지막 줄 0.3초 뒤부터 그린다 — 그림은 HOOK2_ART 상자 안만 남는다(옛 hook처럼
+    간단한 그림 하나; 상자 밖에 그린 것은 잘린다). 배경은 브랜드 바탕 그대로. 마스코트는 T_SPRITE에 튀어나온다."""
     words = nar["hook_words"]
     T.sfx = [(T_BIG, "pop"), (T_SPRITE, "sparkle"), *extra_sfx]
     for i, w in enumerate(words):
@@ -473,7 +475,10 @@ def hook2(img, d, t, ta, T, nar, art, extra_sfx=()):
     if nar.get("hook_sub") and t >= T_BIG + 0.3 * (len(words) - 1):
         E.say(img, nar["hook_sub"], "label", (E.W // 2, HOOK2_Y + HOOK2_GAP * len(words)))
     if t >= T_BIG + 0.3 * len(words):
-        art(img, d, t, ta)
+        tmp = img.copy()
+        art(tmp, ImageDraw.Draw(tmp), t, ta)
+        x0, y0, x1, y1 = HOOK2_ART
+        img.paste(tmp.crop((x0, y0, x1 + 1, y1 + 1)), (x0, y0))
     if t >= T_SPRITE:
         HOOK_MASCOT.paste(img, t - T_SPRITE, HOOK2_MASCOT)
 
