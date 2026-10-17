@@ -50,8 +50,10 @@ ROLE_RANGES = {                    # 역할: (명도 하한, 명도 상한, 채�
     "정보 비교": (0.18, 0.958, 0.187),
     "핵심 변화": (0.18, 0.958, 0.187),
     "강조": (0.18, 0.958, 0.187),
+    "발광": (0.18, 0.958, 0.20),   # 빛나는 물질(마그마·용암·필라멘트 등): 밝고 진해도 되지만 면적이 GLOW_MAX_SHARE로 묶인다
 }
-DANGER_HUE_BAND, DANGER_NEAR_C = 25, 0.15   # DANGER 색상각 ±25° 안의 확장색은 채도 0.15 이하
+DANGER_HUE_BAND, DANGER_NEAR_C = 25, 0.15   # DANGER 색상각 ±25° 안의 확장색은 채도 0.15 이하(발광 제외)
+GLOW_MAX_SHARE = 0.15              # 발광색은 프레임마다 캔버스 면적의 15% 이하(2026-10-17 사용자 결정)
 _EPS = 1e-9
 
 
@@ -81,7 +83,7 @@ def range_violations(L, C, h, role):
     dc, dh = oklch(DANGER)[1], oklch(DANGER)[2]
     if C > min(c_max, dc) + _EPS:
         out.append(f"채도 C {C:.3f} > 상한 {min(c_max, dc)}")
-    if abs((h - dh + 180) % 360 - 180) <= DANGER_HUE_BAND and C > DANGER_NEAR_C + _EPS:
+    if role != "발광" and abs((h - dh + 180) % 360 - 180) <= DANGER_HUE_BAND and C > DANGER_NEAR_C + _EPS:
         out.append(f"DANGER 색상각({dh:.0f}°) ±{DANGER_HUE_BAND}° 안(h {h:.0f}°)에서 채도 C {C:.3f} > {DANGER_NEAR_C}")
     return out
 
@@ -102,6 +104,20 @@ def declare_colors(decls):
             raise ValueError(f"확장색 {color}({role}) 범위 밖 — L {L:.3f} C {C:.3f} h {h:.0f}°: " + "; ".join(bad))
         out.append(color)
     return tuple(out)
+
+
+def glow_colors(decls):
+    """선언 중 발광 역할 색 튜플(면적 검사 대상)."""
+    return tuple(d["color"] for d in decls if d.get("role") == "발광")
+
+
+def glow_share(img, glow):
+    """캔버스에서 발광색이 차지하는 면적 비율."""
+    if not glow:
+        return 0.0
+    a = np.asarray(img.convert("RGB")).reshape(-1, 3)
+    cols = np.array([[int(c[i:i + 2], 16) for i in (1, 3, 5)] for c in glow])
+    return float((a[:, None, :] == cols[None]).all(-1).any(-1).mean())
 
 
 def _fonts(label=("Galmuri9.ttf", 10)):
@@ -421,7 +437,7 @@ def ffmpeg_exe():
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def encode(frame_fn, n_frames, wav, out, palette=None):
+def encode(frame_fn, n_frames, wav, out, palette=None, glow=()):
     """frame_fn(i) -> (캔버스 목록, 출력 배열 1080x1920). 캔버스는 그 프레임에 쓰인 180x320 원본 전부이고
     프레임마다 전부 lint를 돌린다(palette가 없으면 PALETTE). 출력 배열은 SCALE×SCALE 블록 lint. 실패가 있으면 영상을 쓰지 않는다.
     반환: (고립 점 수의 최댓값, 합계)."""
@@ -439,7 +455,7 @@ def encode(frame_fn, n_frames, wav, out, palette=None):
         bad, n_iso = 0, 0
         for img in canvases:
             b, n = lint.check_canvas(img, palette or PALETTE, ignore=(BG, DITHER))
-            bad, n_iso = bad + b, max(n_iso, n)
+            bad, n_iso = bad + b + (glow_share(img, glow) > GLOW_MAX_SHARE + _EPS), max(n_iso, n)
         if bad or not lint.check_output(arr, SCALE):
             fails.append((i, bad))
         iso.append(n_iso)

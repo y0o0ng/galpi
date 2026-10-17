@@ -123,12 +123,13 @@ class Episode:
         _bg.cache_clear()
         scenes_json = json.loads((here / "scenes.json").read_text())
         self.media = Path(media) if media else ROOT / "media"
-        self.palette = None
+        self.palette, self.glow = None, ()
         if self.version == 2:
             self.scenes, approved = load_v2(self.nar, scenes_json, ids)
             self.mins = {T.id: T.length for T in self.scenes}
             E.start_texts(approved)
             self.palette = (*E.PALETTE, *E.declare_colors(self.nar.get("palette", [])))
+            self.glow = E.glow_colors(self.nar.get("palette", []))
         else:
             E.start_texts(None)
             self.mins = {s["id"]: s["min"] for s in scenes_json}
@@ -288,6 +289,7 @@ class Episode:
         i = round(self.scenes[0].length * E.FPS_OUT) - 1
         out = self.frame(i, card=False)
         assert not E.lint.check_canvas(out, self.palette or E.PALETTE, ignore=(E.BG, E.DITHER))[0]
+        assert E.glow_share(out, self.glow) <= E.GLOW_MAX_SHARE + E._EPS
         arr = E.to_output(out)
         assert E.lint.check_output(arr, E.SCALE)
         pic = Image.fromarray(arr)
@@ -306,7 +308,7 @@ class Episode:
         b, ty, sf, kept, events = self.sound()
         wav = out.with_suffix(".wav")
         audio.write_wav(wav, b + ty + sf)
-        iso_max, iso_sum = E.encode(self.compose, round(self.total * E.FPS_OUT), wav, out, self.palette)
+        iso_max, iso_sum = E.encode(self.compose, round(self.total * E.FPS_OUT), wav, out, self.palette, self.glow)
         wav.unlink()
         missing = E.undrawn_texts()                      # 형식 2: 승인됐는데 한 번도 안 그려진 화면 문구 = 실패
         if missing:

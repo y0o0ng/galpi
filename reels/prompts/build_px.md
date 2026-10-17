@@ -19,7 +19,7 @@
   {"format_version": 2, "hook": "훅 질문(대본 글자 그대로, hook 장면 screen_text에 있어야 한다)",
    "scenes": {"장면id": {"content": "전달할 내용", "screen_text": ["대본의 화면 문구 그대로", "..."],
                          "evidence": ["근거 행 번호"], "constraint": "대본의 제작 제약"}},
-   "palette": [{"color": "#RRGGBB", "role": "환경|물체·재질|구조·연결부|정보 비교|핵심 변화|강조"}],
+   "palette": [{"color": "#RRGGBB", "role": "환경|물체·재질|구조·연결부|정보 비교|핵심 변화|강조|발광"}],
    "principle": ["줄1", "줄2", "줄3"], "principle_label": "대본에 있을 때만", "bgm": "bright|calm|tense"}
   ```
   대본의 `오늘의 원리`를 `principle`·`principle_label`로, 배경음악을 `bgm`으로 그대로 옮긴다. **`format_version: 2`가 없으면 옛 5px 형식으로 렌더된다 — 반드시 쓴다.**

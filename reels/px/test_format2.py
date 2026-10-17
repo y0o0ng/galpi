@@ -230,7 +230,7 @@ class RenderGateTest(Base):
     def render(self, draw):
         real, calls = E.encode, []
 
-        def fake(frame_fn, n, wav, out, palette=None):
+        def fake(frame_fn, n, wav, out, palette=None, glow=()):
             for i in range(0, n, 12):
                 frame_fn(i)
             calls.append(palette)
@@ -290,6 +290,18 @@ class PaletteTest(Base):
         self.assertTrue(near(0, 0.1501) and near(25, 0.16) and near(-25, 0.16))
         self.assertEqual(near(25.5, 0.16), [])                                 # 밖은 일반 역할 상한만
         self.assertEqual(near(60, 0.18), [])
+
+    def test_glow_role(self):
+        self.assertEqual(E.declare_colors([{"color": "#C8502B", "role": "발광"}]), ("#C8502B",))   # 마그마: 발광이면 DANGER 근처도 통과
+        self.assertTrue(E.range_violations(0.7, 0.2001, 150, "발광"))                           # 채도 상한 0.20
+        from PIL import Image
+        img = Image.new("RGB", (100, 100), E.BG)
+        img.paste("#C8502B", (0, 0, 100, 15))
+        self.assertAlmostEqual(E.glow_share(img, ("#C8502B",)), 0.15)                           # 경계 15%
+        img.paste("#C8502B", (0, 0, 100, 16))
+        self.assertGreater(E.glow_share(img, ("#C8502B",)), E.GLOW_MAX_SHARE)
+        self.assertEqual(E.glow_share(img, ()), 0.0)
+        self.assertEqual(E.glow_colors([{"color": "#C8502B", "role": "발광"}, {"color": "#4D3B2C", "role": "환경"}]), ("#C8502B",))
 
     def test_declaration_needs_role_and_range(self):
         with self.assertRaises(ValueError):
