@@ -263,6 +263,23 @@ class RenderGateTest(Base):
         self.assertTrue(exists)
         self.assertEqual(calls, [tuple(E.PALETTE)])                          # 선언한 확장색이 없으면 공용 팔레트 그대로
 
+    def test_labels_are_optional_but_still_approved(self):
+        nar = dict(NAR, scenes={"a": {"screen_text": ["질문"], "labels": ["라벨", "통로"]}, "b": {"screen_text": ["수치"]}})
+        _, approved, labels = T.load_v2(nar, SCN, ("a", "b"))
+        self.assertEqual(labels, {"라벨", "통로"})
+        E.start_texts(approved, labels)
+        for x in ("질문", "수치", "첫", "훅", "라벨"):
+            E.approve(x)
+        self.assertEqual(E.undrawn_texts(), [])                              # 안 그린 라벨 "통로"는 실패가 아니다
+        with self.assertRaises(ValueError):
+            E.approve("마그마방")                                             # 승인 안 된 글자는 여전히 막힌다
+        E.start_texts(approved, labels)
+        E.approve("라벨")
+        self.assertIn("질문", E.undrawn_texts())                              # 진술·수치·훅은 여전히 필수
+        self.assertNotIn("통로", E.undrawn_texts())
+        with self.assertRaises(ValueError):
+            T.load_v2(dict(nar, scenes={"a": {"screen_text": ["질문"], "labels": "라벨"}, "b": {"screen_text": ["수치"]}}), SCN, ("a", "b"))
+
     def test_empty_episode_fails(self):
         with self.assertRaises(ValueError):
             make(dict(NAR, scenes={}), [], ids=())

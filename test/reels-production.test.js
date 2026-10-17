@@ -290,8 +290,9 @@ test('신규 형식 2: build는 format_version·타임라인·승인 문구 헬�
 
 test('기존 5px 에피소드는 새 형식으로 변환되지 않았다(format_version 표기 없음)', () => {
   const episodes = path.join(__dirname, '..', 'reels', 'episodes');
-  const files = fs.readdirSync(episodes).filter(n => n.endsWith('_px'))
-    .map(n => path.join(episodes, n, 'narration.ko.json')).filter(fs.existsSync);
+  // 형식 2 도입 전(2026-10-17)에 있던 편만 본다 — 이후의 새 편은 format_version 2가 정상이다.
+  const legacy = ['ep01_harmonic_drive_px', 'ep02_speculative_execution_px', 'ep03_natural_circulation_px', 'ep04_stepped_drum_px', 'ep05_c3_px', 'ep06_c5_px', 'ep07_c7_px', 'ep08_c12_px'];
+  const files = legacy.map(n => path.join(episodes, n, 'narration.ko.json')).filter(fs.existsSync);
   assert.ok(files.length > 0);
   for (const file of files) assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).format_version, undefined, file);
 });

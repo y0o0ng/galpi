@@ -216,10 +216,11 @@ STMT_Y, STMT_GAP, STMT_LINES = 14, 18, 2   # 진술 자리: 위쪽, 줄 간격(G
 FONT_H = {"stmt": 14, "label": 12, "body": 12, "bold": 12}
 
 
-def start_texts(approved):
-    """형식 2 편의 승인 문구 목록을 등록한다(None이면 검사 끔). 이전 등록과 그린 기록은 버린다."""
+def start_texts(approved, optional=()):
+    """형식 2 편의 승인 문구 목록을 등록한다(None이면 검사 끔). approved는 반드시 그려야 하는 문구(진술·수치·훅),
+    optional은 그려도 되고 안 그려도 되는 문구(라벨). 이전 등록과 그린 기록은 버린다."""
     global _TEXTS
-    _TEXTS = None if approved is None else {"approved": set(approved), "drawn": set()}
+    _TEXTS = None if approved is None else {"approved": set(approved) | set(optional), "required": set(approved), "drawn": set()}
 
 
 @contextmanager
@@ -243,8 +244,8 @@ def approve(s):
 
 
 def undrawn_texts():
-    """승인됐지만 이 렌더에서 한 번도 안 그려진 문구."""
-    return sorted(_TEXTS["approved"] - _TEXTS["drawn"]) if _TEXTS else []
+    """반드시 그려야 하는데 이 렌더에서 한 번도 안 그려진 문구(라벨은 빠진다)."""
+    return sorted(_TEXTS["required"] - _TEXTS["drawn"]) if _TEXTS else []
 
 
 def say(img, s, kind="statement", xy=None, fill=None, align="center"):

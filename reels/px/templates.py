@@ -81,12 +81,15 @@ def load_v2(nar, scenes_json, ids):
     ids와 대조해 [SceneV2]와 승인 문구 집합을 돌려준다. 장면 하나가 빠지거나 duration·표시 구간이 잘못되면 실패."""
     if not isinstance(nar.get("scenes"), dict) or set(nar["scenes"]) != set(ids):
         raise ValueError(f"narration.scenes가 장면 {list(ids)}와 같아야 한다")
-    approved, content = set(), nar["scenes"]
+    approved, labels, content = set(), set(), nar["scenes"]
     for sid in ids:
         c = content[sid]
         if not isinstance(c, dict) or not isinstance(c.get("screen_text"), list) or not all(isinstance(x, str) and x for x in c["screen_text"]):
             raise ValueError(f"[{sid}] 형식 2 장면은 screen_text(승인된 화면 문구 목록)가 있는 객체여야 한다")
+        if not isinstance(c.get("labels", []), list) or not all(isinstance(x, str) and x for x in c.get("labels", [])):
+            raise ValueError(f"[{sid}] labels(선택 라벨 목록)는 비지 않은 문자열 목록이어야 한다")
         approved |= set(c["screen_text"])
+        labels |= set(c.get("labels", []))
     approved |= _check_hook(nar)
     if not isinstance(scenes_json, list) or [e.get("id") for e in scenes_json] != list(ids):
         raise ValueError(f"scenes.json의 장면 순서가 {list(ids)}와 같아야 한다")
@@ -104,7 +107,7 @@ def load_v2(nar, scenes_json, ids):
         texts = []
         for x in e.get("texts", []):
             s, a, b = x.get("text"), x.get("start"), x.get("end")
-            if s not in content[sid]["screen_text"]:
+            if s not in content[sid]["screen_text"] and s not in content[sid].get("labels", []):
                 raise ValueError(f"[{sid}] 타임라인의 화면 문구가 그 장면의 승인 문구가 아니다: {s!r}")
             if not (isinstance(a, (int, float)) and isinstance(b, (int, float)) and 0 <= a < b <= dur):
                 raise ValueError(f"[{sid}] 화면 문구 표시 구간이 장면 0~{dur} 안이어야 한다: {s!r} {a}~{b}")
@@ -114,7 +117,7 @@ def load_v2(nar, scenes_json, ids):
         raise ValueError("장면이 하나 이상이어야 한다")
     if out[0].length < HOOK_END - 1e-9:
         raise ValueError(f"첫 장면(훅)은 마스코트 반짝이 끝나는 {HOOK_END:.1f}초 이상이어야 한다(커버가 훅 끝 프레임): {out[0].length}")
-    return out, approved
+    return out, approved, labels - approved
 
 
 @lru_cache(None)
@@ -148,9 +151,9 @@ class Episode:
         self.media = Path(media) if media else ROOT / "media"
         self.palette, self.glow = None, ()
         if self.version == 2:
-            self.scenes, approved = load_v2(self.nar, scenes_json, ids)
+            self.scenes, approved, labels = load_v2(self.nar, scenes_json, ids)
             self.mins = {T.id: T.length for T in self.scenes}
-            E.start_texts(approved)
+            E.start_texts(approved, labels)
             self.palette = (*E.PALETTE, *E.declare_colors(self.nar.get("palette", [])))
             self.glow = E.glow_colors(self.nar.get("palette", []))
         else:
