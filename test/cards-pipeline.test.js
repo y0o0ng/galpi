@@ -207,7 +207,7 @@ deck.cards.forEach(card=>{card.eyebrow='TECH NEWS';});
 const quote='This release is a public preview of our new model.';
 function manuscript(){return `## 조립 원고\n\n\`\`\`json\n${JSON.stringify(deck)}\n\`\`\`\n\n## 게시 캡션\n설명해요.  \n원문: ${URL}\n\n## 사실 확인 목록\n| ID | 주장 | 출처 | 인용 |\n| C1 | 발표 | ${URL} | "${quote}" |\n\n## 검토 결과\n판정: PASS\n`;}
 
-function integratedRunner(t,{sourceFix=false,imageFix=false,interrupt=false,blocked=false,visualBlocked=false,sourceCarryBlock=false,mutateReview=false,alwaysFix=false,photo=false,agentBlocked=false,report="READY_FOR_REVIEW\n"}={}){
+function integratedRunner(t,{sourceFix=false,imageFix=false,interrupt=false,blocked=false,visualBlocked=false,sourceCarryBlock=false,mutateReview=false,alwaysFix=false,photo=false,extraMetadata=false,agentBlocked=false,report="READY_FOR_REVIEW\n"}={}){
   const root=temp(t),config=cardsConfig({},path.resolve(__dirname,'..'));
   const workDir=path.join(root,'work'),outDir=path.join(root,'images'),calls=[];
   let firstInterruption=interrupt;
@@ -224,6 +224,14 @@ function integratedRunner(t,{sourceFix=false,imageFix=false,interrupt=false,bloc
       fs.copyFileSync(path.join(outDir,'01.png'),path.join(assembly,'photo.png'));
       fs.writeFileSync(path.join(assembly,'assets.json'),JSON.stringify([{file:photo==='outside'?path.join(root,'outside.png'):'photo.png',kind:'photo',source_url:URL,provider:'공식 발표',usage_terms:photo==='missing'?'':'보도용 허용',caption:'제품',purpose:'실물 확인'}]));
       if(photo==='outside')fs.copyFileSync(path.join(outDir,'01.png'),path.join(root,'outside.png'));
+    }
+    if(extraMetadata){
+      const license='https://creativecommons.org/licenses/by/4.0/',caption=`설명해요.\n원문: ${URL}\n이용 조건: CC BY 4.0 ${license}`;
+      const actual=JSON.parse(fs.readFileSync(path.join(assembly,'deck.json')));actual.caption=caption;actual.cards[1].history_art='history.png';
+      fs.copyFileSync(path.join(outDir,'01.png'),path.join(assembly,'history.png'));fs.writeFileSync(path.join(assembly,'deck.json'),JSON.stringify(actual));
+      fs.writeFileSync(path.join(assembly,'caption.txt'),caption);fs.writeFileSync(path.join(assembly,'manuscript.md'),manuscript().replace(`설명해요.  \n원문: ${URL}`,caption));
+      const metadata=JSON.parse(fs.readFileSync(path.join(assembly,'assets.json')));metadata[0].usage_terms='CC BY 4.0 '+license;
+      metadata.push({file:'history.png',kind:'pixel'});fs.writeFileSync(path.join(assembly,'assets.json'),JSON.stringify(metadata));
     }
   };
   const runner=async args=>{
@@ -342,10 +350,57 @@ test('사진 파일은 편 내부에만 두고 출처 검토에는 경로 없는
   const outside=integratedRunner(t,{photo:'outside'});await assert.rejects(outside.run(),{code:'CARDS_PATH_OUTSIDE_JOB'});
 });
 
+test('사진 캡션·등록 그림·이용허락 링크가 함께 있어도 통합 검증과 독립 검토를 끝낸다',async t=>{
+  const job=integratedRunner(t,{photo:true,extraMetadata:true}),record=await job.run();
+  assert.equal(record.outcome,'ok');assert.ok(record.caption.includes('이용 조건: CC BY 4.0'));
+  assert.deepEqual(job.calls.map(c=>c.name),['create','source-0','visual-0']);verifySnapshot(record.snapshot);
+});
+
 test('출처 검사는 인용이 없는 사실 행을 통과시키지 않는다',async t=>{
   const root=temp(t),config=cardsConfig({},path.resolve(__dirname,'..'));const file=path.join(root,'draft.md');
   fs.writeFileSync(file,'## 사실 확인 목록\n| C1 | 주장 | 출처 | 직접 확인 |\n');
   await assert.rejects(checkFacts(config,file,root),{code:'CARDS_FACTCHECK_FAILED'});
+});
+
+test('중복 캡션은 원고와 같을 때만 허용하고 게시 문구·미등록 추가 필드는 계속 거부한다',t=>{
+  const {validateDeck}=require('../lib/cards/production'),root=temp(t),file=path.join(root,'deck.json');
+  const expected={cards:[{title:'원고 제목'}]},caption='게시 문구\n원문 링크';
+  fs.writeFileSync(path.join(root,'caption.txt'),caption+'\n');
+  fs.writeFileSync(file,JSON.stringify({...expected,caption:caption+'  \n'}));
+  assert.equal(validateDeck(file,expected,root,caption).caption,caption+'  \n');
+  fs.writeFileSync(file,JSON.stringify({...expected,caption:'바뀐 게시 문구'}));
+  assert.throws(()=>validateDeck(file,expected,root,caption),{code:'CARDS_CAPTION_MISMATCH'});
+  fs.writeFileSync(file,JSON.stringify({cards:[{title:'변경된 제목'}],caption}));
+  assert.throws(()=>validateDeck(file,expected,root,caption),{code:'CARDS_COPY_MISMATCH'});
+  fs.writeFileSync(file,JSON.stringify({...expected,unexpected:'추가 주장',caption}));
+  assert.throws(()=>validateDeck(file,expected,root,caption),{code:'CARDS_COPY_MISMATCH'});
+});
+
+test('추가 그림 참조는 등록된 파일만 허용하고 작업 밖 경로는 계속 차단한다',t=>{
+  const {validateDeck}=require('../lib/cards/production'),root=temp(t),file=path.join(root,'deck.json');
+  const expected={cards:[{title:'원고 제목'}]};fs.writeFileSync(path.join(root,'caption.txt'),'게시 문구');fs.writeFileSync(path.join(root,'history.png'),'image');
+  fs.writeFileSync(file,JSON.stringify({cards:[{title:'원고 제목',history_art:'history.png'}]}));
+  assert.doesNotThrow(()=>validateDeck(file,expected,root,'게시 문구',new Set(['history.png'])));
+  assert.throws(()=>validateDeck(file,expected,root,'게시 문구'),{code:'CARDS_COPY_MISMATCH'});
+  const outside=path.join(temp(t),'outside.png');fs.writeFileSync(outside,'image');
+  fs.writeFileSync(file,JSON.stringify({cards:[{title:'원고 제목',history_art:outside}]}));
+  assert.throws(()=>validateDeck(file,expected,root,'게시 문구',new Set([outside])),{code:'CARDS_PATH_OUTSIDE_JOB'});
+});
+
+test('사진 이용허락 링크는 등록된 사진의 이용조건 행에서만 사실 인용과 구분한다',async t=>{
+  const root=temp(t),config=cardsConfig({},path.resolve(__dirname,'..')),file=path.join(root,'draft.md'),license='https://creativecommons.org/licenses/by/4.0/';
+  const source=path.join(root,'source.txt');fs.writeFileSync(source,quote);fs.writeFileSync(path.join(root,'source-map.json'),JSON.stringify({[URL]:source}));
+  const metadata=[{kind:'photo',source_url:'https://example.com/photo.jpg',provider:'작가',usage_terms:'CC BY 4.0 '+license}];
+  fs.writeFileSync(file,manuscript().replace('원문: '+URL,'원문: '+URL+'\n이용 조건: CC BY 4.0 '+license));
+  assert.ok((await checkFacts(config,file,root,undefined,metadata)).every(c=>c.found));
+  await assert.rejects(checkFacts(config,file,root),{code:'CARDS_CAPTION_SOURCE'});
+  await assert.rejects(checkFacts(config,file,root,undefined,[{...metadata[0],kind:'pixel'}]),{code:'CARDS_CAPTION_SOURCE'});
+  fs.writeFileSync(file,manuscript().replace('원문: '+URL,'원문: '+URL+'\n주장의 근거: '+license));
+  await assert.rejects(checkFacts(config,file,root,undefined,metadata),{code:'CARDS_CAPTION_SOURCE'});
+  fs.writeFileSync(file,manuscript().replace('원문: '+URL,'원문: '+URL+'\n이용 조건: https://other.example/license'));
+  await assert.rejects(checkFacts(config,file,root,undefined,metadata),{code:'CARDS_CAPTION_SOURCE'});
+  fs.writeFileSync(file,manuscript().replace(quote,'This claim is not in the original.'));
+  await assert.rejects(checkFacts(config,file,root,undefined,metadata),{code:'CARDS_CHECK_FAILED'});
 });
 
 test('캐러셀: JPEG 공개, 자식 순서 보존, parent만 게시, publish는 자동 재시도 없음',async t=>{
