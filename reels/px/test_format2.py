@@ -134,11 +134,14 @@ class TextTest(Base):
 
     def test_statement_lines_and_safe_area(self):
         img = Image.new("RGB", (E.W, E.H), E.BG)
-        E.start_texts({"가 " * 5, "가 " * 40, "라벨"})
+        comma = "텍사스는 가스 발전이 가장 크고, 석탄도 돌아요."                 # 쉼표 앞 조각이 폭을 넘어 쉼표 규칙만으론 3줄(25편)
+        E.start_texts({"가 " * 5, "가 " * 40, "라벨", comma})
         E.say(img, "가 " * 5)                                                  # 한 줄
         with self.assertRaises(ValueError) as cm:
             E.say(img, "가 " * 40)                                             # 두 줄 초과
         self.assertIn("최대 2줄", str(cm.exception))
+        self.assertEqual(len(E.split_lines(comma, E.TEXT_SAFE[2] - E.TEXT_SAFE[0] + 1, "stmt")), 3)
+        E.say(img, comma)                                                      # 쉼표 규칙 없이 두 줄로 다시 나눠 통과
         with self.assertRaises(ValueError):
             E.say(img, "라벨", "label", (5, 100))                              # 안전 영역 왼쪽 밖
         with self.assertRaises(ValueError):

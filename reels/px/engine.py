@@ -259,6 +259,8 @@ def say(img, s, kind="statement", xy=None, fill=None, align="center"):
     if kind == "statement":
         font, scale, fill = "stmt", 1, fill or TEXT
         lines = split_lines(s, sx1 - sx0 + 1, font)
+        if len(lines) > STMT_LINES:                   # 쉼표 줄바꿈 때문에 넘치면 쉼표 규칙 없이 다시 나눈다
+            lines = split_lines(s, sx1 - sx0 + 1, font, comma_break=False)
         if len(lines) > STMT_LINES:
             raise ValueError(f"진술은 최대 {STMT_LINES}줄: {s!r} ({len(lines)}줄)")
         x0, y0, gap = None, (xy[1] if xy else STMT_Y), STMT_GAP
@@ -296,8 +298,8 @@ def center_text(img, y, s, font="body", fill=TEXT, scale=1):
 BREAK_AFTER = tuple(",.는이가을를에로와과도만면고서며데지요죠")  # "은"·"의"는 꾸미는 말(좁은, 부품값의)에도 붙어 뺀다 + ("보다", "부터", "까지", "처럼", "만큼")
 
 
-def split_lines(s, max_w=CARD_INNER_W, font="body"):
-    """띄어쓰기에서 끊고, 쉼표 뒤에서는 줄을 바꾼다."""
+def split_lines(s, max_w=CARD_INNER_W, font="body", comma_break=True):
+    """띄어쓰기에서 끊고, 쉼표 뒤에서는 줄을 바꾼다(comma_break=False면 쉼표도 폭으로만 끊는다)."""
     lines, cur = [], ""
     for tok in s.split():
         trial = f"{cur} {tok}".strip()
@@ -306,7 +308,7 @@ def split_lines(s, max_w=CARD_INNER_W, font="body"):
             cur = tok
         else:
             cur = trial
-        if tok.endswith(","):
+        if comma_break and tok.endswith(","):
             lines.append(cur)
             cur = ""
     if cur:
