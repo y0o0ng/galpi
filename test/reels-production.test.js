@@ -357,6 +357,16 @@ test('거절된 도구 호출을 단계 기록에 짧게 남긴다', async () =>
   assert.deepEqual(record.stages[0].denied, ['Bash: cd /x && python a.py', 'Write: /etc/passwd']);
 });
 
+test('결과 파일 없이 끝난 단계는 멈춘 사유와 마지막 보고 앞부분을 남기고 단계 결과는 failed 그대로다', async () => {
+  const f = fixture();
+  const stdout = JSON.stringify({ result: '보' + '고'.repeat(400), stop_reason: 'refusal', terminal_reason: 'completed', num_turns: 2 });
+  const record = await run(f, fakeSpawn(() => {}, { stdout }));
+  assert.equal(record.stages[0].result, 'failed');
+  assert.equal(record.stages[0].stop_reason, 'refusal');
+  assert.equal(record.stages[0].terminal_reason, 'completed');
+  assert.equal(record.stages[0].final_message.length, 300);
+});
+
 test('중단 신호가 오면 claude 프로세스 그룹을 끄고 그 단계에서 멈춘다', async () => {
   const f = fixture();
   const killed = [];
