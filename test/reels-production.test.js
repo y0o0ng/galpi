@@ -59,11 +59,12 @@ function fakeSpawn(handler, { stdout = JSON.stringify({ result: 'ok', total_cost
 }
 
 const FINAL = '# 대본\n- **[A]** 출처, https://e.com/a\n\n## 게시 문구\n훅\n한 줄이에요.\n\n출처:\nA https://e.com/a\n\n#시온의원리노트\n';
+const DRAFT = '# 대본\n\n## 4. 사실 확인 목록\n- 1\n';
 const write = (file, text = 'x') => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
 
 function happy(f, { must = 2 } = {}) {
   return (_call, n) => {
-    if (n === 1) write(path.join(f.workDir, 'draft.md'));
+    if (n === 1) write(path.join(f.workDir, 'draft.md'), DRAFT);
     if (n === 2) write(path.join(f.workDir, 'final.md'), FINAL);
     if (n === 3) {
       write(MP4(f.reelsDir)); write(MP4(f.reelsDir).replace('.mp4', '_cover.png'));
@@ -157,6 +158,17 @@ test('결과 파일이 없으면 거기서 멈추고 이유를 기록한다', as
   assert.equal(record.stages[0].result, 'failed');
   assert.equal(record.stages[0].code, 'REELS_NO_DRAFT');
   assert.equal(JSON.parse(fs.readFileSync(path.join(f.workDir, 'production.json'), 'utf8')).outcome, 'failed');
+});
+
+test('사실 확인 목록 절이 없는(중간에 끊긴) 대본은 대본 단계에서 멈춘다 — 다음 재시도가 대본부터 돌게', async () => {
+  const f = fixture();
+  const spawn = fakeSpawn(() => write(path.join(f.workDir, 'draft.md'), '# 대본\n\n## 3. 장면\n| `array` |'));
+  const record = await run(f, spawn);
+  assert.equal(spawn.calls.length, 1);
+  assert.equal(record.stages[0].code, 'REELS_DRAFT_INCOMPLETE');
+  const kept = await produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake', spawn, from: 'review' });
+  assert.equal(kept.stages[0].code, 'REELS_DRAFT_INCOMPLETE');
+  assert.equal(spawn.calls.length, 1);
 });
 
 test('factcheck가 0 missing이 아니면 검토 단계에서 멈춘다', async () => {
@@ -299,7 +311,7 @@ test('기존 5px 에피소드는 새 형식으로 변환되지 않았다(format_
 
 test('from: 앞 단계 결과가 남아 있으면 그 단계부터 다시 돌고 옛 기록은 남긴다', async () => {
   const f = fixture();
-  write(path.join(f.workDir, 'draft.md')); write(path.join(f.workDir, 'final.md'), FINAL);
+  write(path.join(f.workDir, 'draft.md'), DRAFT); write(path.join(f.workDir, 'final.md'), FINAL);
   write(path.join(f.workDir, 'production.json'), '{"outcome":"failed"}');
   const build = happy(f);
   const spawn = fakeSpawn((call, n) => build(call, n + 2));          // 첫 호출이 build
