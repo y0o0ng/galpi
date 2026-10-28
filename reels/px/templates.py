@@ -178,8 +178,20 @@ class Episode:
     def _check_principle(self):
         lines = self.nar["principle"]
         assert 1 <= len(lines) <= 3 and all(isinstance(x, str) and x for x in lines), "principle은 비지 않은 1~3줄"
-        for x in lines:
-            assert E.text_w(x, "bold", 2) <= E.W, f"principle 줄이 캔버스 폭({E.W}px)을 넘는다: {x!r} ({E.text_w(x, 'bold', 2)}px)"
+        # 폭을 넘는 줄은 띄어쓰기 자리에서 나눈다(대본이 글자 수를 잘못 세도 멈추지 않게, 2026-10-28 29편). (줄, 강조) 목록.
+        self.principle = []
+        for k, x in enumerate(lines):
+            cur = ""
+            for w in x.split():
+                assert E.text_w(w, "bold", 2) <= E.W, f"principle 낱말이 캔버스 폭({E.W}px)을 넘는다: {w!r}"
+                if cur and E.text_w(f"{cur} {w}", "bold", 2) > E.W:
+                    self.principle.append((cur, k == len(lines) - 1))
+                    cur = w
+                else:
+                    cur = f"{cur} {w}" if cur else w
+            self.principle.append((cur, k == len(lines) - 1))
+        most = 4 if self.version == 2 else 3
+        assert len(self.principle) <= most, f"principle을 나누니 {len(self.principle)}줄이라 엔딩에 안 들어간다(최대 {most}줄)"
         label = self.nar.get("principle_label")
         assert label is None or E.text_w(label, "label") <= E.W, f"principle_label이 캔버스 폭을 넘는다: {label!r}"
         assert re.match(r"ep(\d+)_", self.out), f"출력 이름에서 편 번호를 못 읽는다: {self.out}"
@@ -264,14 +276,15 @@ class Episode:
         """엔딩 도장 장면: "오늘의 원리" → 원리 줄 타이핑 → 영문 라벨 → 도장 + 먼지 + 시온 점프·반짝. 배치는 ENDING[형식]."""
         g_ = ENDING[self.version]
         T.sfx = [(T_JINGLE, "jingle"), (T_STAMP, "stamp")]
-        lines = self.nar["principle"]
+        lines = self.principle
         E.center_text(img, g_["label_y"], "오늘의 원리", "label", E.LABEL)
-        shown, y = int(min(1, t / T_TYPED) * sum(map(len, lines))), g_["line_y"]
-        for k, line in enumerate(lines):
+        shown, y = int(min(1, t / T_TYPED) * sum(len(x) for x, _ in lines)), g_["line_y"]
+        gap = g_["line_gap"] if len(lines) <= 3 else 34   # 4줄(형식 2만)은 간격을 좁혀 영문 라벨(en_y)과 안 겹치게
+        for line, emph in lines:
             part, shown = line[:max(0, shown)], shown - len(line)
             if part:
-                E.text(img, ((E.W - E.text_w(line, "bold", 2)) // 2, y), part, "bold", E.INK if k == len(lines) - 1 else E.TEXT, scale=2)
-            y += g_["line_gap"]
+                E.text(img, ((E.W - E.text_w(line, "bold", 2)) // 2, y), part, "bold", E.INK if emph else E.TEXT, scale=2)
+            y += gap
         if t >= T_LABEL and self.nar.get("principle_label"):
             E.center_text(img, g_["en_y"], self.nar["principle_label"], "label", E.LABEL)
         if t < T_STAMP:
@@ -301,7 +314,7 @@ class Episode:
                 typed += [off + ct for ct, c in zip(E.char_times(card, start, dur), chars) if c not in " ,.?!"]
         bgm = audio.bgm(self.total, self.bgm, self.starts[-1] if self.ending else None)
         if self.ending:                                  # 엔딩 도장 장면: 세 줄 타이핑 소리, BGM 1 → 0.35 선형(곡의 끝이 있는 곡은 이미 끝나 있다)
-            off, chars = self.starts[-1], "".join(self.nar["principle"])
+            off, chars = self.starts[-1], "".join(x for x, _ in self.principle)
             typed += [off + (k + 1) * T_TYPED / len(chars) for k, c in enumerate(chars) if c != " "]
             i0 = int(off * audio.SR)
             if not audio.SONGS[self.bgm].get("finale"):

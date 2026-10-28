@@ -511,6 +511,15 @@ class EndingTest(Base):
         with self.assertRaises(AssertionError):
             make(dict(NAR, principle=["가" * 10]))
 
+    def test_wide_principle_line_wraps_at_spaces(self):
+        ep = make(dict(NAR, principle=["걸린 시간으로 거리를", "세 원이 겹친 점이", "내 위치다"], principle_label="LABEL"))
+        self.assertEqual(ep.principle, [("걸린 시간으로", False), ("거리를", False), ("세 원이 겹친 점이", False), ("내 위치다", True)])
+        g = T.ENDING[2]
+        self.assertLessEqual(g["line_y"] + 3 * 34 + 2 * E.FONT_H["bold"], g["en_y"])   # 4줄 마지막 글자가 영문 라벨 위에서 끝난다
+        ep.frame(round((ep.starts[-1] + 3.0) * 24))
+        with self.assertRaises(AssertionError):                           # 나눠도 5줄이면 안 들어간다
+            make(dict(NAR, principle=["가나다라마 바사아자차 카타파하가", "하", "하"]))
+
     def test_no_card_box_in_body_frames(self):
         ep = make()
         body = ep.frame(1)
