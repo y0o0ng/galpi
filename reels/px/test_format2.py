@@ -539,5 +539,19 @@ class TrialEpisodesTest(Base):
         self.assertEqual((a.version, b.version, a.scenes[-1].length), (2, 2, 4.2))
 
 
+class TextFitTest(unittest.TestCase):
+    """검토 게이트(textfit)는 장면 표의 화면 문구를 렌더와 같은 E.say로 잰다(30편: 두 줄에 안 드는 진술이 빌드를 세 번 죽였다)."""
+
+    def test_table(self):
+        from px import textfit
+        md = ("| 장면 | 전달할 내용 | 화면 문구 | 근거 행 | 제작 제약 |\n| --- | --- | --- | --- | --- |\n"
+              "| `a` | 내용 | 진술: `판을 구부리면 바깥쪽은 늘어나고 안쪽은 줄어들어요` · 라벨(선택): `중립축` | 1 | `진술: \"x\"` |\n"
+              "| `b` | 내용 | 진술 `약한 층 위아래를 비슷하게 쌓으면 중립축이 그 층 근처로 와요` | 2 | 없음 |\n")
+        items = textfit.screen_texts(md)
+        self.assertEqual([k for k, _ in items], ["statement", "label", "statement"])
+        bad = textfit.misfits(items)
+        self.assertEqual([s for _, s, _ in bad], ["약한 층 위아래를 비슷하게 쌓으면 중립축이 그 층 근처로 와요"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,7 @@ const REAL_PROMPTS = path.join(__dirname, '..', 'reels', 'prompts');
 const CARD = { id: 7, title: 't', source_url: 'https://e.com/a', published_at: '2026-10-01', why: 'w', concept: 'c', bridge: 'b', template: '단계', hook_paradox: 'p', hook_term: 'h', hook_subtitle: 's', risk: 'r' };
 
 // 임시 저장소: 앞 편 3편(번호 최대 3), 프롬프트 실물, 가짜 파이썬(factcheck 결과를 파일로 조절).
-function fixture({ factcheck = '1 rows, 0 missing' } = {}) {
+function fixture({ factcheck = '1 rows, 0 missing', textfit = '3 texts, 0 misfit' } = {}) {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'reels-prod-'));
   const reelsDir = path.join(repo, 'reels');
   fs.mkdirSync(path.join(repo, 'docs'));
@@ -29,7 +29,8 @@ function fixture({ factcheck = '1 rows, 0 missing' } = {}) {
   const report = { version: 1, rows: 1, sources: ['https://e.com/a'], fetch_errors: [],
     claims: [{ row: '1', claim: 'test claim', quote: 'a source quotation long enough to check',
       source: '[A]', url: 'https://e.com/a', sources: ['https://e.com/a'], found: ok, status: ok ? 'matched' : 'mismatch' }] };
-  fs.writeFileSync(py, `#!/bin/sh\necho '${JSON.stringify(report)}'\nexit ${ok ? 0 : 1}\n`, { mode: 0o755 });
+  const fit = `case "$1" in *textfit.py) echo '${textfit}'; exit ${textfit.includes('넘침') ? 1 : 0};; esac\n`;
+  fs.writeFileSync(py, `#!/bin/sh\n${fit}echo '${JSON.stringify(report)}'\nexit ${ok ? 0 : 1}\n`, { mode: 0o755 });
   return { repo, reelsDir, workDir: path.join(reelsDir, 'work', '2026-10-04-c7') };
 }
 
@@ -176,6 +177,17 @@ test('factcheck가 0 missing이 아니면 검토 단계에서 멈춘다', async 
   const record = await run(f, fakeSpawn(happy(f)));
   assert.equal(record.stages[1].code, 'REELS_FACTCHECK');
   assert.equal(record.stages.length, 2);
+});
+
+test('화면 문구가 넘치면 검토에서 멈추고, 재시도 검토에 넘친 문구가 전달된다', async () => {
+  const f = fixture({ textfit: '넘침 statement: 아주 긴 진술 (3줄)' });
+  const record = await run(f, fakeSpawn(happy(f)));
+  assert.deepEqual(record.stages.map(s => [s.stage, s.result]), [['script', 'ok'], ['review', 'failed']]);
+  assert.equal(record.stages[1].code, 'REELS_TEXT_FIT');
+  assert.match(record.stages[1].reason, /아주 긴 진술/);
+  const spawn = fakeSpawn(happy(f));
+  await produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake', spawn, from: 'review', previousRecord: record });
+  assert.match(spawn.calls[0].stdin, /화면 문구 넘침[\s\S]*아주 긴 진술/);
 });
 
 test('대본 재작성에는 DB 실패 근거와 보존한 이전 최종본이 대본·검토 양쪽에 전달된다', async () => {
