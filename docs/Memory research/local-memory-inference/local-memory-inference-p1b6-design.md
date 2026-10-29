@@ -1208,6 +1208,30 @@ audit and v4 review; (4) deterministic 380 selection; (5) the independent second
 review of the 80 selected HELD rows; (6) freeze. Surface defects found on that path are handled by
 the existing gates (exclusion, top-up), not by contract changes.
 
+**Blind HUMAN review attempt-001 (owner, 2026-10-29).** `--human-results <raw>` applies the
+protocol's `semanticsAfterResult` and writes
+`fixtures/local-memory-inference-p1b6-v4-human-review-attempt-001.json` (raw `3875975b…`, not
+committed). `cc054a42`: 5 / 5 mandatory and 4 / 4 calibration are IN_SCOPE and KEEP ESCALATE,
+matching v4 — the 5 become `HUMAN_ADJUDICATED` / `ELIGIBLE`, the 4 stay `PROVISIONAL`. Scope
+checks: 9 IN_SCOPE (unchanged) and 10 OUT_OF_SCOPE (`INELIGIBLE`) — all five `5fc872af` DEV rows,
+`714725ee` `b003-182`·`-183`, `49e0f357` `b003-120`, `16697b52` `b003-044`, `f03b5a7c`
+`b003-275`. Not independent (the owner wrote the clarification, decided v4 and saw the pool
+review summary). The owner gave the verdicts; a display aid wrote the reason fields, and rows
+with no owner reason carry its fixed placeholder sentence.
+
+**Ledger v6 and shortage v6.** `scripts/build-memory-inference-p1b6-reviewed-pool-ledger-v6.js`
+applies both v4 receipts to the byte-identical v5 ledger; every in-pool reference label now comes
+from v4. 32 rows move: 23 leave the pool (10 `43016ef6` non-realizations, 3 HELD scope flags,
+10 HUMAN scope-out) and the 9 `cc054a42` rows stay as ESCALATE. **Pool 363.** Shortage v6: top-up
+lower bound **21** — TRAIN 11, DEV 7, HELD per skeleton `11e63b75` 2 and `a19bb9e9` 1; KO 12,
+MIXED 3, EN 2; fragments 1:3, 2:6, 3:1, 4:6, 5:1 (slots may overlap). Zero-covered active
+skeletons: `43016ef6` and `5fc872af`.
+
+**Owner decision for the top-up (2026-10-29).** Attempt a fresh user-centered realization of
+`43016ef6` (the redefined user-stance skeleton); leave `5fc872af` uncovered, since all five of
+its surfaces were judged not about the user and the skeleton itself may not fit the
+user-centered scope. Coverage of every skeleton is not a corpus constraint.
+
 ## Supervised Corpus
 
 The new supervised corpus has exactly 380 surface items:

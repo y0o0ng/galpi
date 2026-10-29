@@ -75,3 +75,23 @@ test('HUMAN packet: 28 sorted opaque rows, same questions for every row, no leak
     assert.equal(text.includes(value), false, value);
   }
 });
+
+const human = JSON.parse(read(builder.HUMAN_RECEIPT_FILE));
+const HUMAN_RAW = path.join(os.homedir(), 'Downloads', 'p1b6-v4-human-review-results.json');
+
+test('committed v4 HUMAN receipt: 9 / 9 cc054a42 rows match v4, 10 of 19 scope rows out; not independent', () => {
+  assert.deepEqual(human.summary, {
+    total: 28,
+    scope: { rows: 19, SCOPE_CONFIRMED: 9, SCOPE_OUT: 10 },
+    mandatory: { rows: 5, HUMAN_MATCH: 5 },
+    calibration: { rows: 4, CALIBRATION_MATCH: 4 },
+  });
+  assert.equal(human.poolReviewReceipt.rawSha256, sha256RawBytes(read(builder.RECEIPT_FILE)));
+  assert.equal(human.reviewPacket.rawSha256, sha256RawBytes(builder.artifactBytes(builder.buildHumanPacket(receipt, a))));
+  assert.equal(human.reviewer.independentConfirmation, false);
+  for (const [key, value] of Object.entries(human.authority)) assert.equal(value, false, key);
+});
+
+test('the HUMAN receipt equals the reconciled raw result bytes when they are supplied', { skip: !fs.existsSync(HUMAN_RAW) }, () => {
+  assert.deepEqual(builder.reconcileHuman(fs.readFileSync(HUMAN_RAW), receipt, a), human);
+});

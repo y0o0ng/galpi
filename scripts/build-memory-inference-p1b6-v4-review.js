@@ -280,6 +280,56 @@ function buildHumanPacket(receipt, a = verifySources(loadSources())) {
   };
 }
 
+const HUMAN_RECEIPT_FILE = 'local-memory-inference-p1b6-v4-human-review-attempt-001.json';
+const HUMAN_REVIEW = Object.freeze({
+  date: '2026-10-29',
+  reasonTranscription: 'the owner gave the scope and semantic verdicts; a display aid wrote the reason fields, and the rows where the owner gave no reason carry its fixed placeholder sentence',
+});
+
+// Applies the HUMAN protocol's semanticsAfterResult to the owner's 28 answers.
+function reconcileHuman(resultBytes, receipt, a = verifySources(loadSources())) {
+  const routed = receipt.rows.filter(row => row.human);
+  const results = parseResults(resultBytes, routed.map(row => humanRowId(row.itemId)), row =>
+    JSON.stringify(Object.keys(row).toSorted()) === '["decision","disposition","reason","reviewRowId","scope"]'
+    && ['IN_SCOPE', 'OUT_OF_SCOPE', 'UNCERTAIN'].includes(row.scope) && validSemantic(row));
+  const rows = routed.map(row => {
+    const r = results.get(humanRowId(row.itemId));
+    const entry = {
+      reviewRowId: r.reviewRowId, itemId: row.itemId, semanticSkeletonId: row.semanticSkeletonId, splitAssignment: row.splitAssignment,
+      role: row.human, v4Reference: row.v4Reference ?? null, scope: r.scope, disposition: r.disposition, decision: r.decision, reason: r.reason,
+    };
+    const inScope = r.scope === 'IN_SCOPE';
+    if (row.human === 'scope') return { ...entry, outcome: inScope ? 'SCOPE_CONFIRMED' : 'SCOPE_OUT', eligibility: inScope ? 'UNCHANGED' : 'INELIGIBLE' };
+    const match = inScope && r.disposition === 'KEEP' && r.decision === row.v4Reference;
+    if (row.human === 'mandatory') return { ...entry, outcome: match ? 'HUMAN_MATCH' : 'HUMAN_MISMATCH', eligibility: match ? 'ELIGIBLE' : 'INELIGIBLE' };
+    return { ...entry, outcome: match ? 'CALIBRATION_MATCH' : 'CALIBRATION_MISMATCH', eligibility: match ? 'PROVISIONAL' : 'INELIGIBLE' };
+  });
+  const count = predicate => rows.filter(predicate).length;
+  const role = name => ({ rows: count(row => row.role === name), ...Object.fromEntries([...new Set(rows.filter(row => row.role === name).map(row => row.outcome))].sort()
+    .map(outcome => [outcome, count(row => row.role === name && row.outcome === outcome)])) });
+  return {
+    name: 'xion-local-memory-inference-p1b6-v4-human-review-attempt-001-receipt-v1',
+    status: 'COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V4',
+    reviewDate: HUMAN_REVIEW.date,
+    reviewProtocol: { identity: HUMAN_PROTOCOL.identity, rawSha256: HUMAN_PROTOCOL.rawSha256 },
+    reviewPacket: { identity: 'xion-local-memory-inference-p1b6-v4-human-review-packet-v1', rawSha256: sha256RawBytes(artifactBytes(buildHumanPacket(receipt, a))), rows: rows.length, committed: false },
+    poolReviewReceipt: { identity: receipt.name, rawSha256: sha256RawBytes(artifactBytes(receipt)) },
+    rawResultArtifact: { filename: 'p1b6-v4-human-review-results.json', sha256: sha256RawBytes(resultBytes), committed: false },
+    reviewer: {
+      role: 'repository owner',
+      independentConfirmation: false,
+      limitation: 'The owner wrote the user-centered clarification, decided v4, and had seen the pool review summary, including which skeletons were flagged; row blindness hid only which opaque row was a scope check and which a semantic row.',
+      reasonTranscription: HUMAN_REVIEW.reasonTranscription,
+    },
+    summary: { total: rows.length, scope: role('scope'), mandatory: role('mandatory'), calibration: role('calibration') },
+    rows,
+    authority: {
+      promotedToHumanAdjudicatedByCalibration: false, catalogAmendedByThisResult: false, surfaceAcceptancePerformed: false,
+      referenceLabelFreezePerformed: false, finalSelectionPerformed: false, trainingOrEvaluationOccurred: false,
+    },
+  };
+}
+
 function main(argv = process.argv.slice(2)) {
   const a = verifySources(loadSources());
   if (argv.length === 0) {
@@ -295,6 +345,14 @@ function main(argv = process.argv.slice(2)) {
     process.stdout.write(`Reconciled: ${JSON.stringify(receipt.summary)} -> fixtures/${RECEIPT_FILE}\n`);
     return 0;
   }
+  if (argv.length === 2 && argv[0] === '--human-results') {
+    const output = path.join(ROOT, 'fixtures', HUMAN_RECEIPT_FILE);
+    if (fs.existsSync(output)) throw new Error(`Existing output will not be overwritten: ${output}`);
+    const human = reconcileHuman(fs.readFileSync(argv[1]), JSON.parse(fs.readFileSync(path.join(ROOT, 'fixtures', RECEIPT_FILE))), a);
+    fs.writeFileSync(output, artifactBytes(human), { flag: 'wx' });
+    process.stdout.write(`Reconciled: ${JSON.stringify(human.summary)} -> fixtures/${HUMAN_RECEIPT_FILE}\n`);
+    return 0;
+  }
   const humanPacket = () => {
     if (sha256RawBytes(fs.readFileSync(path.join(ROOT, 'fixtures', HUMAN_PROTOCOL.fixture))) !== HUMAN_PROTOCOL.rawSha256) {
       fail('HUMAN protocol bytes are not the pinned artifact');
@@ -302,7 +360,7 @@ function main(argv = process.argv.slice(2)) {
     return buildHumanPacket(JSON.parse(fs.readFileSync(path.join(ROOT, 'fixtures', RECEIPT_FILE))), a);
   };
   const build = { '--scope-packet': buildScopePacket, '--review-packet': buildReviewPacket, '--human-packet': humanPacket }[argv[0]];
-  if (argv.length !== 2 || !build) throw new Error('Usage: [--scope-packet <out> | --review-packet <out> | --human-packet <out> | --scope-results <raw> --review-results <raw>]');
+  if (argv.length !== 2 || !build) throw new Error('Usage: [--scope-packet <out> | --review-packet <out> | --human-packet <out> | --scope-results <raw> --review-results <raw> | --human-results <raw>]');
   if (fs.existsSync(argv[1])) throw new Error(`Existing output will not be overwritten: ${argv[1]}`);
   const bytes = artifactBytes(build(a));
   fs.writeFileSync(argv[1], bytes, { flag: 'wx' });
@@ -311,8 +369,8 @@ function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
-  CALIBRATION_HASH_DOMAIN, HUMAN_PROTOCOL, OWNER_DECISIONS, PLAN_FILE, RECEIPT_FILE, SOURCES, artifactBytes, buildHumanPacket,
-  buildPlan, buildReviewPacket, buildScopePacket, derivePopulations, humanRowId, loadSources, main, reconcile, reviewRowId,
+  CALIBRATION_HASH_DOMAIN, HUMAN_PROTOCOL, HUMAN_RECEIPT_FILE, OWNER_DECISIONS, PLAN_FILE, RECEIPT_FILE, SOURCES, artifactBytes, buildHumanPacket,
+  buildPlan, buildReviewPacket, buildScopePacket, derivePopulations, humanRowId, loadSources, main, reconcile, reconcileHuman, reviewRowId,
   scopeRowId, verifySources,
 };
 

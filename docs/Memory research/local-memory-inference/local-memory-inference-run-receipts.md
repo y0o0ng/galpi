@@ -5515,3 +5515,15 @@ v3 unchanged. No review has run; the accepted pool record stays **93**.
 Claude Opus 5.5 (owner-reported); scope session ran without its protocol file (owner kept it).
 `43016ef6` 10 rows and HELD scope-flagged 3 rows `INELIGIBLE`. No HUMAN review or acceptance; the
 accepted pool record stays **93**.
+
+#### P1-B6 v4 HUMAN review attempt-001 — cc054a42 9 / 9 match; scope 9 IN / 10 OUT; ledger v6 pool 363, top-up lower bound 21
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-v4-human-review-attempt-001.json` | receipt, `743fc757…`; raw `3875975ba419719e4e0fc5b3f4dce9ce218c0d8effac09d5baa331954703c843`, not committed |
+| `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v6.json` | ledger v6 under v4, pool 363 |
+| `fixtures/local-memory-inference-p1b6-shortage-receipt-v6.json` | top-up lower bound 21 (TRAIN 11 / DEV 7 / HELD `11e63b75` 2 + `a19bb9e9` 1) |
+
+Owner, 2026-10-29, not independent; reasons written by a display aid. `5fc872af` left uncovered and
+`43016ef6` to get a fresh realization in the top-up (owner). No acceptance; the accepted pool record
+stays **93**.

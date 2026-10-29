@@ -76,6 +76,7 @@
     "build:memory-inference-p1b6-batch-006-v3-review-packet": "node scripts/build-memory-inference-p1b6-batch-006-v3-review-packet.js",
     "build:memory-inference-p1b6-batch-006-human-review-packet": "node scripts/build-memory-inference-p1b6-batch-006-human-review-packet.js",
     "build:memory-inference-p1b6-reviewed-pool-ledger-v5": "node scripts/build-memory-inference-p1b6-reviewed-pool-ledger-v5.js",
+    "build:memory-inference-p1b6-reviewed-pool-ledger-v6": "node scripts/build-memory-inference-p1b6-reviewed-pool-ledger-v6.js",
     "build:memory-inference-p1b6-skeleton-semantic-contract-v4": "node scripts/build-memory-inference-p1b6-skeleton-semantic-contract-v4.js",
     "build:memory-inference-p1b6-v4-review": "node scripts/build-memory-inference-p1b6-v4-review.js",
     "build:memory-inference-p1b6-surface-repair-human-review-packet": "node scripts/build-memory-inference-p1b6-surface-repair-human-review-packet.js",
