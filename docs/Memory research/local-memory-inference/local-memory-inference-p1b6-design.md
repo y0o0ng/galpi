@@ -1232,6 +1232,19 @@ skeletons: `43016ef6` and `5fc872af`.
 its surfaces were judged not about the user and the skeleton itself may not fit the
 user-centered scope. Coverage of every skeleton is not a corpus constraint.
 
+**Batch-007 top-up — preregistered, not authored (owner, 2026-10-29).** The single top-up the
+contract freeze allows. `scripts/build-memory-inference-p1b6-batch-007.js` pins v4, ledger v6,
+shortage v6 and both review protocols and writes
+`fixtures/local-memory-inference-p1b6-surface-batch-007-authoring-protocol.json`. 27 slots (lower
+bound 21 + buffer 6): TRAIN 13 (`43016ef6` 2 as a realizability probe, `53ab6351` 4, `0768ea20` 4,
+`2da4e54e` 3), DEV 9 (`714725ee` 3, one each on `16697b52`·`aebbf047`·`d8ca2878`·`db090829`·
+`e7da7f4b`·`f2fb3e89`), HELD 5 (`11e63b75` 3, `a19bb9e9` 2); KO 20 / MIXED 4 / EN 3; fragments
+1:4 2:8 3:4 4:8 5:3. TRAIN / DEV skeletons come from a water-fill over pooled coverage (ties by
+ID, cap 4) that the builder re-derives and checks; `5fc872af` is excluded. Every TARGET is the
+user's own state from authoring on. Gates: TRAIN / DEV get owner pre-audit → source audit → blind
+scope review → blind v4 review → mandatory HUMAN for any flag and hashed 20% calibration of clean
+agreements; HELD get source audit → scope → v4 review only, never shown to the owner.
+
 ## Supervised Corpus
 
 The new supervised corpus has exactly 380 surface items:

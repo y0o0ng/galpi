@@ -1,0 +1,390 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-007-authoring-protocol-v1",
+  "status": "PREREGISTERED",
+  "decisionsSource": "REPOSITORY_OWNER_APPROVED_TOP_UP_PARAMETERS",
+  "decisionDate": "2026-10-29",
+  "inputs": {
+    "v4": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v4",
+      "rawSha256": "a53debe1b065e9bbd5a94f32036f8ac2586eae72b2f5a6bdf9fae0a93dfed194"
+    },
+    "ledgerV6": {
+      "identity": "xion-local-memory-inference-p1b6-reviewed-pool-ledger-v6",
+      "rawSha256": "d5b9da39032eaf4ed09b78493690cf88b686e3075f2b5d548b19676f4debc592"
+    },
+    "shortageV6": {
+      "identity": "xion-local-memory-inference-p1b6-shortage-receipt-v6",
+      "rawSha256": "93aa6862dbce8c7050af10486d7f248c85e2fc5dce6ab19fbb5eaee281e2af8d"
+    },
+    "scopeProtocol": {
+      "identity": "xion-local-memory-inference-p1b6-user-centered-scope-review-protocol-v1",
+      "rawSha256": "38eef07a36b05b449e7482b9bea17aeff2a39130e0ddce47c5a44583ebe3dfe7"
+    },
+    "reviewProtocol": {
+      "identity": "xion-local-memory-inference-p1b6-v4-strong-model-review-protocol-v1",
+      "rawSha256": "229d0026867aa5ed33a21cbc6984236ca98ad1a4ec90d2710cb9fdada5fba652"
+    }
+  },
+  "tranche": {
+    "total": 27,
+    "lowerBound": 21,
+    "buffer": 6,
+    "split": {
+      "TRAIN": 13,
+      "DEV": 9,
+      "FINAL_HELD_OUT": 5
+    },
+    "language": {
+      "KO": 20,
+      "MIXED": 4,
+      "EN": 3
+    },
+    "fragments": {
+      "1": 4,
+      "2": 8,
+      "3": 4,
+      "4": 8,
+      "5": 3
+    }
+  },
+  "allocation": {
+    "trainDev": "water-fill: each slot to the lowest pooled-plus-allocated coverage in its split, ties by skeleton ID, at most 4 per skeleton",
+    "probeCaps": {
+      "p1b6-sk-43016ef6da889a87": 2
+    },
+    "leftUncovered": [
+      "p1b6-sk-5fc872afb058b370"
+    ],
+    "held": "per-skeleton need plus 1 buffer on each needed skeleton",
+    "singleTopUp": "the contract freeze allows one top-up; the buffer absorbs review losses and no further top-up follows"
+  },
+  "slots": [
+    {
+      "slot": "001",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "zero coverage; realizability probe capped at 2"
+    },
+    {
+      "slot": "002",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "MIXED",
+      "fragments": 3,
+      "discoursePattern": "INTERLEAVED",
+      "allocationRule": "zero coverage; realizability probe capped at 2"
+    },
+    {
+      "slot": "003",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "004",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "EN",
+      "fragments": 2,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "005",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "MIXED",
+      "fragments": 4,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "006",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "SELF_REVISION",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "007",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "008",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "EN",
+      "fragments": 2,
+      "discoursePattern": "CONTEXT_FIRST",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "009",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "010",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "INTERLEAVED",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "011",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "MIXED",
+      "fragments": 2,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "012",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "CONTEXT_FIRST",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "013",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "014",
+      "semanticSkeletonId": "p1b6-sk-714725eea477a631",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "015",
+      "semanticSkeletonId": "p1b6-sk-714725eea477a631",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "INTERLEAVED",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "016",
+      "semanticSkeletonId": "p1b6-sk-16697b52f83abeba",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "017",
+      "semanticSkeletonId": "p1b6-sk-714725eea477a631",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "SELF_REVISION",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "018",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "MIXED",
+      "fragments": 4,
+      "discoursePattern": "CONTEXT_FIRST",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "019",
+      "semanticSkeletonId": "p1b6-sk-d8ca287837bcc32d",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "EN",
+      "fragments": 2,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "020",
+      "semanticSkeletonId": "p1b6-sk-db0908294e6deb6f",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "021",
+      "semanticSkeletonId": "p1b6-sk-e7da7f4bbf645574",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "022",
+      "semanticSkeletonId": "p1b6-sk-f2fb3e894c37caac",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 5,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "lowest pooled coverage, ties by skeleton ID, cap 4"
+    },
+    {
+      "slot": "023",
+      "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 5,
+      "discoursePattern": "SELF_REVISION",
+      "allocationRule": "HELD per-skeleton need"
+    },
+    {
+      "slot": "024",
+      "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "allocationRule": "HELD per-skeleton need"
+    },
+    {
+      "slot": "025",
+      "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 5,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "HELD buffer, one per needed skeleton"
+    },
+    {
+      "slot": "026",
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "CONTEXT_FIRST",
+      "allocationRule": "HELD per-skeleton need"
+    },
+    {
+      "slot": "027",
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "allocationRule": "HELD buffer, one per needed skeleton"
+    }
+  ],
+  "authoringRules": [
+    "Fresh content under the b007 namespace; no reuse of any prior text, ID or review result.",
+    "The batch-003 leakage check runs fail-closed against every prior batch and candidate artifact, including batch-004, batch-005 and batch-006.",
+    "Authoring target labels are the v4 labels; they are generator targets, not HUMAN gold, and never enter a blind packet.",
+    "User-centered at authoring: the single TARGET denotes the user's own state, stance, plan, preference, commitment, habit, situation or relationship, or a rule / object state as it applies to the user. Never another person's state, the content of quoted speech itself, or a fact the visible evidence does not tie to the user.",
+    "43016ef6: the TARGET is the user's own stance toward what another person said, not the quoted content; ESCALATE needs visible evidence that leaves that stance unresolved without adding premises.",
+    "714725ee: the TARGET is the user's actual state, with role-play speech only as evidence.",
+    "HELD slots are authored by the assistant and are never shown to the owner."
+  ],
+  "gates": {
+    "reviews": {
+      "scope": {
+        "identity": "xion-local-memory-inference-p1b6-user-centered-scope-review-protocol-v1",
+        "rawSha256": "38eef07a36b05b449e7482b9bea17aeff2a39130e0ddce47c5a44583ebe3dfe7"
+      },
+      "semantic": {
+        "identity": "xion-local-memory-inference-p1b6-v4-strong-model-review-protocol-v1",
+        "rawSha256": "229d0026867aa5ed33a21cbc6984236ca98ad1a4ec90d2710cb9fdada5fba652"
+      },
+      "session": "one fresh separate session per blind packet; every audited PASS row gets both reviews"
+    },
+    "held": {
+      "order": [
+        "fresh source/bundle audit (FAIL / UNCERTAIN excluded)",
+        "blind scope review",
+        "blind v4 strong-model semantic review"
+      ],
+      "routing": "IN_SCOPE and clean v4 agreement → CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL (the post-selection independent second strong-model review still applies); anything else → INELIGIBLE; no owner pre-audit and no HUMAN review because repeated HELD review stays unopened"
+    },
+    "trainDev": {
+      "order": [
+        "owner pre-audit authoring review",
+        "fresh source/bundle audit (FAIL / UNCERTAIN excluded)",
+        "blind scope review",
+        "blind v4 strong-model semantic review",
+        "mandatory owner HUMAN for scope OUT / UNCERTAIN, disagreement, FIX, REJECT or missing",
+        "owner HUMAN calibration of a hashed share of clean agreements"
+      ],
+      "calibration": {
+        "size": "ceil(0.2 × clean agreements)",
+        "rule": "the clean agreements with the lowest sha256 of the hash domain, a NUL separator and the itemId",
+        "hashDomain": "p1b6-batch-007-calibration-v1"
+      },
+      "humanQuestions": "the v4 HUMAN protocol's two questions (scope, then KEEP / FIX / REJECT with CLEAR / ESCALATE) for every HUMAN row",
+      "mandatoryMatchingKeepSemantics": "IN_SCOPE and KEEP matching v4 → HUMAN_ADJUDICATED / ELIGIBLE; anything else → INELIGIBLE",
+      "calibrationMatchingKeepSemantics": "IN_SCOPE and KEEP matching v4 → stays CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL, not promoted; anything else → INELIGIBLE"
+    }
+  },
+  "authority": {
+    "surfacesAuthored": false,
+    "sourceAuditRun": false,
+    "semanticReviewRun": false,
+    "humanReviewRun": false,
+    "acceptancePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

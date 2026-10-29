@@ -5527,3 +5527,11 @@ accepted pool record stays **93**.
 Owner, 2026-10-29, not independent; reasons written by a display aid. `5fc872af` left uncovered and
 `43016ef6` to get a fresh realization in the top-up (owner). No acceptance; the accepted pool record
 stays **93**.
+
+#### P1-B6 batch-007 top-up — PREREGISTERED, 27 slots, not authored
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-007-authoring-protocol.json` | authoring protocol; TRAIN 13 / DEV 9 / HELD 5 against lower bound 21 |
+
+No surface authored, audited or reviewed; the accepted pool record stays **93**.
