@@ -9,7 +9,9 @@ const { migrations } = require('../lib/database-migrations');
 const { applyModuleMigrations, main: applyCommand } = require('../lib/memory-storage/migrations');
 const { openDevelopmentDb } = require('../lib/memory-storage/review-ui');
 const { createMemoryEvidenceRegistry } = require('../lib/memory-storage/evidence-registry');
-const { createGeneralFactStore } = require('../lib/memory-storage/general-fact');
+const { createGeneralFactStore, canonicalJson } = require('../lib/memory-storage/general-fact');
+const { hash } = require('../lib/memory-storage/project');
+const { createProjectReviewStore } = require('../lib/memory-storage/project-review');
 const { createGeneralFactReviewStore } = require('../lib/memory-storage/general-fact-review');
 const { createGeneralFactReviewHandler } = require('../lib/memory-storage/general-fact-proposer');
 const { createOpenAIGeneralFactProposer } = require('../lib/memory-storage/general-fact-openai');
@@ -25,14 +27,41 @@ test('module migration applies once, preserves foreign keys and keeps the develo
   db.close();
   db = openDevelopmentDb(filename);
   applyModuleMigrations(db); applyModuleMigrations(db);
-  assert.deepEqual(db.prepare('SELECT version FROM memory_storage_migrations').all(), [{ version: 1 }]);
+  assert.deepEqual(db.prepare('SELECT version FROM memory_storage_migrations').all(), [{ version: 1 }, { version: 2 }]);
   assert.deepEqual(db.pragma('foreign_key_check'), []);
   assert.equal(db.pragma('foreign_keys', { simple: true }), 1);
   db.close();
-  assert.deepEqual(applyCommand([filename]), { version: 1 });
+  assert.deepEqual(applyCommand([filename]), { version: 2 });
   db = openDevelopmentDb(filename);
   db.exec('CREATE TABLE unexpected(value TEXT)'); db.close();
   assert.throws(() => openDevelopmentDb(filename), /Expected only/);
+});
+
+test('module migration 2 upgrades a version 1 development DB without inventing names or changing old reviews', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-v1-upgrade-')); fs.chmodSync(dir, 0o700);
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const filename = path.join(dir, 'general-fact-development.db');
+  let db = new Database(filename); fs.chmodSync(filename, 0o600); db.pragma('foreign_keys = ON');
+  db.exec('CREATE TABLE messages(id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL)');
+  for (const name of ['memory_evidence_refs', 'memory_general_fact_storage', 'memory_general_fact_reviews']) migrations.find(m => m.name === name).up(db);
+  applyModuleMigrations(db);
+  db.exec('ALTER TABLE memory_project_reviews DROP COLUMN approved_display_name; ALTER TABLE memory_projects DROP COLUMN display_name; DELETE FROM memory_storage_migrations WHERE version=2');
+  db.prepare('INSERT INTO memory_projects(project_id) VALUES (?)').run('legacy-project');
+  db.prepare('INSERT INTO memory_project_candidates(candidate_id,candidate_json,evidence_ids_json) VALUES (?,?,?)').run('old-candidate', '{}', '[]');
+  const proposal = canonicalJson({ targetProjectId: 'NEW', targetClaimId: null, changeClass: null, transition: 'CREATE', evidenceIds: ['ev'], rationale: 'old' });
+  const proposalSha256 = hash(proposal), replaySha256 = 'a'.repeat(64);
+  const packageSha256 = hash(canonicalJson({ schemaVersion: 1, candidateId: 'old-candidate', replaySha256, proposalSha256 }));
+  db.prepare('INSERT INTO memory_project_reviews(review_id,candidate_id,replay_sha256,proposal_json,proposal_sha256,package_sha256) VALUES(?,?,?,?,?,?)')
+    .run('legacy-review', 'old-candidate', replaySha256, proposal, proposalSha256, packageSha256);
+  db.close();
+  db = openDevelopmentDb(filename);
+  assert.deepEqual(db.prepare('SELECT version FROM memory_storage_migrations').all(), [{ version: 1 }]);
+  applyModuleMigrations(db); applyModuleMigrations(db);
+  assert.deepEqual(db.prepare('SELECT version FROM memory_storage_migrations').all(), [{ version: 1 }, { version: 2 }]);
+  assert.equal(db.prepare('SELECT display_name FROM memory_projects WHERE project_id=?').get('legacy-project').display_name, null);
+  assert.equal(db.prepare('SELECT proposal_json FROM memory_project_reviews WHERE review_id=?').get('legacy-review').proposal_json, proposal);
+  assert.equal(createProjectReviewStore(db, createMemoryEvidenceRegistry(db)).get('legacy-review').packageSha256, packageSha256);
+  assert.deepEqual(db.pragma('foreign_key_check'), []); db.close();
 });
 
 test('MULTI Luna proposal schema requires a specific state ID field', async () => {

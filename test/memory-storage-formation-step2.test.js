@@ -49,6 +49,10 @@ test('Luna request shape, stage inputs and output validation', async () => {
     assert.deepEqual(JSON.parse(body.input).anchor, { turnId: 'm1', text: '물리학' });
   }
   assert.equal(JSON.parse(bodies[1].input).durabilityReason, undefined);
+  assert.match(bodies[1].instructions, /각 앵커를 그 자체로 판정/);
+  assert.match(bodies[1].instructions, /사용자 목표, 현재 단계, 주요 결정, 장애는 WRITE/);
+  assert.match(bodies[1].instructions, /세부 설계 항목이나 문서의 세부 항목은 NO_WRITE/);
+  assert.match(bodies[1].instructions, /원문은 나중에 직접 검색/);
   assert.equal(JSON.parse(bodies[2].input).durabilityReason, '지속');
   assert.ok(JSON.parse(bodies[2].input).attributes.primary_phone);
   const retraction = createFormationLunaStages({ apiKey: 'fake', fetch: async () => response(complete({ disposition: 'EXTRACTED', reason: null,

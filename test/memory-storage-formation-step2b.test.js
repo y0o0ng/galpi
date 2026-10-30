@@ -58,7 +58,7 @@ test('run processes one episode, freezes an attempt and refuses undecided earlie
       extractCandidate: async ({ evidence }) => ({ disposition: 'EXTRACTED', semanticFamily: 'project',
         payload: { subject: 'USER', projectMention: 'synthetic project', kind: 'CLAIM', status: null, claimText: 'synthetic' }, evidenceTurnIds: [evidence[0].turnId] }) },
     generalProposer: async () => { throw Error('unexpected'); }, projectProposer: async request => ({ targetProjectId: 'NEW', targetClaimId: null,
-      transition: 'CREATE', changeClass: null, evidenceIds: JSON.parse(request.input).replayPackage.newEvidence.map(e => e.evidenceRef.evidenceId), rationale: 'test' }) };
+      transition: 'CREATE', changeClass: null, displayName: 'synthetic', evidenceIds: JSON.parse(request.input).replayPackage.newEvidence.map(e => e.evidenceRef.evidenceId), rationale: 'test' }) };
   await run(inputDir, dbPath, outputDir, 1, adapters);
   assert.equal(calls, 1);
   await assert.rejects(run(inputDir, dbPath, outputDir, 1, adapters), /EPISODE_ALREADY_ATTEMPTED/);
@@ -106,7 +106,7 @@ test('whole episode extracts first, then each UI decision proposes the next cand
   for (let i = 0; i < 15; i++) {
     const ids = i === 0 ? [1, 2, 3] : [i + 3];
     const episode = { schemaVersion: 1, sourceDomain: 'conversation_message', sessionId: 'shared-main', firstMessageId: ids[0], lastMessageId: ids.at(-1),
-      turns: ids.map(id => ({ turnId: `m${id}`, messageId: id, role: 'USER', text: `synthetic claim ${id}`, createdAt: id })) };
+      turns: ids.map(id => ({ turnId: `m${id}`, messageId: id, role: 'USER', text: `synthetic project claim ${id}`, createdAt: id })) };
     entries.push({ session: 'shared-main', episodeSha256: writePrivateArtifact(path.join(inputDir, `episode-${String(i + 1).padStart(2, '0')}.json`), episode), sourceDbSha256: 'a'.repeat(64) });
   }
   writePrivateArtifact(path.join(inputDir, 'manifest.json'), { sourceFileIdentitySha256: 'b'.repeat(64), episodes: entries });
@@ -126,6 +126,7 @@ test('whole episode extracts first, then each UI decision proposes the next cand
       if (replay.candidate.payload.claimText === 'claim m3') throw Error('synthetic provider failure');
       return { targetProjectId: replay.projects.length ? replay.projects[0].projectId : 'NEW', targetClaimId: null,
         transition: replay.projects.length ? 'EXPAND' : 'CREATE', changeClass: replay.projects.length ? 'EXPANSION' : null,
+        displayName: replay.projects.length ? null : 'synthetic',
         evidenceIds: replay.newEvidence.map(e => e.evidenceRef.evidenceId), rationale: 'test' }; },
   };
   const first = await run(inputDir, dbPath, outputDir, 1, adapters);
@@ -211,13 +212,24 @@ test('extractor accepts project candidates and rejects malformed kind-specific f
   } });
   assert.deepEqual((await stages.extractCandidate(input)).payload, payload);
   assert.equal(request.text.format.strict, true);
+  assert.match(request.instructions, /한 번들의 앵커를 표현하는 후보 하나/);
+  assert.match(request.instructions, /프로젝트를 지칭하는 원문 표현 그대로/);
+  assert.match(request.instructions, /표현을 조합하거나 새로 만들지 않고/);
   const oldStages = createFormationLunaStages({ apiKey: 'fake', fetch: async () => new Response(JSON.stringify({ status: 'completed',
     output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: JSON.stringify(answer) }] }] }),
   { headers: { 'content-type': 'application/json' } }) });
   await assert.rejects(oldStages.extractCandidate(input), /INVALID_FORMATION_RESPONSE/);
   answer = extraction({ ...payload, kind: 'STATUS', status: 'ACTIVE', claimText: null });
   assert.equal((await stages.extractCandidate(input)).payload.status, 'ACTIVE');
+  answer = extraction({ ...payload, projectMention: null });
+  assert.equal((await stages.extractCandidate(input)).payload.projectMention, null);
+  const assistantContext = { ...input, evidence: [...input.evidence, { turnId: 'm2', role: 'ASSISTANT', text: '알파 작업' }] };
+  answer = { ...extraction({ ...payload, projectMention: '알파' }), evidenceTurnIds: ['m1'] };
+  await assert.rejects(stages.extractCandidate(assistantContext), /INVALID_FORMATION_RESPONSE/);
+  answer.evidenceTurnIds.push('m2');
+  assert.equal((await stages.extractCandidate(assistantContext)).payload.projectMention, '알파');
   for (const invalid of [{ ...payload, status: 'ACTIVE' }, { ...payload, projectMention: ' ' },
+    { ...payload, projectMention: '만든 프로젝트명' },
     { ...payload, kind: 'STATUS', status: 'UNKNOWN', claimText: null }, { ...payload, projectId: 'invented' }]) {
     answer = extraction(invalid);
     await assert.rejects(stages.extractCandidate(input), /INVALID_FORMATION_RESPONSE/);

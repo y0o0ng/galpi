@@ -513,6 +513,47 @@ chat read-path change.
   boundary requires fresh review on a changed snapshot and SI-7 requires replay
   of the actual current state.
 
+### Step 2b run 1 stopped at episode 10 — revision and amendment (2026-10-30)
+
+**Observation.** Episodes 1–9 prepared no review (NO_WRITE or extraction
+deferral, mostly interests with no family). Episode 10 is a conversation where
+the user pasted a summary of the memory design: anchor discovery made one anchor
+per document item, Durability kept them as project detail, and 20 project
+candidates followed — `WORLD_UPDATE ≠ CORRECTION.`, `전부 rebuildable.` and so
+on — with project names taken verbatim from local phrases (`현재 시온 기억
+시스템`, `연구`, `Separate on write, associate on read 원칙`). The first review was
+left undecided; that development DB is kept as a record and run 1 is not scored.
+
+**Governing contracts (unchanged).** The unit is already fixed by
+`Current independent-target granularity` and `Accepted development anchor
+contract` item 1: anchor = adjudication target = storage target, one bundle
+carries one target, and the Extractor changes representation, not identity or
+scope. Anchor discovery must not pre-filter by storage value (item 8),
+independently adjudicable user states get their own anchors even within one turn
+(item 5), and a document the user wrote states the user's own decisions, so its
+items can be legitimate targets. **Anchor discovery therefore stays exactly as
+step 1 passed it;** the fix belongs to the later stages.
+
+**The one allowed revision, applied to all 15 episodes on a fresh DB:**
+
+- *Durability — write threshold (§50 B2, owner policy for this loop):* each
+  anchor is still judged on its own. For a project, the user's goal, current
+  stage, major decision or blocker is WRITE; fine-grained design or document
+  items stay source-only (NO_WRITE, KEEP AS SOURCE ONLY per §52.6) and remain
+  retrievable directly (§54.5).
+- *Extractor:* one candidate per bundle, representing that bundle's anchor
+  (`Agreed extraction success / deferral boundary`). `projectMention` is an
+  expression that actually refers to the project in the bundle, verbatim, or
+  null when none does — never composed (anchor contract item 2 applies the same
+  no-invented-label rule to anchors).
+
+**Design amendment — project display name.** Mentions stay aliases and never
+decide identity (RC42). At CREATE the proposer selects a display name from an
+expression present in the evidence, and the owner approves or edits it in the
+review UI; an owner-edited name is a HUMAN-authored label. It lives on the
+project target, is not a claim and is not used for matching; renaming later is
+out of scope for v1. Delivered as module migration 2.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
