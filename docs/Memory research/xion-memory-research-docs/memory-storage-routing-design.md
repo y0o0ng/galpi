@@ -252,6 +252,56 @@ and `public/style.css` inputs are byte-identical to the baseline. No UI fix is
 included. `git diff --check` and AGENTS/CLAUDE body equality pass. These are local
 mechanical tests with synthetic judgments, not a semantic model evaluation.
 
+## Formation loop step 1 — anchor discovery with fixed evidence windows — PREREGISTERED 2026-10-30
+
+Owner decision (2026-10-30): before any further policy research, run one thin
+formation loop end to end on cloud models — (1) anchor discovery with fixed
+evidence windows, (2) Luna Ambiguity / Durability / Extractor adapters plus 5–10
+developer-registered attributes, (3) reading approved states into the chat
+`<memory>` block. This section preregisters step 1 only. The minimal-bundle
+evidence selection came from the local-model study; on a cloud path, generous
+evidence removes the observed missing-antecedent failures, so the model now
+finds anchors only and code attaches evidence. Existing evidence-selection and
+audit code stay as they are; this path does not call them.
+
+**Episodes (mechanical, no hand-picking).** Source: a read-only copy of the Pi
+DB in a private 0700 directory outside the repository. Session `shared-main`,
+messages created 2026-08-01 00:00 to 2026-10-30 00:00 KST. An episode is a
+maximal run of consecutive messages with no gap of 30 minutes or more; keep
+episodes of 6–24 messages; drop any overlapping message IDs 1684–1707 (earlier
+probes). Order the rest by `sha256("formation-loop-step1-v1\0" + firstId + "\0" +
+lastId)` and take the first 15. The committed manifest holds only session, first
+and last message IDs, message counts and source-copy SHA-256; episode text stays
+private.
+
+**Owner reference lists (blind, before any model call).** For each episode the
+owner writes, in free text, the user states XION should remember — the user's
+own state, stance, plan, preference, commitment, habit, situation or
+relationship. These are recall references, not HUMAN gold or P1-B6 labels. The
+list file is frozen by SHA-256 before discovery runs; the owner does not see
+model output first.
+
+**Change.** A new discovery prompt version returns anchors only
+(`{"anchors":[{"turnId","text"}]}`, same user-centered target rules, same exact
+unique-substring anchor rule). Evidence is attached by code: the whole episode
+when it has 16 turns or fewer, otherwise the anchor turn ±4 turns clipped to the
+episode. The resulting bundles use the existing `buildEvidenceBundles` shape, so
+the formation runner accepts them unchanged.
+
+**Run.** One Luna call per episode (`reasoning.effort` medium, no retries, the
+existing development selector settings), inputs frozen before dispatch. No
+storage commit, no downstream stage, no production write.
+
+**Scoring (owner, private).** For each reference item: covered by which anchor,
+or missed. For each anchor: about the user (IN) or not (OUT). A script computes
+recall = covered items / items and out-of-scope = OUT anchors / anchors.
+Duplicate or over-split anchors are reported, not gated.
+
+**Gate.** PASS when recall ≥ 70% and out-of-scope ≤ 20%. On FAIL, one prompt
+revision may be rerun on the same 15 episodes; a second FAIL returns the
+discovery design to the owner. The fixed window is not tuned on this set.
+Step 2 does not start before PASS. Nothing here opens production integration.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
@@ -808,6 +858,19 @@ Owner clarification after the real-conversation anchor comparison:
   stay duration. Candidate eligibility does not adopt a new storage representation
   or bypass Durability and the later representation/transition checks.
 
+**Selected-bundle context sufficiency:** 선택한 번들만 읽었을 때, 앵커가
+무엇에 관한 말인지 파악하는 데 필요한 원문 맥락이 빠져 있지 않아야 한다.
+Preserve available antecedents, questions and other context needed to judge the
+anchor. This does not require resolving ambiguity that remains in the source,
+inventing missing context, or including every turn of the episode.
+
+앵커의 대상·의미를 파악하는 데 필요한 맥락은 포함한다. 그 대상의 원인이나 배경을 더 풍부하게 설명할 뿐인 맥락은 자동으로 포함하지 않는다.
+한 앵커에는 불필요한 배경이라도, 그 배경 자체가 독립된 사용자 상태라면 별도 앵커와 번들로 다룰 수 있다.
+These rules do not impose a one-level causal cutoff or minimum-length bundle.
+Assistant explanations remain attributed evidence, not confirmed user facts.
+A fixed-anchor selection call still selects evidence for its given anchor only;
+separate target discovery belongs to discovery mode.
+
 **Required construction order:** read the conversation → fix one representative
 anchor → construct that anchor's evidence bundle → fix another anchor → construct
 its bundle, repeating within the same Builder task. Do not first produce an
@@ -865,6 +928,115 @@ the experimental prompt is privately frozen as `request.json`. Only source/outpu
 validation and `git diff --check` were run for this documentation/private probe;
 no new full-suite pass is claimed. Next is owner review of complete bundles,
 including target granularity and evidence sufficiency, before another prompt run.
+
+#### Selected-bundle context probe — 2026-10-03
+
+Owner-approved context-sufficiency wording above was added to both development
+selection prompt modes. A new private probe reused the previous paired probe's
+accepted-contract instructions with only that wording added; it did not silently
+replace the default discovery prompt with the full experimental prompt.
+Fixed real episode: `shared-main` **1696–1707**, 12 messages; raw source SHA256
+`271b7c0046f4da9d22694223be9783f0f3c71ddc18774356037707a36de71761`.
+Private source/request/plan/results and unabridged `luna-review.md` are retained in
+`/private/tmp/galpi-bundle-context-probe-50k0wno1` (0700; files 0600).
+Luna medium/current_turn returned **4 bundles**, one completed call, zero retries;
+2,170 input / 1,214 output tokens. Bundle artifact SHA256:
+`2668f81ec3bff18b7a491c07e2c708d23d8d8450538ffe89257b884902391923`.
+The request/episode were frozen before dispatch. Pi read-only/query-only inspection
+had zero total changes and unchanged DB/WAL/SHM fingerprints; Vault access and
+storage commits were zero. Source/span validation passed; semantic completeness
+remains NOT_VALIDATED pending owner review. This new-episode probe is not a
+controlled estimate of the added instruction's effect. Focused Builder/audit
+regressions: **31 PASS**; `git diff --check` passed. Full suite was not run for
+this prompt/documentation change. Raw conversations/results remain outside Git.
+
+#### Background relevance refinement probe — 2026-10-03
+
+The owner adopted the two relevance/discovery rules above. Development prompts
+now include relevance filtering in both modes and independent-background target
+discovery in discovery mode only. The private experiment reused the previous
+12-turn episode byte-for-byte (no new Pi access), adding those rules to its
+accepted-contract prompt and a review-only maximum of three bundles in reading
+order. This limit is not the general discovery contract or a completeness claim.
+Private artifacts: `/private/tmp/galpi-bundle-background-probe-fslffppy` (0700,
+files 0600). One Luna medium/current_turn call, zero retries, **3 bundles**;
+2,329 input / 619 output tokens. Result SHA256:
+`d1ceb4a6d6b7b15e0a28e7cf6c8c1de37bd18fcc1f254bc69eabafb18d2ad275`.
+Source/span checks passed; semantic completeness remains NOT_VALIDATED. In this
+output, the fatigue bundle lost its preceding design exchange, while the
+conversation-time bundle still includes the assistant's explanatory reply.
+The separate lack-of-time/background anchor was not returned in the capped
+output; this does not establish omission from an uncapped discovery run.
+No semantic success or causal prompt improvement is claimed. Focused tests:
+**31 PASS**; diff check and AGENTS/CLAUDE body equality passed. Full suite was
+not run for this prompt/documentation change. Production writes, storage commits
+and downstream judgments were zero; private source/results were not added to Git.
+
+#### Same-request reasoning-none probe — 2026-10-03
+
+At owner request, one separate private Luna call used `reasoning.effort=none`.
+Pre-dispatch object comparison verified that effort was the only request change
+from the preceding medium probe: same source, instructions, review cap of three,
+schema and other configuration. The default development selector stays medium;
+no adapter or production configuration changed. Private directory:
+`/private/tmp/galpi-bundle-none-probe-11cgi4n2` (0700; files 0600).
+One completed call / zero retries returned three structurally valid bundles;
+usage **2,329 input / 121 output / 0 reasoning tokens** (previous medium:
+619 output including 502 reasoning). All three evidence-ID selections and the
+first two anchors were identical to medium; only the third anchor widened to
+the full user sentence. This single pair does not establish relative quality.
+Result SHA256: `0a59388b0169d8fa1ce171c376c1b5456b357fd8ce1a6bab7df7f2626bc36c46`.
+Full source-bound review text remains private. No new Pi/DB/Vault access,
+source reconstruction, storage commit, retry or downstream judgment occurred.
+Request-difference and output-comparison assertions plus `git diff --check`
+passed; no new full-suite run for this private experiment/documentation receipt.
+
+#### New-episode example-guided none probe — 2026-10-03
+
+Owner approved a short demonstrated construction followed by another real episode.
+The private request appended the previously discussed fatigue, conversation-time
+and lack-of-time constructions as examples (not independent HUMAN gold); source
+turns remained verbatim and assistant explanations retained their attribution.
+The review-only three-bundle discovery cap was removed; model/default production
+configuration and the committed prompt were not changed by this probe.
+An initially attempted 1734–1745 range failed the fixed-universe check before any
+model call; the successful frozen input is **1684–1695**, 12 shared-main messages.
+Raw source SHA256:
+`14e8eb7b549b6865e36a9284edd462f4760d046bc29dcedab28283a33e54797a`.
+Pi readonly/query_only checks passed, total_changes delta zero, DB/WAL/SHM
+fingerprints unchanged; Vault access zero. Input contains text references to
+pictures; no image was reconstructed or sent, so visual-context completeness is
+not established. This is development inspection, not a held-out benchmark.
+Private directory: `/private/tmp/galpi-bundle-example-probe-sqg0n9jk` (0700,
+files 0600). Source/request/plan were frozen before the one-shot Luna none call;
+**7 bundles**, 3,034 input / 278 output / 0 reasoning tokens, zero retries.
+Result SHA256: `bde804665718b873ecc173038a6115e4685ae4d5b439aaaef7f8fab6bf87c85b`.
+All source/span checks passed. Every returned bundle includes its following
+assistant turn; the completion/contact bundle does not include the preceding
+turns identifying the task. These are inspection observations, not semantic
+labels or proof that examples helped. Full unabridged output remains private in
+`luna-review.md`; presentation can select three explicitly identified cases
+without claiming representativeness. Storage commits/downstream judgments zero.
+No code was changed in this probe; diff check passed, tests were not rerun.
+
+#### Fixed contact-anchor diagnostic — 2026-10-03
+
+Owner approved a single evidence-only diagnostic for the preceding probe's third
+anchor, `m1688`, using the identical frozen 1684–1695 episode. The existing
+`buildBundleSelectionRequest(episode, anchor)` fixed-anchor prompt/schema was
+used; the code retained the anchor and accepted only evidence IDs. The earlier
+discovery examples were not included, so this is not a single-variable A/B or
+proof that splitting the production workflow would improve performance.
+Private directory: `/private/tmp/galpi-fixed-contact-probe-1o92muu0` (0700,
+files 0600). Luna none, one completed call / zero retries; **1,554 input / 33
+output / 0 reasoning tokens**. Selected IDs: **1686, 1687, 1688, 1689** (previous
+discovery selected 1688–1689). The earlier picture-sharing exchange is now included,
+but the preceding Figma/home-work context (1684–1685) is still absent. Structural
+checks passed; no semantic completeness PASS or HUMAN gold is assigned.
+Result SHA256: `ec8c83ea158b3ac65fcb7cf310c224aaea5917d02980fe17dc0f40527131f987`.
+Source/request/plan were frozen before dispatch; no new Pi/DB/Vault access,
+production writes, storage commits or downstream judgments. No production/code
+change; diff check passed and tests were not rerun for this private diagnostic.
 
 ### Existing development mechanics and initial probe
 
