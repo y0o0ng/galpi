@@ -1,0 +1,128 @@
+{
+  "name": "xion-memory-formation-step2b-manifest-v1",
+  "sampledAt": "2026-10-30",
+  "sourceBackup": "galpi-20261030-1621-fa3fbda1-2551-4bf8-b95f-22744a61d9f6.db",
+  "episodes": [
+    {
+      "episodeSha256": "e33eba240dd2169540538a86803c685cd01f4df863f9831ce871c2651d0bf3a1",
+      "firstMessageId": 548,
+      "lastMessageId": 555,
+      "messageCount": 8,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "f55a06d565c08e1f3c5bfb89998d1956baac25652d27631f68576c778a9df396",
+      "firstMessageId": 624,
+      "lastMessageId": 629,
+      "messageCount": 6,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "de8e6131f9c9f47a70f60f2e6c47f3924f178fdecb57c4a4ac8a19dc36eca66d",
+      "firstMessageId": 670,
+      "lastMessageId": 677,
+      "messageCount": 8,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "2c048efab0a4cb4e627a371cf2161c3eeb183fa468870e8dd36abaec06dceab4",
+      "firstMessageId": 680,
+      "lastMessageId": 685,
+      "messageCount": 6,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "6d51769dfe47be9bf000eec4d7c9d0312ab20c5977d06f0c7312e8bd1893e9ab",
+      "firstMessageId": 686,
+      "lastMessageId": 691,
+      "messageCount": 6,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "643a46497b09e34e97287bcef111dcdb74824a84217f5f50b23856756b129092",
+      "firstMessageId": 744,
+      "lastMessageId": 759,
+      "messageCount": 16,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "49502e843cc7835ec7c3ae5ca23b3665b571124573af4bef007aabae11ee7802",
+      "firstMessageId": 796,
+      "lastMessageId": 801,
+      "messageCount": 6,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "cbba1452e03e1c338efa3b6c331430be9793cd4a74375b5f2d3c1f6f4be7bf14",
+      "firstMessageId": 806,
+      "lastMessageId": 811,
+      "messageCount": 6,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "70344a721afc5a3e2bc7e85cfc34182771943ca0522e226ced99bb2667e40c75",
+      "firstMessageId": 814,
+      "lastMessageId": 823,
+      "messageCount": 10,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "580e18efdb9982f634dc62b2ec00b1efb0485c9b9ae092f83092e8ca8a9670d4",
+      "firstMessageId": 830,
+      "lastMessageId": 839,
+      "messageCount": 10,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "7434711348be91eb4add24df80fcffed7aebd1629a2c5564bb4468ef396410ac",
+      "firstMessageId": 880,
+      "lastMessageId": 899,
+      "messageCount": 20,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "339b73656a82269389bb268e96d57cc925c7cc3b562be705df06adc473fbb4ad",
+      "firstMessageId": 1230,
+      "lastMessageId": 1235,
+      "messageCount": 6,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "697d8027892e3a4705b8fc989c6d28ec435234b67564ed8f5c1db22c3237c8b5",
+      "firstMessageId": 1242,
+      "lastMessageId": 1249,
+      "messageCount": 8,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "dc12fc6eba68b587ed92a4d77a6c999716236b0e254d07e0631e623d96d449a8",
+      "firstMessageId": 1560,
+      "lastMessageId": 1577,
+      "messageCount": 18,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    },
+    {
+      "episodeSha256": "31d43de9fb5b2f4060d75fcd5a3c3f670580052e30907e7324752dcc02267137",
+      "firstMessageId": 1708,
+      "lastMessageId": 1717,
+      "messageCount": 10,
+      "session": "shared-main",
+      "sourceDbSha256": "bc8c7435d3934f2fc2fe4bfcaf06f166f1f79f05180897d259829f35ae63e439"
+    }
+  ],
+  "sourceFileIdentitySha256": "058562942f99996b757452453b94ed49b849a13fd321865c68c760a6d2d57be9"
+}
