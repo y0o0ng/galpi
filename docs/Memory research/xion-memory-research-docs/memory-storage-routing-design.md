@@ -385,6 +385,40 @@ deferral reasons and HUMAN approvals are reported without thresholds. On FAIL,
 one prompt revision may rerun the same 73 anchors; a second FAIL returns to the
 owner. Nothing here connects production or the chat read path (step 3).
 
+### Formation loop step 2 — result: FAIL twice, returned to the owner (2026-10-30)
+
+Both runs reused the 73 step-1 anchors (bundle IDs verified) on fresh
+development DBs holding only `messages` and the LTM tables (a full Pi copy is
+refused by the review DB guard; the first attempt stopped there before any call).
+
+| run | keep WRITE | operational NO_WRITE | ESCALATE | NO_WRITE | extracted / deferred | errors |
+| --- | --- | --- | --- | --- | --- | --- |
+| r1 (preregistered prompts) | 23/30 (76.7%) | 5/7 | 0 | 15 | 1 / 57 | 0 |
+| r2 (contract-revised prompts) | 19/27 (70.4%) | 7/7 | 3 | 35 | 1 / 34 | 0 |
+
+**Between runs (recorded deviations).** The owner withdrew "schedules are
+memory" under canonical §47.7 / RC36 / RC40 (operational commitments are owned by
+the task store), so three schedule anchors left the keep set (30 → 27, set raw
+`0e841e22…`). The single allowed revision rewrote all three prompts against the
+contracts: Ambiguity now carries the user-centered and v4 CLEAR / ESCALATE rules;
+Durability judges the anchor alone, treats NO_WRITE as keep-as-source-only and
+leaves operational commitments to their owning store; Extractor preserves user
+wording without normalization, defers rather than dropping conditions, ignores
+assistant statements and may return a `null` retraction value as `general_fact`
+v1 allows. The gate's fixed keep-set size was removed for the 27-item set.
+
+**Reading.** The pipeline is mechanically sound: zero processing errors, plausible
+ESCALATEs after the revision, the only extraction (`academic_major` = 기계공학부)
+correct, a MacBook mention correctly not forced into `primary_laptop`. The r2
+keep misses are mostly transient experiences the owner's references include but
+the conservative contract wording excludes (pre-order worries, a color remark,
+calluses, a watch language setting, a week of uptime), plus a news-interest
+request read as an operational commitment owned by the news store and one
+ESCALATE on a mixed question anchor. This is the open WRITE threshold (§50 B2),
+not a model malfunction. Separately, Durability judged 35 anchors worth
+remembering and SINGLE `general_fact` could hold one: the storage family, not
+judgment quality, now bounds what the loop can remember.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |

@@ -92,7 +92,7 @@ test('explicit input saves owning source/candidate before one proposal and requi
   const { base, input, post } = await serving(t, f.reviews, prepare);
   const config = await (await fetch(`${base}/api/input-config`)).json();
   assert.equal(config.enabled, true);
-  assert.deepEqual(Object.keys(config.attributes), ['primary_laptop']);
+  assert.deepEqual(Object.keys(config.attributes), ['primary_laptop', 'academic_major', 'affiliation', 'residence_area', 'primary_phone']);
   const body = candidateInput();
   const response = await input(body); assert.equal(response.status, 200);
   const result = await response.json(); assert.equal(calls, 1);
