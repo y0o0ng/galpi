@@ -419,6 +419,85 @@ not a model malfunction. Separately, Durability judged 35 anchors worth
 remembering and SINGLE `general_fact` could hold one: the storage family, not
 judgment quality, now bounds what the loop can remember.
 
+## Formation loop step 2b — claim-set storage: project family and attribute cardinality — PREREGISTERED 2026-10-30
+
+**Owner decisions (2026-10-30).** The write baseline stays conservative as in
+step 2's revised Durability prompt (transient experiences remain source-only;
+§50 B2 threshold settled for this loop, not for R3). Step 3 waits for a storage
+family that can hold what Durability keeps.
+
+**Contract basis.** A derived claim carries evidence, assumptions,
+counterevidence, temporal / contextual scope and status, and one target may hold
+1..N live claims without exclusivity (§44.2, §51.4); `EXPAND` is a first-class
+transition (§42.4); history is preserved rather than flattened (SI-12); a
+summary never replaces experience (SI-4); mutation is minimal and
+provenance-scoped (SI-6); unsafe merges are worse than unresolved state (SI-9,
+RC42–RC45); the v1 SINGLE restriction is an implementation choice, not an R2
+rule (Phase 2 above). So every family is a target holding registered attributes
+with declared cardinality plus claims that keep accumulating.
+
+**Project family.** A project is the user's own multi-session undertaking —
+building, researching, studying or preparing something. Schedules and
+commitments stay with the task store (§47.7); interests and subscriptions are a
+later family.
+
+```text
+Project (opaque project_id minted at CREATE; names are aliases derived from
+         approved mentions, never identity)
+├─ registered attributes, cardinality declared per attribute
+│   └─ status: SINGLE current + history — PLANNED / ACTIVE / PAUSED / DONE / ABANDONED
+└─ open claims 0..N: user-grounded statements about the project, each with
+    the user's wording, EvidenceRefs, optional time / condition scope and a
+    lifecycle of CURRENT / HISTORICAL / CORRECTED / INVALIDATED
+```
+
+No sub-project relation in v1; nested undertakings are separate projects.
+
+**Attribute cardinality for `general_fact`.** Each registered attribute declares
+SINGLE (one current value plus history) or MULTI (0..N current values).
+`primary_laptop`, `academic_major`, `residence_area` and `primary_phone` stay
+SINGLE; `affiliation` becomes MULTI. Attribute-less claims about the user stay
+unsupported — the router's no-generic-fallback rule holds, and new attributes
+still enter through the proposal → HUMAN approval path.
+
+**Transitions (§42.4), each scoped to one target or one claim.** CREATE (new
+project with its first status or claim; first value of an attribute); EXPAND
+(a new claim on an existing project, a new value on a MULTI attribute);
+SUPERSEDE (WORLD_UPDATE: the earlier claim / value becomes valid history);
+REVISE and INVALIDATE (CORRECTION); NO_CHANGE (a restatement, which adds no
+independent support, §54.3); KEEP_AMBIGUOUS (target project or related claim
+unclear — the candidate stays pending and nothing commits). FORK stays
+unsupported. Every commit is owner-approved and atomic (SI-10).
+
+**Responsibilities.** The Extractor turns one anchor into one candidate and does
+not choose identity: project candidates are
+`{ projectMention, kind: STATUS | CLAIM, status | claimText }` with the user's
+wording. The storage-side Luna proposer sees the current projects (aliases,
+status, current claims) or the attribute's current values plus the replay
+package, and proposes target and transition, preferring KEEP_AMBIGUOUS over a
+doubtful match.
+
+**Storage.** New `memory_project_*` tables modelled on the General Fact tables,
+plus the cardinality change, delivered as the first module migration under
+`lib/memory-storage/` with its own version record, applied explicitly to
+development DBs only (Future migration boundary above). The development review
+UI shows the chosen target project and the claim it touches prominently.
+
+**Evaluation.** 15 fresh episodes sampled by the step-1 rule with hash domain
+`formation-loop-step2b-v1`, excluding every step-1 message, processed in
+chronological order from an empty store so EXPAND has real targets. Anchor
+discovery and the Ambiguity / Durability prompts are the frozen step-1 and
+step-2 r2 versions; only the Extractor gains the new output kinds. Every prepared
+project or MULTI review is decided by the owner, who tags each rejection
+WRONG_TARGET, WRONG_CONTENT or OTHER.
+
+**Gate.** PASS when both hold: zero WRONG_TARGET proposals (a merge into a
+different project, or a claim attached to the wrong project); owner approval
+≥ 70% of prepared project / MULTI reviews. Duplicate projects created for the
+same undertaking are reported, not gated. One prompt revision may rerun the same
+episodes on a fresh DB; a second FAIL returns to the owner. No production, Pi or
+chat read-path change.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
