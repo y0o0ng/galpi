@@ -340,6 +340,51 @@ count as IN under the scope definition; filtering them is the Durability stage's
 job, not discovery's. The two misses were a shared repository URL and an interest
 voiced only as a question. Per the gate, step 2 may now be preregistered.
 
+## Formation loop step 2 — Luna stages on SINGLE attributes — PREREGISTERED 2026-10-30
+
+Owner decision (2026-10-30), option A: prove the loop on the existing
+SINGLE-valued `general_fact` contract and let observed extraction deferrals pick
+the first multi-valued family, instead of designing one now. Of step 1's 32
+reference items only about two (major, primary laptop) fit SINGLE; projects,
+interests, preferences, purchases and plans will mostly defer. That is the
+expected result, not a failure. No new family, transition, table or migration.
+
+**Change.**
+
+- Three Luna adapters (`gpt-6-luna`, medium, structured output, one call each,
+  no retry) for the existing runner callbacks, with the agreed inputs:
+  Ambiguity sees anchor + evidence → CLEAR / ESCALATE + reason; Durability sees
+  the same, not the Ambiguity result → WRITE / NO_WRITE + reason; Extractor sees
+  the same plus the WRITE reason and the registered attribute list → EXTRACTED
+  (`general_fact`, `USER`, attribute, string value, evidence turn IDs) or
+  DEFERRED + reason. The existing Luna transition proposer prepares HUMAN review.
+- Developer-registered SINGLE string attributes added beside `primary_laptop`:
+  `academic_major` (the user's field of study), `affiliation` (the school or
+  organization the user belongs to), `residence_area` (where the user currently
+  lives), `primary_phone` (the phone the user identifies as their main one).
+
+**Run.** The 73 step-1 anchors are reused, not rediscovered: each episode's
+selector returns its frozen step-1 anchors and the fixed windows rebuild the same
+bundles (bundle IDs must match). A writable development copy of the same Pi
+backup in a private directory is the only database written; the source copy and
+production are untouched. Every `REVIEW_PREPARED` candidate is reviewed by the
+owner in the existing development review UI.
+
+**Gate.** PASS when all of:
+
+- zero `PROCESSING_ERROR`;
+- Durability keeps ≥ 80% of the 30 keep-set anchors (those covering a step-1
+  reference item) as WRITE — an anchor stopped by ESCALATE counts as not kept;
+- Durability marks ≥ 5 of the 7 operational-set anchors (one-off reminder,
+  registration and cancellation mechanics) as NO_WRITE.
+
+Both sets were drafted by the assistant from anchor text before any stage ran,
+excluding anchors in the keep set, and are frozen privately (raw `40dfee3e…`) for
+owner review. ESCALATE rate, extraction success / deferral counts, grouped
+deferral reasons and HUMAN approvals are reported without thresholds. On FAIL,
+one prompt revision may rerun the same 73 anchors; a second FAIL returns to the
+owner. Nothing here connects production or the chat read path (step 3).
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
