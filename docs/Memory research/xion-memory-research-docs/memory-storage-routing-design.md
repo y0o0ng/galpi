@@ -498,6 +498,21 @@ same undertaking are reported, not gated. One prompt revision may rerun the same
 episodes on a fresh DB; a second FAIL returns to the owner. No production, Pi or
 chat read-path change.
 
+### Step 2b owner decisions during implementation (2026-10-30)
+
+- **First status on an existing project is CREATE on that status slot**
+  (`changeClass = null`), as the preregistration's "first value of an
+  attribute" already says and as `general_fact` treats an empty slot; once the
+  slot has a value, changes are SUPERSEDE / REVISE / INVALIDATE.
+- **Reviews are prepared one candidate at a time.** Ambiguity, Durability and
+  Extractor run for the whole episode up front (they do not read the store);
+  target / transition proposal and review preparation happen per candidate,
+  after the previous one is decided, against the updated state. Batch
+  preparation would let every candidate of a multi-anchor episode see an empty
+  store and propose NEW, and approving one would stale the rest; the approval
+  boundary requires fresh review on a changed snapshot and SI-7 requires replay
+  of the actual current state.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
