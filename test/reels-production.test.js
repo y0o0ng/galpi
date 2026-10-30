@@ -107,7 +107,7 @@ test('다섯 단계가 순서대로 돌고 단계마다 같은 안전 인자와 
     assert.equal(flag(call.args, '--output-format'), 'json');
     assert.equal(flag(call.args, '--permission-mode'), 'dontAsk');
     assert.equal(flag(call.args, '--permission-prompts'), 'none');
-    assert.deepEqual(Object.keys(call.options.env).sort(), ['HOME', 'LANG', 'PATH']);
+    assert.deepEqual(Object.keys(call.options.env).sort(), ['CLAUDE_CODE_OAUTH_TOKEN', 'HOME', 'LANG', 'PATH']);
     assert.ok(!/\{\{\w+\}\}/.test(call.stdin));
   }
   assert.ok(fs.existsSync(path.join(f.workDir, 'production.json')));

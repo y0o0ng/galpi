@@ -69,7 +69,7 @@ test('프롬프트는 stdin으로 가고 환경에는 로그인 상태 외 비�
   assert.ok(call.args.includes('--tools'));
   assert.match(call.stdin, /비신뢰 데이터/);
   assert.match(call.stdin, /https:\/\/example\.com\/a/);
-  assert.deepEqual(Object.keys(call.options.env).sort(), ['HOME', 'LANG', 'PATH']);
+  assert.deepEqual(Object.keys(call.options.env).sort(), ['CLAUDE_CODE_OAUTH_TOKEN', 'HOME', 'LANG', 'PATH']);
 });
 
 test('프롬프트 칸 규칙: 빈 칸·없는 칸이면 실패한다', () => {
