@@ -24,14 +24,17 @@ test('sampler splits at 30 minutes, filters size and excluded IDs, and orders de
   const hashes = result.map(x => crypto.createHash('sha256').update(`formation-loop-step1-v1\0${x.firstMessageId}\0${x.lastMessageId}`).digest('hex'));
   assert.deepEqual(hashes, [...hashes].sort());
 });
-test('fixed windows use whole short episode and clipped long window; anchors must be unique', () => {
+test('fixed windows use whole short episode and clipped long window; an anchor that cannot be located once is dropped, the rest survive', () => {
   const get = (n, turnId) => attachAnchorWindows(episode(n), { anchors: [{ turnId, text: `unique ${turnId.slice(1)}` }] }).bundles[0].evidenceSpanRefs.map(x => x.turnId);
   assert.equal(get(16, 'm1').length, 16);
   assert.deepEqual(get(17, 'm1'), ['m1', 'm2', 'm3', 'm4', 'm5']);
   assert.equal(get(17, 'm9').length, 9);
   assert.deepEqual(get(17, 'm17'), ['m13', 'm14', 'm15', 'm16', 'm17']);
   const e = episode(6); e.turns[0].text = 'repeat repeat';
-  assert.throws(() => attachAnchorWindows(e, { anchors: [{ turnId: 'm1', text: 'repeat' }] }), /ANCHOR_NOT_UNIQUE/);
+  const kept = attachAnchorWindows(e, { anchors: [{ turnId: 'm1', text: 'repeat' }, { turnId: 'm2', text: 'unique 2' },
+    { turnId: 'm2', text: 'unique 2' }, { turnId: 'm3', text: 'absent' }] });
+  assert.deepEqual(kept.bundles.map(b => b.anchorSpanRef.turnId), ['m2']);
+  assert.deepEqual(kept.droppedAnchors.map(d => d.reason), ['ANCHOR_NOT_UNIQUE_IN_SOURCE', 'DUPLICATE_ANCHOR', 'ANCHOR_NOT_IN_SOURCE']);
   assert.equal(buildAnchorDiscoveryRequest(e).promptVersion, 'memory-anchor-discovery-user-state-v1');
 });
 test('anchors pass unchanged formation runner with fixed evidence', async () => {

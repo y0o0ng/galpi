@@ -302,6 +302,44 @@ revision may be rerun on the same 15 episodes; a second FAIL returns the
 discovery design to the owner. The fixed window is not tuned on this set.
 Step 2 does not start before PASS. Nothing here opens production integration.
 
+### Formation loop step 1 — result: PASS (2026-10-30)
+
+Source: Pi online backup `galpi-20261030-1621-…` (raw `bc8c7435…`), copied to a
+private 0700 directory; 15 episodes sampled by the preregistered rule
+(`fixtures/memory-formation-step1-manifest.json`, IDs and hashes only). One Luna
+call per episode (`gpt-6-luna`, medium, anchor-only prompt
+`memory-anchor-discovery-user-state-v1`), no storage, no downstream stage.
+
+| measure | value |
+| --- | --- |
+| reference items | 32 |
+| covered | 30 — **recall 93.8%** |
+| anchors | 73 |
+| out of scope | 1 — **1.4%** |
+| duplicate / over-split anchors (reported, not gated) | 6 |
+
+**Deviations from the preregistration, all recorded here:**
+
+- **Reference lists were drafted by the assistant**, not written blind by the
+  owner: draft raw `8b6c48ef…`; the owner then removed 1 item, added 3 and
+  rewrote 1 (frozen raw `089ad958…`, 32 items). The draft may favor what a model
+  notices, so recall can be optimistic; one of the owner's three additions
+  (a Zigbee interest) was missed.
+- **Scoring was drafted by the assistant and reviewed by the owner unchanged**
+  (raw `afdaeede…`).
+- **Episode 10 was rerun once after a code fix.** The first call failed the whole
+  episode with `ANCHOR_NOT_UNIQUE_IN_SOURCE` (one anchor string occurred twice in
+  its turn; the response was not retained). `attachAnchorWindows` now drops only
+  an anchor that cannot be located exactly once (or repeats) and reports it in
+  `droppedAnchors`; the other 14 results are unaffected by the change. The failed
+  attempt's records are kept; the rerun returned 4 anchors with none dropped.
+
+**Observations.** Anchors are dense and almost all are user-centered. Many are
+one-off operational commands (schedule and reminder requests, `등록해줄래?`) that
+count as IN under the scope definition; filtering them is the Durability stage's
+job, not discovery's. The two misses were a shared repository URL and an interest
+voiced only as a question. Per the gate, step 2 may now be preregistered.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
