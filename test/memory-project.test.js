@@ -9,7 +9,7 @@ const { createMemoryStorageRouter } = require('../lib/memory-storage/router');
 const { createProjectStore, hash } = require('../lib/memory-storage/project');
 const { canonicalJson } = require('../lib/memory-storage/general-fact');
 const { createProjectReviewStore } = require('../lib/memory-storage/project-review');
-const { createProjectReviewHandler } = require('../lib/memory-storage/project-proposer');
+const { INSTRUCTIONS, createProjectReviewHandler } = require('../lib/memory-storage/project-proposer');
 const { createOpenAIProjectProposer } = require('../lib/memory-storage/project-openai');
 const { createReviewServer, APP } = require('../lib/memory-storage/review-ui');
 
@@ -39,6 +39,11 @@ function fixture(t) {
     { choice, packageSha256: result.review.packageSha256, ...(rejectionTag ? { rejectionTag } : {}) });
   return { db, store, reviews, candidate, propose, decide };
 }
+
+test('proposer instructions pair each transition with the change class the validator accepts', () => {
+  assert.match(INSTRUCTIONS, /EXPAND는 EXPANSION/);
+  assert.match(INSTRUCTIONS, /NO_CHANGE는 ADDITIONAL_CONTEXT/);
+});
 
 test('project CREATE, EXPAND, status SUPERSEDE, claim REVISE and INVALIDATE preserve provenance', async t => {
   const f = fixture(t);

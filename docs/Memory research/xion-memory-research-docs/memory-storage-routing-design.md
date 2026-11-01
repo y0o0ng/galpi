@@ -554,6 +554,55 @@ review UI; an owner-edited name is a HUMAN-authored label. It lives on the
 project target, is not a claim and is not used for matching; renaming later is
 out of scope for v1. Delivered as module migration 2.
 
+### Step 2b run 2 stopped at episode 11 — owner amendment and run 3 (2026-11-01)
+
+**Observation (run 2, fresh DB, same 15 episodes, unscored).** Episodes 1–9
+again prepared no review. Episode 10: 25 anchors → 13 NO_WRITE, 1 extraction
+deferral, 11 project candidates → 1 APPROVE (CREATE `시온 기억 시스템`),
+5 REJECT `WRONG_CONTENT`, 3 processing errors, 2 KEEP_AMBIGUOUS. Episode 11:
+10 anchors → 2 NO_WRITE, 4 deferrals, 4 candidates → 1 APPROVE (CREATE of a
+separate research project), 3 processing errors. `WRONG_TARGET` 0: every
+proposal chose the right project, split the research idea from the memory
+system and recognized a restatement.
+
+**Processing errors are an implementation defect, not a policy result.** All
+six stored proposals were mechanically rejected `INVALID_TRANSITION_TARGET`:
+five were `EXPAND` with `ADDITIONAL_CONTEXT`, one was `NO_CHANGE` with a null
+class. The validator pairs `EXPAND` with `EXPANSION` and requires a class for
+every non-CREATE transition (and this document maps `ADDITIONAL_CONTEXT` to
+`NO_CHANGE`), but the proposer instructions never stated the pairing. Six of
+twelve proposals were lost to this, including a stage statement the owner would
+have kept, so run 2 measured the defect rather than the loop.
+
+**Write-threshold boundary found during review (§50 B2, owner policy).** The
+owner rejected the design-principle candidates and confirmed the working
+criterion: for a project, the user's *relation to the project* — goal, current
+stage, a decision (the event of choosing), a blocker — is WRITE; the *content of
+the project's artifacts* — structure, principles, rules, item descriptions of a
+design, document or code — is source-only (NO_WRITE, KEEP AS SOURCE ONLY per
+§52.6) even when the user wrote it, and stays directly retrievable (§54.5). The
+earlier `주요 결정 / 세부 설계 항목` wording left principles readable as
+decisions. The owner noted the details must still be knowable; that requirement
+belongs to direct source retrieval in step 3, not to project claims.
+
+**Owner amendment (a second revision, beyond the one preregistered).** Run 2 is
+stopped and kept as a record, unscored. Two changes only, then the same 15
+episodes on a fresh DB as run 3, with the unchanged gate:
+
+- *Proposer:* state the change-class pairing — CREATE null, EXPAND EXPANSION,
+  SUPERSEDE WORLD_UPDATE, REVISE / INVALIDATE CORRECTION, NO_CHANGE
+  ADDITIONAL_CONTEXT, KEEP_AMBIGUOUS AMBIGUOUS / UNRESOLVED; a restatement or
+  context that leaves existing claims unchanged is ADDITIONAL_CONTEXT /
+  NO_CHANGE, only a separate new claim is EXPANSION / EXPAND. Validation is
+  unchanged.
+- *Durability:* the relation-vs-artifact-content criterion above replaces the
+  earlier wording.
+
+Not changed on purpose, to keep the effect attributable: anchor discovery, the
+Extractor (it still writes stage statements as CLAIM with a null mention rather
+than STATUS — observed, deferred), and the queue not advancing past a candidate
+with no review (handled by running `next` by hand).
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
