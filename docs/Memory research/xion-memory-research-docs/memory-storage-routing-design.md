@@ -603,6 +603,61 @@ Extractor (it still writes stage statements as CLAIM with a null mention rather
 than STATUS — observed, deferred), and the queue not advancing past a candidate
 with no review (handled by running `next` by hand).
 
+### Step 2b run 3 FAIL at episode 11 — identity signal amendment and run 4 (2026-11-01)
+
+**Observation (run 3, fresh DB, same 15 episodes).** The relation-vs-content
+threshold worked: episode 10 went 26 anchors → 22 NO_WRITE, 1 deferral,
+3 candidates → 2 APPROVE (CREATE `시온 기억 시스템` with the home-lab decision;
+first STATUS `PLANNED` on it via mention `연구`), 1 KEEP_AMBIGUOUS. The owner
+called it the first result that felt right. Episode 11 (10 anchors → 3 NO_WRITE,
+3 deferrals, 4 candidates) then broke identity: a separate research idea, which
+run 2 had split into its own project, was proposed as EXPAND onto `시온 기억
+시스템` "in the research context" — no expression in the new source referred to
+that project; only the generic alias `연구` and being the sole project linked
+them. The owner rejected it `WRONG_TARGET`; the next proposal repeated the same
+target and was left undecided. **The gate's zero-WRONG_TARGET condition is
+violated, so run 3 is FAIL**; the owner stopped it there rather than finish
+episodes 12–15. The two runs choosing differently on the same question also show
+the proposer's identity choice is unstable.
+
+The Extractor additionally split one sentence, moving the research question into
+`projectMention` and leaving a meaningless tail as `claimText`, and wrote a stage
+statement as CLAIM after writing another as STATUS.
+
+**Governing contracts.** RC42: identity is not decided by name strings. RC43: no
+unsafe merge when the identity choice changes answers or downstream
+contamination is plausible; assignment may stay unresolved. RC44 lists the
+admissible identity signals — same event, temporal adjacency, explicit
+descriptors, relationship cues, co-occurrence / provenance; topical similarity is
+not among them. §42.2's specialization table gives identity resolution a stricter
+fail-close gate because false merges are costly; a wrong split is repairable
+(RC46). Extraction success is "one structured candidate faithfully representing
+the anchor" (`Agreed extraction success / deferral boundary`).
+
+**Owner amendment, applied to the same 15 episodes on a fresh DB as run 4, gate
+unchanged:**
+
+- *Proposer — identity signal:* attaching to an existing project (EXPAND,
+  SUPERSEDE, REVISE, INVALIDATE, NO_CHANGE, an existing project's first STATUS)
+  requires a positive signal in the new source or its conversation that it is the
+  same undertaking — an explicit designation, the same event or continued work,
+  co-occurring context. Topic similarity or a shared generic word (`연구`,
+  `실험`) is not a signal. Without one: NEW if the source itself describes a
+  distinct undertaking, otherwise KEEP_AMBIGUOUS. The rationale names the signal.
+- *Extractor:* `projectMention` is only a name or designation of the undertaking,
+  never claim content; `claimText` must carry the anchor's meaning on its own or
+  the bundle is DEFERRED. An anchor that states the project's stage itself
+  (not started, in progress, paused, finished, abandoned) is STATUS; anything
+  else is CLAIM.
+- *Runner (operational):* a candidate that ends without a review (processing
+  error, KEEP_AMBIGUOUS) no longer stalls the queue; preparation continues to the
+  next candidate. Still one proposal call per candidate, no retry.
+
+Unchanged: anchor discovery, Durability (run 3 confirmed it), validation code and
+the gate. Trade-off accepted: real continuations without a signal may now split
+or stay pending; a wrong NEW is also rejected `WRONG_TARGET`, so the gate still
+sees it.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |

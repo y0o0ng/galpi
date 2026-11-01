@@ -45,6 +45,12 @@ test('proposer instructions pair each transition with the change class the valid
   assert.match(INSTRUCTIONS, /NO_CHANGE는 ADDITIONAL_CONTEXT/);
 });
 
+test('proposer instructions require a positive identity signal before attaching to an existing project', () => {
+  assert.match(INSTRUCTIONS, /같은 일을 가리키는 긍정 신호가 있어야 한다/);
+  assert.match(INSTRUCTIONS, /같은 단어가 있다는 것은 신호가 아니다/);
+  assert.match(INSTRUCTIONS, /신호가 없으면 기존 프로젝트에 연결하지 않는다/);
+});
+
 test('project CREATE, EXPAND, status SUPERSEDE, claim REVISE and INVALIDATE preserve provenance', async t => {
   const f = fixture(t);
   const create = await f.propose(f.candidate('STATUS', 'PLANNED', 'Galpi'), 'NEW', null, 'CREATE', null);

@@ -156,7 +156,8 @@ test('whole episode extracts first, then each UI decision proposes the next cand
   assert.equal(second.review.proposal.transition, 'EXPAND');
   assert.equal(second.preview.project.currentClaims[0].value, 'claim m1');
   await assert.rejects(run(inputDir, dbPath, outputDir, 2, adapters), /EARLIER_REVIEW_UNDECIDED/);
-  assert.equal((await approve(decided.nextPreparation.reviewId)).nextPreparation.status, 'PROCESSING_ERROR');
+  const last = (await approve(decided.nextPreparation.reviewId)).nextPreparation;
+  assert.equal(last.status, 'COMPLETE'); assert.deepEqual(last.skipped, ['PROJECT_PROPOSAL_FAILED']);
   assert.equal(events.filter(event => event === 'propose-claim m3').length, 1);
   assert.equal((await prepareNext(inputDir, dbPath, outputDir, 1, adapters)).status, 'COMPLETE');
   assert.equal(events.filter(event => event === 'propose-claim m3').length, 1);
@@ -215,6 +216,8 @@ test('extractor accepts project candidates and rejects malformed kind-specific f
   assert.match(request.instructions, /한 번들의 앵커를 표현하는 후보 하나/);
   assert.match(request.instructions, /프로젝트를 지칭하는 원문 표현 그대로/);
   assert.match(request.instructions, /표현을 조합하거나 새로 만들지 않고/);
+  assert.match(request.instructions, /주장의 내용을 그 자리로 옮기지 않는다/);
+  assert.match(request.instructions, /진행 단계 자체.*STATUS/);
   const oldStages = createFormationLunaStages({ apiKey: 'fake', fetch: async () => new Response(JSON.stringify({ status: 'completed',
     output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: JSON.stringify(answer) }] }] }),
   { headers: { 'content-type': 'application/json' } }) });
