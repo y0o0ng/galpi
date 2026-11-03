@@ -658,6 +658,57 @@ the gate. Trade-off accepted: real continuations without a signal may now split
 or stay pending; a wrong NEW is also rejected `WRONG_TARGET`, so the gate still
 sees it.
 
+### Step 2b run 4 FAIL — returned to the owner (2026-11-03)
+
+All 15 episodes finished on a fresh DB: 74 anchors → 49 NO_WRITE, 11 deferrals,
+14 candidates → 13 reviews + 1 KEEP_AMBIGUOUS, 0 processing errors. Transitions
+6 CREATE, 6 EXPAND, 1 NO_CHANGE; 4 projects, no overlapping aliases. Owner: 11
+APPROVE, 1 `WRONG_CONTENT`, 1 `WRONG_TARGET`. Approval 84.6% clears 70%, but **the
+zero-WRONG_TARGET condition is violated, so run 4 is FAIL.** Run 3 and run 4 are
+the two FAILs the gate allows, so this returns to the owner instead of another
+automatic rerun. Private text and decisions stay in the owner-private run
+directory.
+
+*What the amendment fixed.* The research idea that broke run 3 was split into its
+own project and no claim was attached across projects without a signal. The
+relation-vs-content threshold held, and the queue no longer stalled.
+
+*What failed.* In episode 15 a feature decision the user mentioned as made during
+a larger renewal became a CLAIM on a new project named after that renewal. The
+proposer took the mention as a signal: being done *during* an undertaking was read
+as being *part of* it. The owner rejected it `WRONG_TARGET` under the existing
+rule that a wrong NEW counts. This differs from run 3, which attached with no
+signal at all. The anchor was the decision itself, so a project-only candidate
+alone would not have prevented it.
+
+*Other observations.*
+
+- The Extractor paraphrased two claims so they read alone, against its "user's
+  wording" instruction; the code does not check `claimText`. The owner approved
+  both. No canonical contract sentence requires verbatim claims: SI-1/SI-3 guard
+  integrity through preserved source and provenance, so verbatim is a development
+  rule of this step.
+- Two adjacent evaluations in one turn got opposite Durability answers (one
+  NO_WRITE, one WRITE, then approved), so the threshold is still not fully stable.
+
+*Open for the next preregistration — none adopted yet:*
+
+1. A candidate that presents only a project, with no status or claim. Today CREATE
+   requires a first status or claim; this is a v1 limit, not a canonical rule. Two
+   options: a third candidate kind that leaves the status slot empty and displays
+   `identified (date)` from the evidence turn's time (assistant's recommendation),
+   or an `IDENTIFIED` status value (owner's alternative; simpler, but it mixes
+   system knowledge with project stage and needs an exception for the first-status
+   CREATE rule). Either way a stage stated in the source must still be written.
+2. A rule separating "happened during an undertaking" from "part of it".
+3. The claim wording rule: allow a self-contained sentence that keeps the anchor's
+   meaning, with the source shown beside it at review.
+4. How status expresses failure. The owner would have preferred a failed status
+   for a project that collapsed; the enum has none, and `ABANDONED` would merge
+   "tried and blocked" with "dropped".
+5. Where a one-off achievement goes. One was held KEEP_AMBIGUOUS because nothing
+   showed a multi-session undertaking, and no registered attribute fits it.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
