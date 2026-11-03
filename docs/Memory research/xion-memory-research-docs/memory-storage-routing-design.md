@@ -745,6 +745,16 @@ project decision phrased with `~하면서` may be held back, so the result repor
 became of run 4's 11 approved items, outside the gate. Not in this run: claim wording,
 a failed status, a home for one-off achievements.
 
+**Run 5 owner correction (2026-11-03).** In episode 11 the owner meant to reject a
+claim attached to the wrong project as WRONG_TARGET but clicked approve, and
+confirmed the mistake. The DB keeps the recorded APPROVE and its committed transition,
+because rewriting them by hand would break replayable history (SI-2, SI-3). The
+private `owner-corrections.json` holds the review ID and the intended decision. Run 5
+is therefore FAIL by the owner's decision, whatever `gate` prints: the tool counts
+this review as approved. The wrong claim stays in the project's state for later
+proposals, so results on that project from episode 11 on are marked possibly
+contaminated. By the 2-FAIL rule, run 5 returns to the owner after episode 15.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
