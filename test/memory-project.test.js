@@ -49,6 +49,10 @@ test('proposer instructions require a positive identity signal before attaching 
   assert.match(INSTRUCTIONS, /같은 일을 가리키는 긍정 신호가 있어야 한다/);
   assert.match(INSTRUCTIONS, /같은 단어가 있다는 것은 신호가 아니다/);
   assert.match(INSTRUCTIONS, /신호가 없으면 기존 프로젝트에 연결하지 않는다/);
+  assert.match(INSTRUCTIONS, /주장의 대상이 그 일 자체여야 한다/);
+  assert.match(INSTRUCTIONS, /배경이나 이유로만 나오고.*NEW의 근거도 아니며 KEEP_AMBIGUOUS/);
+  assert.match(INSTRUCTIONS, /새 프로젝트의 첫 주장에도 똑같이 적용한다/);
+  assert.match(INSTRUCTIONS, /IDENTIFIED 후보는.*이미 있는 프로젝트면 NO_CHANGE/);
 });
 
 test('project CREATE, EXPAND, status SUPERSEDE, claim REVISE and INVALIDATE preserve provenance', async t => {
@@ -238,4 +242,43 @@ test('UI keeps the HUMAN decision when next preparation fails', async t => {
   assert.equal(response.status, 200); assert.equal(result.saved, true); assert.equal(result.nextPreparation.status, 'PREPARATION_FAILED');
   assert.equal(JSON.stringify(result).includes('private provider details'), false);
   assert.equal(f.reviews.get(pending.review.reviewId).decision, 'APPROVE'); assert.equal(calls, 1);
+});
+
+test('IDENTIFIED creates a stage-less project, restates as NO_CHANGE, and leaves the first status and claim rules intact', async t => {
+  const { db, store, reviews, candidate, propose, decide } = fixture(t);
+  assert.throws(() => store.prepare({ candidate: { ...candidate('CLAIM', 'x'), payload: { subject: 'USER', projectMention: null, kind: 'IDENTIFIED', status: null, claimText: null } }, evidenceRefs: [] }), /INVALID_PROJECT_CANDIDATE/);
+  const created = await propose(candidate('IDENTIFIED', null, 'alpha'), 'NEW', null, 'CREATE', null, 'alpha');
+  const madeAt = reviews.read(created.review.reviewId).preview;
+  assert.equal(madeAt.identifiedAt, 2);
+  assert.equal(madeAt.resultingCurrentValue, null);
+  const done = decide(created);
+  const { project_id: projectId } = db.prepare('SELECT project_id FROM memory_projects').get();
+  assert.equal(db.prepare('SELECT count(*) c FROM memory_project_states').get().c, 0);
+  assert.equal(db.prepare('SELECT next_state_id n FROM memory_project_transitions WHERE transition_id=?').get(done.transitionId).n, null);
+  let [project] = store.readProjects();
+  assert.equal(project.currentStatus, null);
+  assert.deepEqual(project.currentClaims, []);
+  assert.deepEqual(project.aliases, ['alpha']);
+
+  await assert.rejects(propose(candidate('IDENTIFIED', null, 'alpha'), projectId, null, 'CREATE', null), /INVALID_TRANSITION_TARGET/);
+  await assert.rejects(propose(candidate('IDENTIFIED', null, 'alpha'), projectId, null, 'EXPAND', 'EXPANSION'), /INVALID_TRANSITION_TARGET/);
+  const again = await propose(candidate('IDENTIFIED', null, 'alpha again'), projectId, null, 'NO_CHANGE', 'ADDITIONAL_CONTEXT');
+  const preview = reviews.read(again.review.reviewId).preview;
+  assert.equal(preview.identifiedAt, 2);
+  assert.equal(preview.resultingCurrentValue, null);
+  decide(again);
+
+  decide(await propose(candidate('STATUS', 'ACTIVE', 'alpha'), projectId, null, 'CREATE', null));
+  decide(await propose(candidate('CLAIM', 'a fact', 'alpha'), projectId, null, 'EXPAND', 'EXPANSION'));
+  [project] = store.readProjects();
+  assert.equal(project.currentStatus.value, 'ACTIVE');
+  assert.equal(project.currentClaims.length, 1);
+  assert.deepEqual(project.aliases, ['alpha', 'alpha again']);
+  assert.equal(project.history.length, 4);
+});
+
+test('review UI labels a stage-less project with the date from evidence', () => {
+  assert.match(APP, /function identified\(at\)/);
+  assert.match(APP, /p\.currentStatus\|\|identified\(preview\.identifiedAt\)/);
+  assert.match(APP, /payload\.kind==='IDENTIFIED'\?identified\(preview\.identifiedAt\)/);
 });

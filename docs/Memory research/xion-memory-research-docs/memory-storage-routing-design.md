@@ -709,6 +709,42 @@ alone would not have prevented it.
 5. Where a one-off achievement goes. One was held KEEP_AMBIGUOUS because nothing
    showed a multi-session undertaking, and no registered attribute fits it.
 
+### Step 2b run 5 — project-only candidate and belonging rule (2026-11-03)
+
+The owner authorized one more run after the second FAIL, on the same 15 episodes
+with a fresh DB and an unchanged gate. Rule 2 below was written from episode 15,
+so run 5 is a regression check, not evidence the rule generalizes. If it passes,
+a fresh-episode confirmation is preregistered separately before step 3.
+
+**Governing contracts.** Anchor = adjudication target = storage target: "Evidence
+may mention other targets without authorizing their storage." RC44 lists
+*candidate clustering* signals, so run 4's prompt overread them as proof of
+belonging. RC43 lets an assignment stay unresolved. Project claims are 0..N.
+
+- *Project-only candidate:* `kind: IDENTIFIED`, `projectMention` required, `status`
+  and `claimText` null. Only for an anchor that designates the undertaking and
+  states neither a stage nor another fact; those stay STATUS and CLAIM. New project
+  → CREATE with no state row (so no migration); existing project → NO_CHANGE. A
+  later first status (CREATE) or claim (EXPAND) follows the existing rules. Without
+  evidence of a multi-session undertaking: KEEP_AMBIGUOUS. A project with no current
+  status displays `identified (date)`, the date being computed from its earliest
+  evidence turn and never stored. The owner's `IDENTIFIED` status value was not
+  taken because it mixes system knowledge with project stage.
+- *Belonging rule:* a claim belongs to a project only if the claim is about the
+  undertaking itself — its goal, scope, stage, a decision within it, a blocker. When
+  the undertaking appears only as background or reason (`~하면서`, `~하다가`,
+  `~때문에`) and the claim is about something else, that is neither a signal nor a
+  ground for NEW: the Extractor defers and the proposer keeps it ambiguous. This
+  applies to a new project's first claim too.
+
+Unchanged: anchor discovery, Ambiguity, Durability, DB schema, gate. Limits: a
+project-only candidate arises only from an anchor targeting the project, and frozen
+Durability may mark such anchors NO_WRITE, so it may never fire in this run; it is
+then reported as verified by synthetic tests only. Accepted trade-off: a real
+project decision phrased with `~하면서` may be held back, so the result reports what
+became of run 4's 11 approved items, outside the gate. Not in this run: claim wording,
+a failed status, a home for one-off achievements.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |

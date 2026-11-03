@@ -218,6 +218,8 @@ test('extractor accepts project candidates and rejects malformed kind-specific f
   assert.match(request.instructions, /표현을 조합하거나 새로 만들지 않고/);
   assert.match(request.instructions, /주장의 내용을 그 자리로 옮기지 않는다/);
   assert.match(request.instructions, /진행 단계 자체.*STATUS/);
+  assert.match(request.instructions, /단계도 다른 사실도 말하지 않을 때만 IDENTIFIED/);
+  assert.match(request.instructions, /배경이나 이유로만 나오면 project 후보를 만들지 않고 DEFERRED/);
   const oldStages = createFormationLunaStages({ apiKey: 'fake', fetch: async () => new Response(JSON.stringify({ status: 'completed',
     output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: JSON.stringify(answer) }] }] }),
   { headers: { 'content-type': 'application/json' } }) });
