@@ -755,6 +755,45 @@ this review as approved. The wrong claim stays in the project's state for later
 proposals, so results on that project from episode 11 on are marked possibly
 contaminated. By the 2-FAIL rule, run 5 returns to the owner after episode 15.
 
+### Step 2b run 5 FAIL — returned to the owner (2026-11-04)
+
+91 anchors → 45 NO_WRITE, 32 deferred, 6 KEEP_AMBIGUOUS, 8 prepared reviews, 0
+processing errors. `gate` prints PASS (7/8 approved, 0 WRONG_TARGET). With the owner
+correction above: 6/8 approved (75%), 1 WRONG_TARGET, **FAIL**. The other rejection
+is WRONG_CONTENT. Projects: 3, all owner-approved names; the second kept a file suffix
+in its display name because the approval screen was not edited.
+
+**The failure.** In episode 11, run 3's failure spot, a claim about a separate research
+idea was attached to the memory-system project. Run 4 extracted the same anchor with
+two evidence turns, one naming the research, and a naming mention, and correctly
+created a new project. Run 5's Extractor chose only the anchor turn and a bare
+demonstrative as the mention, so the proposal had no naming evidence and the rationale
+asserted a referent the evidence did not state. The next candidate, with naming
+evidence, was separated correctly. So run 4's pass at this spot depended on which
+evidence the Extractor happened to pick; the run 3 fix is not proven.
+
+**What the belonging rule did.** The run 4 news-agent decision was deferred with
+background-only reasoning: the case it was written from is fixed, on the episode it
+came from. `IDENTIFIED` never fired, so it is verified by synthetic tests only.
+
+**Run 4's 11 approved items, outside the gate.** 3 approved again; 3 approved as
+equivalent content from a different or wider anchor; 1 is the wrong-target claim; 2
+deferred because the anchor alone did not identify the project; 2 held KEEP_AMBIGUOUS
+along with the whole renewal project, which run 5 never created. A causal link from
+these 4 losses to the belonging rule was not established; anchor-only identification
+and the proposer's ambiguity are the visible reasons.
+
+**Instability.** Anchor discovery is frozen yet produced 91 anchors against 74, of
+which one letter-style episode went from 1 to 21. Excluding that episode, deferrals
+are 13 against about 11, and the rise in deferrals is mostly that episode.
+
+**Review tool gap.** An approval cannot be undone from the UI and a display name
+cannot be edited afterward. The owner also approved a coverage-number claim that the
+owner had rejected as too detailed in run 4; which decision reflects the standard is
+open.
+
+Next step is the owner's decision. Not started: run 6, fresh episodes, step 3.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
