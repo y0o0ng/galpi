@@ -969,7 +969,11 @@ by owner decision (2026-11-04), value holds one of status, claim text or identif
 sub-field, which gives `IDENTIFIED` its place, and `projectMention` takes the relation slot. That
 slot then holds the expression pointing at the undertaking rather than a relation type, a slight
 widening accepted by the owner. It stays an alias source, never identity (RC42). Labels convert
-mechanically. To settle when storage reopens; the
+mechanically. The owner also decided that the Extractor picks the bundle's most recognisable
+expression as `projectMention`, and at CREATE code uses it as the default display name, which the
+owner may edit at approval; an attachment only adds it as an alias. The proposer no longer picks a
+name. The expression stays verbatim, the Extractor still does not know whether the undertaking is
+new, and renaming after approval is still needed. Code follows when storage reopens. To settle when storage reopens; the
 three tuned stages sit before this boundary.
 
 **Stored candidate boundary (owner).** With a parent undertaking named in the bundle, its detail
