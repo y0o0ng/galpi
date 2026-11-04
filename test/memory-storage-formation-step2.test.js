@@ -18,9 +18,9 @@ const input = { bundle: built.bundles[0], evidence: episode.turns };
 const response = value => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
 const complete = value => ({ status: 'completed', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: JSON.stringify(value) }] }] });
 
-test('registry defines string attributes and MULTI affiliation', () => {
-  assert.deepEqual(Object.keys(GENERAL_FACT_ATTRIBUTES), ['primary_laptop', 'academic_major', 'affiliation', 'residence_area', 'primary_phone']);
-  for (const [key, value] of Object.entries(GENERAL_FACT_ATTRIBUTES)) assert.deepEqual([value.valueType, value.cardinality], ['string', key === 'affiliation' ? 'MULTI' : 'SINGLE']);
+test('registry defines string attributes and its MULTI attributes', () => {
+  assert.deepEqual(Object.keys(GENERAL_FACT_ATTRIBUTES), ['primary_laptop', 'academic_major', 'affiliation', 'residence_area', 'primary_phone', 'preference', 'possession']);
+  for (const [key, value] of Object.entries(GENERAL_FACT_ATTRIBUTES)) assert.deepEqual([value.valueType, value.cardinality], ['string', ['affiliation', 'preference', 'possession'].includes(key) ? 'MULTI' : 'SINGLE']);
 });
 test('frozen anchors reconstruct the same bundle identities', () => {
   assert.deepEqual(anchorsFor(episode, built), [{ turnId: 'm1', text: '물리학' }]);
