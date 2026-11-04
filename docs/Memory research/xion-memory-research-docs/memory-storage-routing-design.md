@@ -946,6 +946,7 @@ training. It widens no storage rule outside the project family.
 | --- | --- |
 | Scope | Not limited to academic or technical work. A personal undertaking the user is actually preparing counts, such as a purchase plan |
 | Intent versus interest | Stated intent to do or buy it counts; merely finding something appealing is an interest and stays out |
+| Goals (owner, 2026-11-04) | A goal the user holds is a project, whether near or long-term. A passing mood stays out |
 | Excluded | Schedules and commitments (§47.7); interests and subscriptions |
 | What is written | The user's goal, stage, decision and blocker; artifact detail stays source-only |
 | Request anchors | A request for help is not itself written; a state it reveals is written from the anchor that states it |
