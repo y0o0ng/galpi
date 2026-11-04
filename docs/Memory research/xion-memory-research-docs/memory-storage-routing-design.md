@@ -847,6 +847,29 @@ August-onward sample is unaffected. The coverage-number claim
 approved in run 5 was passed over, not a change of standard: artifact detail remains
 source-only.
 
+### Step 2b confirmation run FAIL — no reviews prepared, returned to the owner (2026-11-04)
+
+15 fresh episodes, 66 anchors → 32 NO_WRITE, 22 deferred, 12 KEEP_AMBIGUOUS, **0
+prepared reviews**, 0 processing errors, 0 projects. `gate` prints FAIL because it
+requires at least one prepared review. This says nothing about target accuracy: no
+attachment to an existing project was tested, and the new identifying-mention rule never
+fired because the store stayed empty.
+
+All 12 holds are the proposer's own choice on a new project (8 STATUS, 4 CLAIM). Most
+rationales say the evidence does not show a multi-session undertaking. A candidate's
+evidence comes from one session and the store was empty, so a first mention can rarely
+show that. The project definition asks for a multi-session undertaking and the
+`IDENTIFIED` rule added in run 5 states the same test; which of these drives the holds
+was not measured. Some holds look right (a purchase intent, a one-off request) and some
+may be real undertakings; that labelling is the owner's.
+
+**Gate gap.** KEEP_AMBIGUOUS is outside the denominator and the owner never sees it, so
+over-holding is invisible except through `prepared > 0`. One approved review with every
+other candidate held would pass.
+
+The remaining unused eligible pool is 10 episodes, fewer than one more sample. Not
+started: any rerun, step 3.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
