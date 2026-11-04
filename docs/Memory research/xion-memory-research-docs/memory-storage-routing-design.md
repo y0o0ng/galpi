@@ -1003,6 +1003,12 @@ while news subscriptions stay with the news store; a later interests family may 
 claim, so label counts are watched for other statements drifting in. Noted DEFERRED labels are
 reopened through a relabel queue; later rows win and the first label stays in the log.
 
+**Open for step 3: the path from a project to source-only detail (owner, 2026-11-04).** "Source-only"
+assumes detail can be reached later, but a NO_WRITE anchor leaves no EvidenceRef, so a project links
+only to the turns behind its stored states. Detail in other turns, or spread across sessions, is
+reachable only by search. Step 3 must define that boundary and routing, measured on questions whose
+answer is source-only, before the source-only standard counts as safe.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
