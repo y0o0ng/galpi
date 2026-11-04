@@ -965,8 +965,9 @@ every project because no target is chosen first. Separating them lets code own t
 no-target outcome and the class-to-transition pairing; a name match can only narrow candidates
 (RC42), so confirming identity stays a model or owner judgement. Whether this reduces target
 errors is unmeasured. The project candidate also differs from the agreed candidate shape:
-`kind` and `status` or `claimText` map onto attribute and value, while `projectMention` and
-`IDENTIFIED` have no place there. Labels convert mechanically. To settle when storage reopens; the
+by owner decision (2026-11-04), value holds one of status, claim text or identified as its
+sub-field, which gives `IDENTIFIED` its place. `projectMention` has no agreed place yet. Labels
+convert mechanically. To settle when storage reopens; the
 three tuned stages sit before this boundary.
 
 **Stored candidate boundary (owner).** With a parent undertaking named in the bundle, its detail
