@@ -836,8 +836,13 @@ the owner confirms any correction.
 **Stopped at sampling.** The preregistered window (2026-08-01 to 2026-10-30) has only 11
 unused episodes of 6 to 24 messages, so `sample-confirm` failed with
 INSUFFICIENT_EPISODES. The source has no `shared-main` message after 2026-10-04, and the
-Pi has the same count. Another 18 eligible episodes predate the window. How to fill the
-sample is the owner's decision.
+Pi has the same count. Another 18 eligible episodes predate the window.
+
+**Owner decisions.** The window starts at 2026-06-01, giving a pool of 29. The cost is
+that older conversations may repeat fewer projects, so the result reports how many
+attachments to an existing project were actually tested. The coverage-number claim
+approved in run 5 was passed over, not a change of standard: artifact detail remains
+source-only.
 
 ## Storage topology and authority
 
