@@ -27,6 +27,7 @@ test('2b sampler excludes both earlier samples and probes, selects by hash, then
   const digest = first => createHash('sha256').update(`formation-loop-step2b-v1\0${first}\0${first + 5}`).digest('hex');
   const expected = firstIds.slice(2).sort((a, b) => digest(a).localeCompare(digest(b))).slice(0, 15).sort((a, b) => a - b);
   assert.deepEqual(result.map(entry => entry.firstMessageId), expected);
+  assert.ok(!sampleEpisodes(rows.map(row => ({ ...row, blank: row.id === expected[0] })), manifest).some(entry => entry.firstMessageId === expected[0]));
   const confirmDigest = first => createHash('sha256').update(`formation-loop-step2b-confirm-v1\0${first}\0${first + 5}`).digest('hex');
   const excludedConfirm = { episodes: [...manifest.episodes, { session: 'shared-main', firstMessageId: 3000, lastMessageId: 3005, messageCount: 6 }] };
   const expectedConfirm = firstIds.slice(3).sort((a, b) => confirmDigest(a).localeCompare(confirmDigest(b))).slice(0, 15).sort((a, b) => a - b);

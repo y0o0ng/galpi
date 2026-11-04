@@ -840,7 +840,10 @@ Pi has the same count. Another 18 eligible episodes predate the window.
 
 **Owner decisions.** The window starts at 2026-06-01, giving a pool of 29. The cost is
 that older conversations may repeat fewer projects, so the result reports how many
-attachments to an existing project were actually tested. The coverage-number claim
+attachments to an existing project were actually tested. Four June-to-July episodes
+contain a blank assistant message, which the episode reader rejects, so episodes with
+a blank message are now ineligible before the hash order: a pool of 25, and step 2b's
+August-onward sample is unaffected. The coverage-number claim
 approved in run 5 was passed over, not a change of standard: artifact detail remains
 source-only.
 
