@@ -85,6 +85,24 @@ test('labels stay in their split, latest decision wins, and bad gold is refused'
   assert.equal(fs.statSync(path.join(out, 'labels-train.jsonl')).mode & 0o777, 0o600);
 });
 
+test('the durability queue shows what Luna dropped and keeps its labels apart', async t => {
+  const { out } = prepared(t);
+  const dropped = { ...stages, assessDurability: async () => ({ disposition: 'NO_WRITE', reason: '일시적' }), selectBundles: async request => {
+    const turns = JSON.parse(request.input).turns;
+    return { anchors: [{ turnId: turns[0].turnId, text: turns[0].text }] };
+  } };
+  await draft(out, 'train', 1, { stages: dropped, selectBundles: dropped.selectBundles });
+  assert.equal(createLabelStore(out, 'train').next().total, 0);
+  const store = createLabelStore(out, 'train', 'durability');
+  const view = store.next();
+  assert.equal(view.total, 1); assert.equal(view.item.draft, null);
+  assert.throws(() => store.save({ itemId: view.item.itemId, decision: 'APPROVE' }), /INVALID_LABEL/);
+  store.save({ itemId: view.item.itemId, decision: 'NO_STORE', gold: null });
+  assert.equal(store.next().labeled, 1);
+  assert.equal(fs.existsSync(path.join(out, 'labels-train-durability.jsonl')), true);
+  assert.equal(fs.existsSync(path.join(out, 'labels-train.jsonl')), false);
+});
+
 test('earlier reports are reused only for the byte-identical episode', async t => {
   const { dir, out } = prepared(t);
   const manifest = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));

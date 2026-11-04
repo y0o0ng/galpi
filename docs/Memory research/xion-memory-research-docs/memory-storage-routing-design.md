@@ -928,8 +928,11 @@ step 3, the dedicated local model comparison.
 
 ### Owner direction after the rerun — dedicated tuning and the written project standard (2026-11-04)
 
-**Direction.** Luna prompt revision stops here. The owner's aim is a fine-tuned local
-model on the Qwen family for the Extractor and proposer. A gate on the untuned model
+**Direction.** Luna prompt revision stops here. The owner's aim is fine-tuned local
+models on the Qwen family for Ambiguity, Durability and the Extractor, as it has been
+from the start; the Bundle Builder is outside tuning, and Ambiguity stays with P1-B6.
+An earlier draft of this note said Extractor and proposer; that narrowing was the
+assistant's, never the owner's. A gate on the untuned model
 decides nothing, so no such gate runs; an untuned score is taken once, on the held-out
 evaluation set, only as the reference for measuring tuning. The owner will buy training
 hardware, so raw conversation need not leave the owner's machines. The 10-episode fresh
