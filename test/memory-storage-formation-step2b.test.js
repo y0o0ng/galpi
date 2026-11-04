@@ -105,6 +105,20 @@ test('2b gate uses prepared project and MULTI reviews as denominator, tags and o
   assert.throws(() => gate([{ results: rows }], store, store, [], [{ reviewId: 'project_review_0', rejectionTag: 'NOPE' }]), /INVALID_OWNER_CORRECTION/);
   decisions[6].decision = 'HOLD';
   assert.equal(gate([{ results: rows }], store, store, projects).gate, 'FAIL');
+  decisions[6].decision = 'APPROVE';
+  const withHeld = [...rows, ...['h0', 'h0', 'h1', 'h2'].map(candidateId => ({ status: 'KEEP_AMBIGUOUS', candidateId }))];
+  const threeProjects = [{ projectId: 'a', aliases: ['a'] }, { projectId: 'b', aliases: ['b'] }, { projectId: 'c', aliases: ['c'] }];
+  const unlabelled = gate([{ results: withHeld }], store, store, threeProjects);
+  assert.equal(unlabelled.gate, 'FAIL'); assert.equal(unlabelled.held, 3); assert.equal(unlabelled.heldUnlabelled, 3);
+  const missed = undertaking => ({ verdict: 'MISSED', undertaking });
+  const oneMissed = gate([{ results: withHeld }], store, store, threeProjects, [],
+    [{ candidateId: 'h0', ...missed('x') }, { candidateId: 'h1', ...missed('x') }, { candidateId: 'h2', verdict: 'CORRECT_HOLD' }]);
+  assert.equal(oneMissed.gate, 'PASS'); assert.equal(oneMissed.missedUndertakings, 1); assert.equal(oneMissed.missRate, 0.25);
+  const twoMissed = gate([{ results: withHeld }], store, store, threeProjects, [],
+    [{ candidateId: 'h0', ...missed('x') }, { candidateId: 'h1', ...missed('y') }, { candidateId: 'h2', verdict: 'CORRECT_HOLD' }]);
+  assert.equal(twoMissed.gate, 'FAIL'); assert.equal(twoMissed.missRate, 0.4);
+  assert.throws(() => gate([{ results: rows }], store, store, projects, [], [{ candidateId: 'nope', verdict: 'CORRECT_HOLD' }]), /INVALID_HELD_LABEL/);
+  assert.throws(() => gate([{ results: withHeld }], store, store, projects, [], [{ candidateId: 'h0', verdict: 'MISSED' }]), /INVALID_HELD_LABEL/);
 });
 
 test('whole episode extracts first, then each UI decision proposes the next candidate against the committed project', async t => {

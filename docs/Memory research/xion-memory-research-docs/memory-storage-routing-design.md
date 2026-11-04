@@ -870,6 +870,36 @@ other candidate held would pass.
 The remaining unused eligible pool is 10 episodes, fewer than one more sample. Not
 started: any rerun, step 3.
 
+### Step 2b rerun after the empty confirmation — first mentions and missed undertakings (2026-11-04)
+
+**Owner labels.** The owner labelled the 12 held results privately, per undertaking and
+per candidate. Five undertakings should be stored; one result is a correct hold because
+the conversation does not name its target; two more belong to those undertakings but
+are not worth storing, one of them a request copied by the Extractor. That Extractor
+issue stays open: an anchor that is only a request should end as no write.
+
+**Contract reading.** Step 2b prefers KEEP_AMBIGUOUS `over a doubtful match` and RC43's
+fail-close concerns merging into an `existing entity`; neither covers a new project in a
+store with nothing to match. `multi-session undertaking` describes the undertaking, and
+one session's evidence can rarely prove it. The prompt had widened both.
+
+**Changes, approved by the owner.** Proposer: several sessions are not a condition a
+first mention must prove; an undertaking not in the store that the user is building,
+researching, studying or preparing goes to NEW and owner review; doubt holds apply to
+matches with existing projects and claims; a mention that only names an artifact, so the
+undertaking cannot be identified, holds. The background-only rule and the code hold are
+unchanged. Gate: every held candidate gets an owner label in
+`owner-held-labels.json` (private, in the results directory), MISSED with an undertaking
+or CORRECT_HOLD, and an unlabelled hold fails. New condition:
+`missed undertakings / (created projects + missed undertakings) ≤ 30%`. The 30% mirrors
+the approval line and has no other basis. Existing conditions are unchanged.
+
+**Evaluation.** The same 15 confirmation episodes on a fresh DB. The prompt was revised
+after seeing these labels, so this is not a clean confirmation. PASS freezes the prompt
+and the 10 unused episodes become the fresh check required before step 3. FAIL returns
+to the owner with no further revision, and comparing the dedicated local model is
+decided then; there is no evidence yet that it reduces this instability.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |

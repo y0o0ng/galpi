@@ -57,6 +57,14 @@ test('proposer instructions require a positive identity signal before attaching 
   assert.match(INSTRUCTIONS, /IDENTIFIED 후보는.*이미 있는 프로젝트면 NO_CHANGE/);
 });
 
+test('proposer instructions keep the doubt rule on matches and do not ask a first mention to prove several sessions', () => {
+  assert.match(INSTRUCTIONS, /첫 언급의 근거로 증명할 조건이 아니다/);
+  assert.match(INSTRUCTIONS, /저장소에 없는 일을.*NEW로 제안하고 판단은 검토자에게 맡긴다/);
+  assert.match(INSTRUCTIONS, /산출물 이름뿐이라.*KEEP_AMBIGUOUS/);
+  assert.match(INSTRUCTIONS, /기존 프로젝트나 기존 주장 연결이 조금이라도 의심스러우면 KEEP_AMBIGUOUS/);
+  assert.doesNotMatch(INSTRUCTIONS, /근거가 없으면 KEEP_AMBIGUOUS/);
+});
+
 test('an attachment without an identifying mention stays ambiguous whatever the proposer chose', async t => {
   const f = fixture(t);
   const created = await f.propose(f.candidate('CLAIM', 'first', 'alpha'), 'NEW', null, 'CREATE', null);
