@@ -957,6 +957,23 @@ training. It widens no storage rule outside the project family.
 The earlier proposer prompt does not yet state this. No prompt changes here: the standard
 goes into the relabelling and the training data first.
 
+**Where the project path departs from the agreed flow (open).** The flow at the top of this
+document separates Target Lookup, Build Replay Package, Change Classification and Propose
+Transition. The step 2b preregistration, written by the assistant, put target, change class and
+transition into one proposer call and did not flag that as a departure. The replay also carries
+every project because no target is chosen first. Separating them lets code own the replay scope, the
+no-target outcome and the class-to-transition pairing; a name match can only narrow candidates
+(RC42), so confirming identity stays a model or owner judgement. Whether this reduces target
+errors is unmeasured. The project candidate also differs from the agreed candidate shape:
+`kind` and `status` or `claimText` map onto attribute and value, while `projectMention` and
+`IDENTIFIED` have no place there. Labels convert mechanically. To settle when storage reopens; the
+three tuned stages sit before this boundary.
+
+**Stored candidate boundary (owner).** With a parent undertaking named in the bundle, its detail
+stays source-only because the project leads back to the source. A problem the user states with no
+parent named has no such path and is worth keeping. No family holds it, nor a preference, because
+attribute-less user claims stay unsupported, so today's correct Extractor answer is DEFERRED.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
