@@ -966,8 +966,10 @@ no-target outcome and the class-to-transition pairing; a name match can only nar
 (RC42), so confirming identity stays a model or owner judgement. Whether this reduces target
 errors is unmeasured. The project candidate also differs from the agreed candidate shape:
 by owner decision (2026-11-04), value holds one of status, claim text or identified as its
-sub-field, which gives `IDENTIFIED` its place. `projectMention` has no agreed place yet. Labels
-convert mechanically. To settle when storage reopens; the
+sub-field, which gives `IDENTIFIED` its place, and `projectMention` takes the relation slot. That
+slot then holds the expression pointing at the undertaking rather than a relation type, a slight
+widening accepted by the owner. It stays an alias source, never identity (RC42). Labels convert
+mechanically. To settle when storage reopens; the
 three tuned stages sit before this boundary.
 
 **Stored candidate boundary (owner).** With a parent undertaking named in the bundle, its detail
