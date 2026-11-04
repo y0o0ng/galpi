@@ -990,6 +990,19 @@ A preference target holds several current claims, read through the Preference Se
 Stated problems stay out of this change and are counted from label notes first. Code follows when
 storage reopens; until then preferences are labelled DEFERRED with a note.
 
+**Preference and possession attributes (owner, 2026-11-04).** 100 Extractor labels left 37 of 74
+storable anchors with no family, 15 of them preferences and 6 possessions. Both now register as
+MULTI `general_fact` attributes under the proposal → HUMAN approval path. `preference`: what the
+user says they like, habitually do or follow; a passing reaction and a news subscription stay
+out. Behaviour stated as behaviour is kept in the user's wording and never rewritten as liking
+(behavior ≠ preference). `possession`: an item the user says they now have, with its kind added
+from the bundle when named there; absence, purchase plans (projects) and consumables stay out.
+Preference Set remains a later projection (§45.4). Interests are held in `preference` for now,
+while news subscriptions stay with the news store; a later interests family may move them.
+`possession` has no canonical counterpart. Free text in `preference` sits close to an attribute-less
+claim, so label counts are watched for other statements drifting in. Noted DEFERRED labels are
+reopened through a relabel queue; later rows win and the first label stays in the log.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |

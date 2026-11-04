@@ -103,6 +103,30 @@ test('the durability queue shows what Luna dropped and keeps its labels apart', 
   assert.equal(fs.existsSync(path.join(out, 'labels-train.jsonl')), false);
 });
 
+test('the relabel queue reopens only noted DEFERRED labels and the new label wins', async t => {
+  const { out } = prepared(t);
+  const deferred = { ...stages, extractCandidate: async () => ({ disposition: 'DEFERRED', reason: '속성 없음' }), selectBundles: async request => {
+    const turns = JSON.parse(request.input).turns;
+    return { anchors: turns.filter(turn => turn.role === 'USER').slice(0, 3).map(turn => ({ turnId: turn.turnId, text: turn.text })) };
+  } };
+  await draft(out, 'train', 1, { stages: deferred, selectBundles: deferred.selectBundles });
+  const store = createLabelStore(out, 'train');
+  const note = store.next().item;
+  store.save({ itemId: note.itemId, decision: 'APPROVE', reason: '취향' });
+  const second = store.next().item; store.save({ itemId: second.itemId, decision: 'APPROVE', reason: '관점' });
+  const third = store.next().item; store.save({ itemId: third.itemId, decision: 'NO_STORE', gold: null, reason: '취향' });
+  const relabel = createLabelStore(out, 'train', 'relabel');
+  const view = relabel.next();
+  assert.equal(view.total, 1); assert.equal(view.item.itemId, note.itemId); assert.equal(view.label.reason, '취향');
+  relabel.save({ itemId: note.itemId, decision: 'EDIT', gold: { disposition: 'EXTRACTED', semanticFamily: 'general_fact',
+    payload: { subject: 'USER', attributeKey: 'preference', value: '소설을 좋아해' }, evidenceTurnIds: [note.anchor.turnId] } });
+  assert.equal(relabel.next().item, null); assert.equal(relabel.next().labeled, 1);
+  const rows = fs.readFileSync(path.join(out, 'labels-train.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  const latest = rows.filter(row => row.itemId === note.itemId).at(-1);
+  assert.equal(latest.gold.payload.attributeKey, 'preference'); assert.equal(latest.relabel, true); assert.equal(latest.reason, '취향');
+  assert.equal(createLabelStore(out, 'train').next().labeled, 3, 'the main queue still counts each item once');
+});
+
 test('earlier reports are reused only for the byte-identical episode', async t => {
   const { dir, out } = prepared(t);
   const manifest = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
