@@ -794,6 +794,51 @@ open.
 
 Next step is the owner's decision. Not started: run 6, fresh episodes, step 3.
 
+### Step 2b confirmation run — identifying mention and fresh episodes (2026-11-04)
+
+The owner approved one run on fresh episodes instead of a sixth run on the same 15.
+
+**Contract basis.** RC43 fails closed when identity choice could contaminate downstream
+state and lets the assignment stay unresolved. RC42 rules out requiring a match with an
+existing alias, because one entity may have many aliases. RC44's signals cluster
+candidates; they do not prove belonging.
+
+**Why.** Both attachments to a wrong existing project (runs 3 and 5) had a null or
+bare-demonstrative mention and one evidence turn. The proposer was told to look for
+signals "in that conversation" but its replay holds only the candidate's evidence and
+project history.
+
+- *Code:* an attachment to an existing project whose mention is null or an exact bare
+  demonstrative stays KEEP_AMBIGUOUS, whatever the proposer chose. Ceiling: a phrase
+  such as "a thing made today" passes, and so does a generic word like "research",
+  which was approved as a correct attachment in runs 3 to 5. Those stay with the prompt
+  and HUMAN review.
+- *Proposer:* the signal is an explicit designation or description in the provided new
+  evidence. "Mentioned together" and "in that conversation" are removed.
+- *Extractor:* with only a demonstrative in the anchor, take the identifying name or
+  description from the bundle, else null.
+- *Gate:* reads `owner-corrections.json` from the private results directory and reports
+  `ownerCorrections`. DB history is untouched; removing a wrong claim from state is a
+  separate decision before step 3. Run 5's gate now prints FAIL at 75%.
+- *Sampling:* `sample-confirm` uses hash domain `formation-loop-step2b-confirm-v1` and
+  excludes step 1 and step 2b episodes.
+
+Replayed on the review records of runs 3 to 5, the rule holds 3 reviews: 2 WRONG_TARGET
+and 1 approved restatement. It was written from those cases, so this is not evidence
+that it generalizes.
+
+**Run rules.** Empty DB; anchor discovery, Ambiguity and Durability frozen; gate
+unchanged; run once. A FAIL returns to the owner without a rerun on these episodes; a
+PASS allows step 3 to be preregistered. The owner decides each review before seeing the
+assistant's opinion, then the assistant checks each attachment against the source and
+the owner confirms any correction.
+
+**Stopped at sampling.** The preregistered window (2026-08-01 to 2026-10-30) has only 11
+unused episodes of 6 to 24 messages, so `sample-confirm` failed with
+INSUFFICIENT_EPISODES. The source has no `shared-main` message after 2026-10-04, and the
+Pi has the same count. Another 18 eligible episodes predate the window. How to fill the
+sample is the owner's decision.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |

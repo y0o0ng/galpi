@@ -27,6 +27,10 @@ test('2b sampler excludes both earlier samples and probes, selects by hash, then
   const digest = first => createHash('sha256').update(`formation-loop-step2b-v1\0${first}\0${first + 5}`).digest('hex');
   const expected = firstIds.slice(2).sort((a, b) => digest(a).localeCompare(digest(b))).slice(0, 15).sort((a, b) => a - b);
   assert.deepEqual(result.map(entry => entry.firstMessageId), expected);
+  const confirmDigest = first => createHash('sha256').update(`formation-loop-step2b-confirm-v1\0${first}\0${first + 5}`).digest('hex');
+  const excludedConfirm = { episodes: [...manifest.episodes, { session: 'shared-main', firstMessageId: 3000, lastMessageId: 3005, messageCount: 6 }] };
+  const expectedConfirm = firstIds.slice(3).sort((a, b) => confirmDigest(a).localeCompare(confirmDigest(b))).slice(0, 15).sort((a, b) => a - b);
+  assert.deepEqual(sampleEpisodes(rows, excludedConfirm, 'formation-loop-step2b-confirm-v1').map(entry => entry.firstMessageId), expectedConfirm);
   assert.throws(() => sampleEpisodes(rows, { episodes: [{ session: 'shared-main', firstMessageId: 103, lastMessageId: 101, messageCount: 3 }] }), /STEP1_EPISODE_NOT_FOUND/);
   const nonmonotonic = rows.map(row => ({ ...row, id: row.id === 103 ? 99 : row.id }));
   const earlier = { episodes: [{ session: 'shared-main', firstMessageId: 101, lastMessageId: 99, messageCount: 3 }] };
@@ -93,7 +97,12 @@ test('2b gate uses prepared project and MULTI reviews as denominator, tags and o
   assert.deepEqual(gate([{ results: rows }], store, store, projects).duplicateProjects, [['a', 'b']]);
   decisions[9].rejectionTag = 'WRONG_TARGET';
   assert.equal(gate([{ results: rows }], store, store, projects).gate, 'FAIL');
-  decisions[9].rejectionTag = 'OTHER'; decisions[6].decision = 'HOLD';
+  decisions[9].rejectionTag = 'OTHER';
+  const corrected = gate([{ results: rows }], store, store, [], [{ reviewId: 'project_review_0', rejectionTag: 'WRONG_TARGET' }]);
+  assert.equal(corrected.gate, 'FAIL'); assert.equal(corrected.approved, 6); assert.equal(corrected.rejectionTags.WRONG_TARGET, 1); assert.equal(corrected.ownerCorrections, 1);
+  assert.throws(() => gate([{ results: rows }], store, store, [], [{ reviewId: 'project_review_x', rejectionTag: 'OTHER' }]), /INVALID_OWNER_CORRECTION/);
+  assert.throws(() => gate([{ results: rows }], store, store, [], [{ reviewId: 'project_review_0', rejectionTag: 'NOPE' }]), /INVALID_OWNER_CORRECTION/);
+  decisions[6].decision = 'HOLD';
   assert.equal(gate([{ results: rows }], store, store, projects).gate, 'FAIL');
 });
 

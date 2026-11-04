@@ -46,13 +46,28 @@ test('proposer instructions pair each transition with the change class the valid
 });
 
 test('proposer instructions require a positive identity signal before attaching to an existing project', () => {
-  assert.match(INSTRUCTIONS, /같은 일을 가리키는 긍정 신호가 있어야 한다/);
+  assert.match(INSTRUCTIONS, /제공된 새 근거 안에 그 일을 가리키는 명시적 지칭이나 설명이 있어야 한다/);
+  assert.match(INSTRUCTIONS, /지시어는 그 자체로 신호가 아니고.*KEEP_AMBIGUOUS/);
+  assert.doesNotMatch(INSTRUCTIONS, /함께 나온 맥락|그 대화 안에/);
   assert.match(INSTRUCTIONS, /같은 단어가 있다는 것은 신호가 아니다/);
   assert.match(INSTRUCTIONS, /신호가 없으면 기존 프로젝트에 연결하지 않는다/);
   assert.match(INSTRUCTIONS, /주장의 대상이 그 일 자체여야 한다/);
   assert.match(INSTRUCTIONS, /배경이나 이유로만 나오고.*NEW의 근거도 아니며 KEEP_AMBIGUOUS/);
   assert.match(INSTRUCTIONS, /새 프로젝트의 첫 주장에도 똑같이 적용한다/);
   assert.match(INSTRUCTIONS, /IDENTIFIED 후보는.*이미 있는 프로젝트면 NO_CHANGE/);
+});
+
+test('an attachment without an identifying mention stays ambiguous whatever the proposer chose', async t => {
+  const f = fixture(t);
+  const created = await f.propose(f.candidate('CLAIM', 'first', 'alpha'), 'NEW', null, 'CREATE', null);
+  f.decide(created);
+  const { projectId } = f.store.readProjects()[0];
+  for (const mention of [null, '거', ' 그거 ']) {
+    const held = await f.propose(f.candidate('CLAIM', `held ${mention}`, mention), projectId, null, 'EXPAND', 'EXPANSION');
+    assert.equal(held.reason, 'KEEP_AMBIGUOUS'); assert.equal(held.review, undefined);
+  }
+  assert.ok((await f.propose(f.candidate('CLAIM', 'kept', '오늘 짠 거'), projectId, null, 'EXPAND', 'EXPANSION')).review);
+  assert.ok((await f.propose(f.candidate('CLAIM', 'new', null), 'NEW', null, 'CREATE', null)).review);
 });
 
 test('project CREATE, EXPAND, status SUPERSEDE, claim REVISE and INVALIDATE preserve provenance', async t => {
@@ -93,10 +108,10 @@ test('display name proposal must occur verbatim in replay evidence and is never 
   assert.equal(project.displayName, '주인이 만든 이름'); assert.deepEqual(project.aliases, []);
   assert.equal(project.history[0].proposal.displayName, 'source');
   await assert.rejects(f.propose(f.candidate('CLAIM', 'other', null), project.projectId, null, 'EXPAND', 'EXPANSION', 'rename'), /INVALID_PROJECT_PROPOSAL/);
-  const next = await f.propose(f.candidate('CLAIM', 'next', null), project.projectId, null, 'EXPAND', 'EXPANSION');
+  const next = await f.propose(f.candidate('CLAIM', 'next', 'later'), project.projectId, null, 'EXPAND', 'EXPANSION');
   assert.equal(f.reviews.read(next.review.reviewId).replayPackage.projects[0].displayName, '주인이 만든 이름');
   f.decide(next);
-  project = f.store.readProjects()[0]; assert.deepEqual(project.aliases, []); assert.equal(project.displayName, '주인이 만든 이름');
+  project = f.store.readProjects()[0]; assert.deepEqual(project.aliases, ['later']); assert.equal(project.displayName, '주인이 만든 이름');
 });
 
 test('migration preserves committed v1 project history with no invented display name', async t => {
