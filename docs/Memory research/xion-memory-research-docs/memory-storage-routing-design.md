@@ -926,6 +926,34 @@ approval (owner request; `display_name` is checked against the approval record a
 undo, and the Extractor copying requests. Not started: the 10-episode fresh check,
 step 3, the dedicated local model comparison.
 
+### Owner direction after the rerun — dedicated tuning and the written project standard (2026-11-04)
+
+**Direction.** Luna prompt revision stops here. The owner's aim is a fine-tuned local
+model on the Qwen family for the Extractor and proposer. A gate on the untuned model
+decides nothing, so no such gate runs; an untuned score is taken once, on the held-out
+evaluation set, only as the reference for measuring tuning. The owner will buy training
+hardware, so raw conversation need not leave the owner's machines. The 10-episode fresh
+check is not started. Tuning can only address what remains once the standard is fixed:
+two of the failures above were prompt and definition issues, not model limits.
+
+**Project standard (owner-confirmed).** This is the answer key for relabelling and
+training. It widens no storage rule outside the project family.
+
+| Question | Standard |
+| --- | --- |
+| Scope | Not limited to academic or technical work. A personal undertaking the user is actually preparing counts, such as a purchase plan |
+| Intent versus interest | Stated intent to do or buy it counts; merely finding something appealing is an interest and stays out |
+| Excluded | Schedules and commitments (§47.7); interests and subscriptions |
+| What is written | The user's goal, stage, decision and blocker; artifact detail stays source-only |
+| Request anchors | A request for help is not itself written; a state it reveals is written from the anchor that states it |
+| Unnamed target | When the conversation cannot identify the undertaking, holding is the correct answer |
+| Same undertaking | A shared topic word is not enough; an expression that directly names part of that undertaking attaches |
+| Finished features | A feature the user reports finishing is its own project, since sub-projects stay closed in v1 |
+| Error cost | A wrong merge is worse than a missed attachment (RC43) |
+
+The earlier proposer prompt does not yet state this. No prompt changes here: the standard
+goes into the relabelling and the training data first.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
