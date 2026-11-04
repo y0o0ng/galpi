@@ -121,6 +121,13 @@ test('the relabel queue reopens only noted DEFERRED labels and the new label win
   relabel.save({ itemId: note.itemId, decision: 'EDIT', gold: { disposition: 'EXTRACTED', semanticFamily: 'general_fact',
     payload: { subject: 'USER', attributeKey: 'preference', value: '소설을 좋아해' }, evidenceTurnIds: [note.anchor.turnId] } });
   assert.equal(relabel.next().item, null); assert.equal(relabel.next().labeled, 1);
+  relabel.save({ itemId: note.itemId, decision: 'EDIT', gold: { disposition: 'DEFERRED' }, reason: '취향' });
+  const edited = fs.readFileSync(path.join(out, 'labels-train.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line)).at(-1);
+  relabel.save({ itemId: note.itemId, decision: 'APPROVE' });
+  const kept = fs.readFileSync(path.join(out, 'labels-train.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line)).at(-1);
+  assert.deepEqual(kept.gold, edited.gold, 'keeping restores the earlier decision, never the first draft');
+  relabel.save({ itemId: note.itemId, decision: 'EDIT', gold: { disposition: 'EXTRACTED', semanticFamily: 'general_fact',
+    payload: { subject: 'USER', attributeKey: 'preference', value: '소설을 좋아해' }, evidenceTurnIds: [note.anchor.turnId] } });
   const rows = fs.readFileSync(path.join(out, 'labels-train.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
   const latest = rows.filter(row => row.itemId === note.itemId).at(-1);
   assert.equal(latest.gold.payload.attributeKey, 'preference'); assert.equal(latest.relabel, true); assert.equal(latest.reason, '취향');
