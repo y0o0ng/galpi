@@ -900,6 +900,32 @@ and the 10 unused episodes become the fresh check required before step 3. FAIL r
 to the owner with no further revision, and comparing the dedicated local model is
 decided then; there is no evidence yet that it reduces this instability.
 
+### Step 2b rerun FAIL — projects form, missed undertakings over the line, returned to the owner (2026-11-04)
+
+The same 15 episodes on a fresh DB, not a clean confirmation. 62 anchors → 34 NO_WRITE,
+16 deferred, 7 results held (5 candidates), 5 prepared reviews, 0 processing errors.
+4 project reviews, 4 approved (3 CREATE, 1 SUPERSEDE), 0 WRONG_TARGET, 0 duplicate
+projects. Owner labels on the holds: 2 undertakings MISSED, 3 candidates CORRECT_HOLD.
+Miss rate 2 / (3 + 2) = 40%, over the 30% line, so **FAIL**. The labels follow answers
+given before this run; the owner kept them after seeing that changing one would pass.
+
+The first-mention change worked: the same episodes went from 0 prepared reviews to 4,
+all approved. Target accuracy is still thin, with one attachment tested. The owner
+deliberately kept a proposed name to see whether a later mention would find that
+project; the proposer held it, judging that a shared topic is not a
+signal, so no wrong merge and no duplicate, but a missed attachment. It counts as
+CORRECT_HOLD because the undertaking is already in the store, so the miss rate does not
+see missed attachments. The artifact-only hold fired as registered.
+
+**Open for the owner.** One miss is a purchase plan, held as not building, researching,
+studying or preparing. The owner holds that a project need not be academic, so the
+definition's reach over personal undertakings is unsettled. The other is a finished
+product feature whose anchor names no undertaking. Also open: renaming a project after
+approval (owner request; `display_name` is checked against the approval record at
+`project-review.js`, so a rename needs its own history rather than an UPDATE), approval
+undo, and the Extractor copying requests. Not started: the 10-episode fresh check,
+step 3, the dedicated local model comparison.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
