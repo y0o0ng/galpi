@@ -981,6 +981,14 @@ stays source-only because the project leads back to the source. A problem the us
 parent named has no such path and is worth keeping. No family holds it, nor a preference, because
 attribute-less user claims stay unsupported, so today's correct Extractor answer is DEFERRED.
 
+**Fact cardinality (owner, 2026-11-04).** Facts and preferences accumulate 0..N claims with history
+(§44.2, §45, §51.4); the SINGLE declaration in step 2b was narrower than the contract. Only the
+attributes whose meaning names one thing keep one current value: `primary_laptop` and
+`primary_phone`. `academic_major`, `residence_area` and `affiliation` may hold several current values.
+A preference target holds several current claims, read through the Preference Set projection (§45).
+Stated problems stay out of this change and are counted from label notes first. Code follows when
+storage reopens; until then preferences are labelled DEFERRED with a note.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
