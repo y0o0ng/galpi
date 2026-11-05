@@ -1041,6 +1041,17 @@ labelling, which may favour Luna; train labels carry the assistant's advice; tra
 Luna's WRITE side (100 of 223 against 51 of 142), so calibration may shift on eval. No Pi, DB, Luna
 stage or Ambiguity change.
 
+**Laya feasibility check — FAIL (2026-11-05).** Frozen backbone on the eval set: 14/22 false WRITE (bar 5),
+4/11 missed (bar 3), 15/33 correct; untuned Luna had 10/22, 0/11 and 23/33. Episode-grouped validation inside
+train had already shown no separation: AUC 0.52, threshold 0.4904 at 46/75 false WRITE and 22/76 missed, with
+training loss staying near chance. No pipeline fault was found: the anchor survived in all 151 states and a
+synthetic pair separated. As preregistered, this says the frozen backbone on 151 items is not enough and does not
+reject Laya. Limits on the reading: 115 of 151 train and 19 of 33 eval states lost turns to the 768-token state budget,
+and calibration fit on 15 items hit the temperature clamp. Setup departures from the first install: Python 3.11,
+transformers 4.48.3, numpy below 2 and torch 2.2.2, the newest torch for this Intel Mac; 8 epochs with an update per
+micro-batch, fixed before eval; temperature from the package's 10% slice. Only aggregates were read from eval.
+Each later candidate scores on it once. The full fine-tune waits for the hardware. Scripts: `scripts/memory-laya-durability.py`.
+
 **Open for step 3: the path from a project to source-only detail (owner, 2026-11-04).** "Source-only"
 assumes detail can be reached later, but a NO_WRITE anchor leaves no EvidenceRef, so a project links
 only to the turns behind its stored states. Detail in other turns, or spread across sessions, is
