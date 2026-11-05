@@ -1003,6 +1003,14 @@ while news subscriptions stay with the news store; a later interests family may 
 claim, so label counts are watched for other statements drifting in. Noted DEFERRED labels are
 reopened through a relabel queue; later rows win and the first label stays in the log.
 
+**A condition of one undertaking is not a preference (owner, 2026-11-05).** A liking that holds
+apart from any one undertaking goes to `preference`. A condition of one undertaking, such as walking
+distance while looking for a home, is a project claim on that undertaking. All 15 train `preference`
+labels are general taste, so none change. In the eval set this settled one label already written as
+a project claim; a second label's claim, which had copied the assistant's question, was reworded
+as the user's statement with its source row kept. Both reviews came after the untuned baseline was
+seen, and no other eval label reopens.
+
 **Open for step 3: the path from a project to source-only detail (owner, 2026-11-04).** "Source-only"
 assumes detail can be reached later, but a NO_WRITE anchor leaves no EvidenceRef, so a project links
 only to the turns behind its stored states. Detail in other turns, or spread across sessions, is
