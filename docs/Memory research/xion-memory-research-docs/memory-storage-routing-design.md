@@ -1011,6 +1011,36 @@ a project claim; a second label's claim, which had copied the assistant's questi
 as the user's statement with its source row kept. Both reviews came after the untuned baseline was
 seen, and no other eval label reopens.
 
+**Laya feasibility check for Durability — preregistration (owner direction, 2026-11-05).** The
+owner prefers Laya over Qwen for Durability and Ambiguity, since both are decisions and Laya
+(`convaiinnovations/laya`, Apache-2.0) answers typed questions with probabilities and never generates
+text. The Extractor stays on Qwen. Ambiguity stays with P1-B6, whose training base is still open.
+Laya cannot write the `short durability reason` of the agreed stage contract, so the local path drops
+that advisory input to the Extractor; the effect is measured when the Extractor is tuned. The Luna path
+is unchanged.
+
+This check asks only whether a cheap fit on the owner's Mac (Intel i5, 16 GB, no usable GPU) is already
+useful. Base: the multilingual checkpoint at a commit pinned on download; the card names no Korean score.
+The environment, weights and outputs stay under `~/galpi-private/`, and runs use `HF_HUB_OFFLINE=1` after
+the download. Gold is `NO_STORE` = NO_WRITE and anything else = WRITE, from the train labels only: 151 items
+in 36 episodes, 76 WRITE and 75 NO_WRITE. Input is the anchor plus its bundle, keeping the turns nearest
+the anchor up to the 1,024-token limit, and the truncated count is reported. The backbone is frozen; only
+the head and calibration fit, because a full fine-tune waits for the hardware. If the package or PyTorch
+will not run on this Mac, or offers no head-only fit, the check stops and returns to the owner.
+
+Temperature and threshold come from episode-grouped 5-fold validation inside train: the lowest false-WRITE
+rate with misses at or below 30%, the bar of the 2b missed-undertakings gate. The eval set of 33 items
+(11 WRITE, 22 NO_WRITE) is then scored once. Untuned Luna on it: 10/22 false WRITE, 0/11 missed, 23/33
+correct. PASS needs both false WRITE at or below 5/22 and misses at or below 3/11. Brier and calibration
+error are reported, not gated. PASS means the full fine-tune is worth planning, not that Laya is adopted.
+FAIL says a frozen backbone on this data is not enough and does not reject Laya; the full fine-tune is its
+real test.
+
+Known limits: 33 eval items are coarse; eval has no session over 18 messages; the owner saw Luna's draft while
+labelling, which may favour Luna; train labels carry the assistant's advice; train over-represents
+Luna's WRITE side (100 of 223 against 51 of 142), so calibration may shift on eval. No Pi, DB, Luna
+stage or Ambiguity change.
+
 **Open for step 3: the path from a project to source-only detail (owner, 2026-11-04).** "Source-only"
 assumes detail can be reached later, but a NO_WRITE anchor leaves no EvidenceRef, so a project links
 only to the turns behind its stored states. Detail in other turns, or spread across sessions, is
