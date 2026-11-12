@@ -266,6 +266,23 @@ class Episode:
                 log.append((round(off + t, 2), name))
         return out, log
 
+    def _voice(self):
+        """narration.ko.json의 "voice": true인 편만: 훅 질문과 화면 진술을 시온 목소리로 말한다(px/voice.py).
+        말이 다음 진술 시작이나 표시 끝을 넘으면(여유 < voice.MARGIN) 렌더를 멈추고 필요한 초를 알려 준다."""
+        if not self.nar.get("voice"):
+            return 0.0
+        from px import voice
+        rows = voice.plan(self)
+        over = [(round(t0, 2), text, round(s, 2), round(room, 2)) for t0, text, s, room in rows if room < voice.MARGIN]
+        if over:
+            raise ValueError(f"시온 목소리가 표시 구간을 넘는다(시각, 문장, 말 길이, 여유; 여유는 {voice.MARGIN}초 이상이어야 한다): {over}")
+        out = np.zeros(int(self.total * audio.SR))
+        for t0, text, _, _ in rows:
+            x = voice.speak(text)
+            i = int(t0 * audio.SR)
+            out[i:i + len(x)] += x[:len(out) - i]
+        return out
+
     def _bgm_gain(self):
         """장면별 bgm_gain을 1초 이동 평균으로 이은 곡선(전부 1이면 1)."""
         g = np.concatenate([np.full(round((T.length) * audio.SR), getattr(T, "bgm_gain", 1.0)) for T in self.scenes])
@@ -346,7 +363,7 @@ class Episode:
                 bgm[i0:] *= np.linspace(1, 0.35, len(bgm) - i0)
         sfx, kept, events = self._sfx_plan()
         if self.version == 2:
-            sfx = sfx + self._kit()[0]
+            sfx = sfx + self._kit()[0] + self._voice()
             bgm = bgm * self._bgm_gain()
         return bgm, audio.typing(typed, self.total), sfx, kept, events
 
