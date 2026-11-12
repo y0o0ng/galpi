@@ -38,6 +38,7 @@ class SceneV2:
     def __init__(self, sid, duration, texts, events):
         self.id, self.length, self.texts, self.events = sid, duration, texts, events
         self.sents, self.plan, self.sfx = [], [], []
+        self.kit, self.bgm_gain = [], 1.0              # 키트 소리 [(장면 시각, 배열, 대상 이름)] · 이 장면 BGM 배율(경계는 1초에 걸쳐 바뀐다)
 
     def visible(self, t, s):
         """s가 이 장면의 표시 구간에 t가 드는가. 이 장면의 문구 목록에 없으면 ValueError(승인되지 않은 문구)."""
@@ -252,6 +253,30 @@ class Episode:
             self._plan = (*audio.place_sfx(events, self.total), events)
         return self._plan
 
+    def _kit(self):
+        """(키트 소리를 섞은 배열, [(절대 시각, 대상 이름)]). T.kit은 _sfx_plan의 장면 가운데 그리기에서 채워진다."""
+        self._sfx_plan()
+        out, log = np.zeros(int(self.total * audio.SR)), []
+        for T, off in zip(self.scenes, self.starts):
+            for t, x, name in getattr(T, "kit", ()):
+                if not 0 <= t <= T.length:
+                    raise ValueError(f"[{T.id}] 키트 소리 시각이 장면 0~{T.length}초 밖이다: {(t, name)}")
+                i = int((off + t) * audio.SR)
+                out[i:i + len(x)] += x[:len(out) - i]
+                log.append((round(off + t, 2), name))
+        return out, log
+
+    def _bgm_gain(self):
+        """장면별 bgm_gain을 1초 이동 평균으로 이은 곡선(전부 1이면 1)."""
+        g = np.concatenate([np.full(round((T.length) * audio.SR), getattr(T, "bgm_gain", 1.0)) for T in self.scenes])
+        n = int(self.total * audio.SR)
+        g = np.pad(g, (0, max(0, n - len(g))), constant_values=1.0)[:n]
+        if np.all(g == 1.0):
+            return 1.0
+        w = audio.SR                                     # 1초 이동 평균(누적합)
+        c = np.concatenate([[0.0], np.cumsum(np.pad(g, (w // 2, w - w // 2 - 1), mode="edge"))])
+        return (c[w:] - c[:-w]) / w
+
     def _react_danger(self, arr, i):
         """danger 소리 시각부터 2프레임, 출력 전체를 한 도트(SCALE px) 좌우로 흔든다."""
         for t, kind, *_ in self._sfx_plan()[1]:
@@ -320,6 +345,9 @@ class Episode:
             if not audio.SONGS[self.bgm].get("finale"):
                 bgm[i0:] *= np.linspace(1, 0.35, len(bgm) - i0)
         sfx, kept, events = self._sfx_plan()
+        if self.version == 2:
+            sfx = sfx + self._kit()[0]
+            bgm = bgm * self._bgm_gain()
         return bgm, audio.typing(typed, self.total), sfx, kept, events
 
     def cover(self):
@@ -363,6 +391,8 @@ class Episode:
         self.cover()
         print("sfx kept", [(round(e[0], 2), *e[1:]) for e in kept])
         print("sfx dropped", [(round(e[0], 2), *e[1:]) for e in sorted(events) if e not in kept])
+        if self.version == 2:
+            print("kit", self._kit()[1])
         for name, x in (("bgm", b), ("typing", ty), ("sfx", sf)):
             print(f"{name}: rms whole {audio.rms_db(x):.1f} dB, active {audio.rms_db(x, True):.1f} dB")
 
