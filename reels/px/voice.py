@@ -22,7 +22,8 @@ else:
 
 RATIO, RATE, DB = 2.2, 10.0, -30
 GAP_WORD, GAP_COMMA, GAP_SENTENCE = (0.02, 0.04), 0.18, 0.3
-MARGIN = 0.2                                     # 말이 끝난 뒤 다음 진술·표시 끝까지 남길 최소 여유(초)
+READ_RATE = 7.0                                  # 읽기 하한: 초당 7음절(사용자 2026-11-12, 첫 편을 보고 조정)
+TAIL = 0.5                                       # 말·읽기가 끝난 뒤 바로 넘어가지 않고 남기는 여유(사용자 2026-11-12)
 CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
 RECORDED_CHO = "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ"
 VOWELS = {"a": 0, "eo": 4, "o": 8, "u": 13, "eu": 18, "i": 20, "e": 5}      # 녹음한 모음 7개(중성 번호)
@@ -129,23 +130,45 @@ def secs(text):
     return len(speak(text)) / SR
 
 
+def need(text):
+    """진술이 화면에 머물러야 하는 최소 시간 = max(말 길이, 읽기 하한) + TAIL."""
+    n = sum(1 for c in text if '가' <= c <= '힣' or c.isalnum())
+    return max(secs(text), n / READ_RATE) + TAIL
+
+
 def plan(ep):
     """[(절대 시각, 문장, 말 길이, 여유)] — 훅 질문은 0.3초, 진술은 표시 시작에 말한다. 라벨은 말하지 않는다.
-    여유 = (그 장면의 다음 진술 시작과 이 진술 표시 끝 중 이른 쪽) - 시작 - 말 길이."""
+    여유 = (그 장면의 다음 진술 시작과 이 진술 표시 끝 중 이른 쪽) - 시작 - need(문장). 0 이상이어야 한다."""
     statements = {s for sc in ep.nar["scenes"].values() for s in sc.get("screen_text", [])}
-    rows = [(0.3, ep.nar["hook"], secs(ep.nar["hook"]), ep.scenes[0].length - 0.3 - secs(ep.nar["hook"]))]
+    rows = [(0.3, ep.nar["hook"], secs(ep.nar["hook"]), ep.scenes[0].length - 0.3 - need(ep.nar["hook"]))]
     for T, off in zip(ep.scenes, ep.starts):
         said = sorted((a, b, t) for t, a, b in getattr(T, "texts", ()) if t in statements)
         for k, (a, b, t) in enumerate(said):
             nxt = said[k + 1][0] if k + 1 < len(said) else T.length
-            s = secs(t)
-            rows.append((off + a, t, s, min(b, nxt) - a - s))
+            rows.append((off + a, t, secs(t), min(b, nxt) - a - need(t)))
     return rows
 
 
+def timing(final_md):
+    """확정 대본(final.md)의 훅과 진술마다 {text, voice, need} — 서버가 빌드 전에 만들어 빌드에 넘긴다."""
+    from px.textfit import screen_texts
+    import re as _re
+    hook = _re.search(r"hook_words`?\**\s*[:：]\s*((?:`[^`]+`\s*/?\s*)+)", final_md)   # "- `hook_words`: `a` / `b`" — 이은 것이 훅 질문(계약)
+    texts = [s for k, s in screen_texts(final_md) if k == "statement"]
+    if hook:
+        texts = [" ".join(_re.findall(r"`([^`]+)`", hook.group(1)))] + texts
+    return [{"text": t, "voice": round(secs(t), 2), "need": round(need(t), 2)} for t in dict.fromkeys(texts)]
+
+
 if __name__ == "__main__":
+    if sys.argv[1] == "--final":                 # python px/voice.py --final final.md --out voice_timing.json
+        import json
+        rows = timing(Path(sys.argv[2]).read_text())
+        Path(sys.argv[4]).write_text(json.dumps(rows, ensure_ascii=False, indent=1))
+        print(f"{len(rows)} lines, longest need {max((r['need'] for r in rows), default=0)}s")
+        sys.exit(0)
     sys.path.insert(0, str(Path(sys.argv[1]).resolve()))
     sys.argv = sys.argv[:1]
     import scene  # noqa: E402  편 폴더의 scene.py가 만든 Episode(ep)
     for t0, text, s, room in plan(scene.ep):
-        print(f"{'OK  ' if room >= MARGIN else 'OVER'} {t0:6.2f}s 말 {s:4.2f}s 여유 {room:5.2f}s  {text}")
+        print(f"{'OK  ' if room >= 0 else 'OVER'} {t0:6.2f}s 말 {s:4.2f}s 여유 {room:5.2f}s  {text}")

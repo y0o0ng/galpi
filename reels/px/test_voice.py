@@ -44,6 +44,16 @@ class VoiceTest(unittest.TestCase):
         self.assertGreater(voice.secs("가나, 다라") - voice.secs("가나 다라"), voice.GAP_COMMA - max(voice.GAP_WORD) - 0.01)
         self.assertGreater(voice.secs("가나. 다라.") - voice.secs("가나 다라."), voice.GAP_SENTENCE - max(voice.GAP_WORD) - 0.01)
 
+    def test_need_is_reading_floor_or_voice_plus_tail(self):
+        t = "가나다라마바사아자차카타파하"                              # 14음절: 읽기 2초 > 말 1.45초
+        self.assertAlmostEqual(voice.need(t), 14 / voice.READ_RATE + voice.TAIL, places=6)
+
+    def test_timing_reads_hook_and_statements_from_final(self):
+        md = "- `hook_words`: `가나는` / `다라?`\n\n| `a` | 내용 | 진술: `마바사`, 라벨(선택): `아자` | 1 | - |\n"
+        rows = voice.timing(md)
+        self.assertEqual([r["text"] for r in rows], ["가나는 다라?", "마바사"])
+        self.assertTrue(all(r["need"] >= r["voice"] + voice.TAIL - 1e-9 for r in rows))
+
     def test_missing_recordings_fail(self):
         os.environ["REELS_VOICE_DIR"] = self.tmp.name + "-없음"
         voice._sample.cache_clear()

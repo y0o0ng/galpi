@@ -29,7 +29,7 @@ function fixture({ factcheck = '1 rows, 0 missing', textfit = '3 texts, 0 misfit
   const report = { version: 1, rows: 1, sources: ['https://e.com/a'], fetch_errors: [],
     claims: [{ row: '1', claim: 'test claim', quote: 'a source quotation long enough to check',
       source: '[A]', url: 'https://e.com/a', sources: ['https://e.com/a'], found: ok, status: ok ? 'matched' : 'mismatch' }] };
-  const fit = `case "$1" in *textfit.py) echo '${textfit}'; exit ${textfit.includes('넘침') ? 1 : 0};; esac\n`;
+  const fit = `case "$1" in *textfit.py) echo '${textfit}'; exit ${textfit.includes('넘침') ? 1 : 0};; *voice.py) echo '[]' > "$5"; exit 0;; esac\n`;
   fs.writeFileSync(py, `#!/bin/sh\n${fit}echo '${JSON.stringify(report)}'\nexit ${ok ? 0 : 1}\n`, { mode: 0o755 });
   return { repo, reelsDir, workDir: path.join(reelsDir, 'work', '2026-10-04-c7') };
 }
@@ -111,6 +111,8 @@ test('다섯 단계가 순서대로 돌고 단계마다 같은 안전 인자와 
     assert.ok(!/\{\{\w+\}\}/.test(call.stdin));
   }
   assert.ok(fs.existsSync(path.join(f.workDir, 'production.json')));
+  assert.ok(fs.existsSync(path.join(f.workDir, 'voice_timing.json')), '검토 뒤 서버가 말 길이 표를 만든다');
+  assert.ok(spawn.calls[2].stdin.includes(path.join(f.workDir, 'voice_timing.json')), '빌드가 그 표를 받는다');
 });
 
 test('단계별 도구: 웹은 대본·검토만, 시각 검토는 읽기와 결과 파일 쓰기만', async () => {

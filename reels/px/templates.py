@@ -268,14 +268,14 @@ class Episode:
 
     def _voice(self):
         """narration.ko.json의 "voice": true인 편만: 훅 질문과 화면 진술을 시온 목소리로 말한다(px/voice.py).
-        말이 다음 진술 시작이나 표시 끝을 넘으면(여유 < voice.MARGIN) 렌더를 멈추고 필요한 초를 알려 준다."""
+        진술이 max(말, 읽기 하한) + TAIL보다 짧게 머물면(다음 진술 시작·표시 끝 기준) 렌더를 멈추고 모자란 초를 알려 준다."""
         if not self.nar.get("voice"):
             return 0.0
         from px import voice
         rows = voice.plan(self)
-        over = [(round(t0, 2), text, round(s, 2), round(room, 2)) for t0, text, s, room in rows if room < voice.MARGIN]
+        over = [(round(t0, 2), text, round(s, 2), round(room, 2)) for t0, text, s, room in rows if room < 0]
         if over:
-            raise ValueError(f"시온 목소리가 표시 구간을 넘는다(시각, 문장, 말 길이, 여유; 여유는 {voice.MARGIN}초 이상이어야 한다): {over}")
+            raise ValueError(f"진술 표시가 max(말, 읽기 하한) + {voice.TAIL}초보다 짧다(시각, 문장, 말 길이, 모자란 초): {over}")
         out = np.zeros(int(self.total * audio.SR))
         for t0, text, _, _ in rows:
             x = voice.speak(text)
