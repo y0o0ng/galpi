@@ -552,6 +552,18 @@ class TextFitTest(unittest.TestCase):
         bad = textfit.misfits(items)
         self.assertEqual([s for _, s, _ in bad], ["약한 층 위아래를 비슷하게 쌓으면 중립축이 그 층 근처로 와요"])
 
+    def test_hook(self):
+        """52편: 훅 첫 줄(212px)이 안전 폭 205px를 넘었는데 게이트가 훅을 안 재서 빌드가 줄을 몰래 나눴다."""
+        from px import textfit
+        md = ("## 1. 훅\n\n- **훅 질문:** 내 번호도 모르는데 재난문자는 어떻게 올까?\n"
+              "- `hook_words`: `내 번호도 모르는데` / `재난문자는` / `어떻게 올까?`\n- **hook_sub:** `셀 브로드캐스트`\n"
+              "- **`hook_sub` 삭제:** `안 잼`\n자동 승인: hook_words `안 잼`\n")
+        items = textfit.hook_texts(md)
+        self.assertEqual(items, [("hook", "내 번호도 모르는데"), ("hook", "재난문자는"), ("hook", "어떻게 올까?"), ("hook_sub", "셀 브로드캐스트")])
+        self.assertEqual([s for _, s, _ in textfit.misfits(items)], ["내 번호도 모르는데"])
+        fixed = textfit.hook_texts(md.replace("`내 번호도 모르는데`", "`내 번호도` / `모르는데`"))
+        self.assertEqual(textfit.misfits(fixed), [])
+
 
 if __name__ == "__main__":
     unittest.main()
