@@ -54,6 +54,25 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual([r["text"] for r in rows], ["가나는 다라?", "마바사"])
         self.assertTrue(all(r["need"] >= r["voice"] + voice.TAIL - 1e-9 for r in rows))
 
+    def test_numbers_units_and_english_read_as_hangul(self):
+        cases = {"서버 4대가": "서버 네 대가", "1980년": "천구백팔십년", "20살": "스무 살", "24시간": "스물네 시간",
+                 "3개월": "삼개월", "1번째": "첫 번째", "3.5배": "삼점오배", "1,000명": "천명", "10000원": "만원",
+                 "15%": "십오퍼센트", "몇 km": "몇 킬로미터", "100m": "백미터", "잡음비(SNR)": "잡음비(에스엔알)", "12": "십이"}
+        for text, said in cases.items():
+            self.assertEqual(voice.read_aloud(text), said, text)
+        self.assertTrue(all('가' <= c <= '힣' for c in voice.read_aloud("fiber")))  # 그 밖의 영어도 한글 음절로
+        self.assertGreater(voice.secs("SNR"), voice.secs("에"))                      # 더는 글자마다 '에' 하나가 아니다
+
+    def test_plan_speaks_statements_not_numbers_or_labels(self):
+        class S:
+            def __init__(self, length, texts):
+                self.length, self.texts = length, texts
+        ep = type("Ep", (), {})()
+        ep.nar = {"hook": "가나?", "scenes": {"a": {"screen_text": ["다라마"], "numbers": ["12"], "labels": ["바사"]}}}
+        ep.scenes = [S(9.0, [("다라마", 1.0, 5.0), ("12", 2.0, 6.0), ("바사", 1.0, 6.0)])]
+        ep.starts = [0.0]
+        self.assertEqual([r[1] for r in voice.plan(ep)], ["가나?", "다라마"])
+
     def test_missing_recordings_fail(self):
         os.environ["REELS_VOICE_DIR"] = self.tmp.name + "-없음"
         voice._sample.cache_clear()

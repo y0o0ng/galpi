@@ -47,21 +47,101 @@ def _sample(name):
     return lfilter(b, a, y)
 
 
+DIGIT = "영일이삼사오육칠팔구"
+NATIVE_ONES = ["", "한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉"]
+NATIVE_TENS = ["", "열", "스물", "서른", "마흔", "쉰", "예순", "일흔", "여든", "아흔"]
+COUNTERS = ("시간", "마리", "사람", "가지", "군데", "그루", "송이", "켤레", "대", "개", "명", "번", "살", "시", "장", "잔", "달", "권", "척", "벌", "채", "줄", "칸", "곳", "통", "판", "알", "쌍")
+SINO_BEFORE = ("개월", "번지", "번호", "시즌", "장면", "대역")   # 고유어 단위로 시작하지만 한자어로 읽는 말
+UNITS = {"km": "킬로미터", "cm": "센티미터", "mm": "밀리미터", "nm": "나노미터", "kg": "킬로그램", "mg": "밀리그램",
+         "GB": "기가바이트", "MB": "메가바이트", "TB": "테라바이트", "KB": "킬로바이트", "Hz": "헤르츠", "kHz": "킬로헤르츠",
+         "MHz": "메가헤르츠", "GHz": "기가헤르츠", "kW": "킬로와트", "kWh": "킬로와트시", "ms": "밀리초", "dB": "데시벨"}
+AFTER_NUMBER = {"m": "미터", "g": "그램", "t": "톤", "W": "와트", "V": "볼트", "A": "암페어", "L": "리터", "s": "초", "K": "케이"}
+SYMBOLS = {"%": "퍼센트", "℃": "도", "°C": "도", "°": "도"}
+LETTERS = dict(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "에이 비 씨 디 이 에프 지 에이치 아이 제이 케이 엘 엠 엔 오 피 큐 알 에스 티 유 브이 더블유 엑스 와이 지".split()))
+EN_CHO = dict(zip("bcdfghjklmnpqrstvwxz", "ㅂㅋㄷㅍㄱㅎㅈㅋㄹㅁㄴㅍㅋㄹㅅㅌㅂㅇㅅㅈ"))
+EN_VOWEL = {"a": 0, "e": 5, "i": 20, "o": 8, "u": 4, "y": 20}               # 첫 모음 글자 → 녹음 모음(중성 번호)
+
+
+def _sino(n):
+    """정수 → 한자어 읽기(1980 → 천구백팔십). 십·백·천과 단독 만 앞의 일은 읽지 않는다."""
+    if n == 0:
+        return "영"
+    out, big = "", ["", "만", "억", "조", "경"]
+    for g in range(len(big) - 1, -1, -1):
+        part = (n // 10 ** (4 * g)) % 10000
+        if not part:
+            continue
+        s = ""
+        for i, unit in ((3, "천"), (2, "백"), (1, "십"), (0, "")):
+            d = part // 10 ** i % 10
+            if d:
+                s += ("" if d == 1 and unit else DIGIT[d]) + unit
+        out += ("" if s == "일" and g == 1 else s) + big[g]
+    return out
+
+
+def _number(m):
+    raw, after = m.group(1).replace(",", ""), m.string[m.end():]
+    word = after.lstrip(" ")
+    if "." not in raw and 0 < int(raw) < 100 and not word.startswith(SINO_BEFORE):
+        if word.startswith("번째"):
+            return "첫 " if raw == "1" else NATIVE_TENS[int(raw) // 10] + NATIVE_ONES[int(raw) % 10] + " "
+        if word.startswith(COUNTERS):
+            n = int(raw)
+            tens, ones = NATIVE_TENS[n // 10], NATIVE_ONES[n % 10]
+            return ("스무" if n == 20 else tens + ones) + " "
+    whole, _, frac = raw.partition(".")
+    return _sino(int(whole)) + ("점" + "".join(DIGIT[int(d)] for d in frac) if frac else "")
+
+
+def _english(m):
+    w = m.group(0)
+    if w in UNITS:
+        return UNITS[w]
+    if w in AFTER_NUMBER and re.search(r"\d\s?$", m.string[:m.start()]):
+        return AFTER_NUMBER[w]
+    if w.isupper() or len(w) == 1:                       # 약어·한 글자는 알파벳 이름(SNR → 에스엔알)
+        return "".join(LETTERS[c] for c in w.upper())
+    w = w.lower()                                        # 그 밖의 낱말은 모음 덩어리마다 한 음절(동물말이라 음절 수와 모음 모양만 맞춘다)
+    if len(w) > 3 and w.endswith("e") and w[-2] not in "aeiouy":
+        w = w[:-1]
+    w = re.sub(r"(.)\1", r"\1", re.sub(r"ph|th|ch|sh|ck|ng$", lambda d: {"ph": "f", "th": "s", "ch": "ㅊ", "sh": "s", "ck": "k", "ng": ""}[d.group(0)], w))
+    syl = lambda cho, v: chr(0xAC00 + CHO.index(cho) * 588 + v * 28)
+    out, cho = "", "ㅇ"
+    for c in re.findall(r"[aeiouy]+|[^aeiouy]+", w):
+        if c[0] in EN_VOWEL:
+            out += syl(cho, EN_VOWEL[c[0]])
+            cho = "ㅇ"
+        else:                                            # 자음 덩어리: 마지막 자음만 다음 모음에 붙고 앞 자음은 '으' 음절(str → 스트)
+            chos = [c_ if c_ in CHO else EN_CHO.get(c_, "ㅇ") for c_ in c]
+            out += "".join(syl(x, 18) for x in chos[:-1] if x != "ㅇ")
+            cho = chos[-1]
+    if cho != "ㅇ":                                     # 자음으로 끝나면 '으' 한 음절
+        out += syl(cho, 18)
+    return out
+
+
+def read_aloud(text):
+    """소리로 읽을 글만 한글 발음으로 바꾼다(화면 글자는 그대로): 숫자·단위·기호·영어."""
+    for k, v in SYMBOLS.items():
+        text = text.replace(k, v)
+    text = re.sub(r"[A-Za-z]+", _english, text)
+    return re.sub(r"(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?: (?=[가-힣]))?", _number, text)
+
+
 def _units(word):
-    """어절 → [(녹음 음절 이름)]. 한글이 아닌 글자·숫자는 '에'로 읽는다."""
+    """어절 → [(녹음 음절 이름)]. read_aloud를 거친 한글만 읽고 남은 글자는 건너뛴다."""
     out = []
     for c in word:
         if '가' <= c <= '힣':
             code = ord(c) - 0xAC00
             cho = PLAIN.get(CHO[code // 588], CHO[code // 588])
             out.append(chr(0xAC00 + CHO.index(cho) * 588 + VOWELS[JUNG_END[(code // 28) % 21]] * 28))
-        elif c.isalnum():
-            out.append("에")
     return out
 
 
 def _sentences(text):
-    out = []
+    out, text = [], read_aloud(text)
     for body, end in re.findall(r"([^.?!…]+)([.?!…]*)", text):
         words = []
         for w in body.replace(",", " , ").split():
@@ -132,12 +212,12 @@ def secs(text):
 
 def need(text):
     """진술이 화면에 머물러야 하는 최소 시간 = max(말 길이, 읽기 하한) + TAIL."""
-    n = sum(1 for c in text if '가' <= c <= '힣' or c.isalnum())
+    n = sum(1 for c in read_aloud(text) if '가' <= c <= '힣')
     return max(secs(text), n / READ_RATE) + TAIL
 
 
 def plan(ep):
-    """[(절대 시각, 문장, 말 길이, 여유)] — 훅 질문은 0.3초, 진술은 표시 시작에 말한다. 라벨은 말하지 않는다.
+    """[(절대 시각, 문장, 말 길이, 여유)] — 훅 질문은 0.3초, 진술(screen_text)은 표시 시작에 말한다. 수치(numbers)·라벨은 말하지 않는다.
     여유 = (그 장면의 다음 진술 시작과 이 진술 표시 끝 중 이른 쪽) - 시작 - need(문장). 0 이상이어야 한다."""
     statements = {s for sc in ep.nar["scenes"].values() for s in sc.get("screen_text", [])}
     rows = [(0.3, ep.nar["hook"], secs(ep.nar["hook"]), ep.scenes[0].length - 0.3 - need(ep.nar["hook"]))]

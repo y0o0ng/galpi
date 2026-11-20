@@ -283,6 +283,15 @@ class RenderGateTest(Base):
         with self.assertRaises(ValueError):
             T.load_v2(dict(nar, scenes={"a": {"screen_text": ["질문"], "labels": "라벨"}, "b": {"screen_text": ["수치"]}}), SCN, ("a", "b"))
 
+    def test_numbers_are_required_and_placeable_but_not_statements(self):
+        nar = dict(NAR, scenes={"a": {"screen_text": ["질문"]}, "b": {"screen_text": [], "numbers": ["12"]}})
+        scn = [SCN[0], {"id": "b", "duration": 4.0, "texts": [{"text": "12", "start": 0.5, "end": 3.0}]}]
+        _, approved, labels = T.load_v2(nar, scn, ("a", "b"))
+        E.start_texts(approved, labels)
+        self.assertIn("12", E.undrawn_texts())                                # 수치는 그려야 한다(말만 안 한다)
+        with self.assertRaises(ValueError):
+            T.load_v2(dict(nar, scenes={"a": {"screen_text": ["질문"]}, "b": {"screen_text": [], "numbers": "12"}}), scn, ("a", "b"))
+
     def test_empty_episode_fails(self):
         with self.assertRaises(ValueError):
             make(dict(NAR, scenes={}), [], ids=())

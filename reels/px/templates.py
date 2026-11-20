@@ -87,9 +87,10 @@ def load_v2(nar, scenes_json, ids):
         c = content[sid]
         if not isinstance(c, dict) or not isinstance(c.get("screen_text"), list) or not all(isinstance(x, str) and x for x in c["screen_text"]):
             raise ValueError(f"[{sid}] 형식 2 장면은 screen_text(승인된 화면 문구 목록)가 있는 객체여야 한다")
-        if not isinstance(c.get("labels", []), list) or not all(isinstance(x, str) and x for x in c.get("labels", [])):
-            raise ValueError(f"[{sid}] labels(선택 라벨 목록)는 비지 않은 문자열 목록이어야 한다")
-        approved |= set(c["screen_text"])
+        for key, what in (("labels", "선택 라벨"), ("numbers", "말하지 않는 큰 수치")):
+            if not isinstance(c.get(key, []), list) or not all(isinstance(x, str) and x for x in c.get(key, [])):
+                raise ValueError(f"[{sid}] {key}({what} 목록)는 비지 않은 문자열 목록이어야 한다")
+        approved |= set(c["screen_text"]) | set(c.get("numbers", []))
         labels |= set(c.get("labels", []))
     approved |= _check_hook(nar)
     if not isinstance(scenes_json, list) or [e.get("id") for e in scenes_json] != list(ids):
@@ -108,7 +109,7 @@ def load_v2(nar, scenes_json, ids):
         texts = []
         for x in e.get("texts", []):
             s, a, b = x.get("text"), x.get("start"), x.get("end")
-            if s not in content[sid]["screen_text"] and s not in content[sid].get("labels", []):
+            if s not in content[sid]["screen_text"] + content[sid].get("numbers", []) + content[sid].get("labels", []):
                 raise ValueError(f"[{sid}] 타임라인의 화면 문구가 그 장면의 승인 문구가 아니다: {s!r}")
             if not (isinstance(a, (int, float)) and isinstance(b, (int, float)) and 0 <= a < b <= dur):
                 raise ValueError(f"[{sid}] 화면 문구 표시 구간이 장면 0~{dur} 안이어야 한다: {s!r} {a}~{b}")
