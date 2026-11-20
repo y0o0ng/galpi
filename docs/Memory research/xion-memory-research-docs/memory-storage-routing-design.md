@@ -990,6 +990,12 @@ A preference target holds several current claims, read through the Preference Se
 Stated problems stay out of this change and are counted from label notes first. Code follows when
 storage reopens; until then preferences are labelled DEFERRED with a note.
 
+**`residence_area` means where the user lives, not only an area (owner, 2026-11-20).** A dwelling
+such as "아빠 집" is a value, as is a region; the first train label of this attribute set it. A place the
+user only spends the day at stays out. Both kinds can be current together, so a later region is
+EXPAND, not SUPERSEDE, of a dwelling; nothing in the attribute tells the two apart yet, which leaves
+that judgement to the proposer and is to be checked when storage reopens.
+
 **Preference and possession attributes (owner, 2026-11-04).** 100 Extractor labels left 37 of 74
 storable anchors with no family, 15 of them preferences and 6 possessions. Both now register as
 MULTI `general_fact` attributes under the proposal → HUMAN approval path. `preference`: what the
