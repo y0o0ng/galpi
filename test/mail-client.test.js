@@ -66,6 +66,7 @@ function fakeGmail() {
     gmailMessage('g-older', NOW - 86400 * 8, ['INBOX']),
   ];
   let unavailable = false;
+  let rejection = null;
   let unavailableWindowEnd = null;
   let emailAddress = 'test@gmail.com';
   let tokenFetches = 0;
@@ -82,6 +83,7 @@ function fakeGmail() {
     const endpoint = parsed.pathname.replace('/gmail/v1/users/me', '');
     calls.push({ endpoint, query: parsed.searchParams });
     if (unavailable) return Response.json({}, { status: 503 });
+    if (rejection) return Response.json(rejection.body, { status: rejection.status });
     if (endpoint === '/profile') return Response.json({ emailAddress });
     if (endpoint === '/labels') return Response.json({ labels: [
       { id: 'INBOX', name: 'INBOX', type: 'system' }, { id: 'Label_2', name: 'Project', type: 'user' },
@@ -136,20 +138,22 @@ function fakeGmail() {
     tokenFetches: () => tokenFetches,
     setMessages(messages) { mail.splice(0, mail.length, ...messages); },
     setUnavailable(value) { unavailable = value; },
+    setRejection(status, body) { rejection = status ? { status, body } : null; },
     setUnavailableWindow(end) { unavailableWindowEnd = end; },
     setEmailAddress(value) { emailAddress = value; },
   };
 }
 
-test('an empty Gmail mailbox and inbox range stay available', async () => {
+test('an empty Gmail mailbox and candidate stream stay available', async () => {
   const gmail = fakeGmail();
   gmail.setMessages([]);
   const account = { address: 'test@gmail.com' };
   const inbox = { providerId: 'INBOX' };
   assert.deepEqual(await gmail.adapter.page(account, inbox, null, 20), { rows: [], next: null });
-  assert.deepEqual(await gmail.adapter.inboxRange(account, inbox, { from: NOW - 3600, to: NOW, maximum: 200 }), {
-    rows: [], earlier: false, anchor: null,
-  });
+  const stream = gmail.adapter.openStream(account, inbox);
+  assert.deepEqual(await stream.open({ from: NOW - 3600, to: NOW, maximum: 200 }), { earlier: false, anchor: null, count: 0 });
+  assert.equal(await stream.peek(), null);
+  assert.equal(stream.carry(), null);
 });
 
 function imapMessage(uid, receivedAt, { source = SOURCE, flags = [], messageId = '<same@example.com>' } = {}) {
@@ -197,6 +201,7 @@ function fakeImap() {
     unavailable: false,
   };
   const calls = [];
+  const connections = [];
   const adapter = createImapMailClient({
     credentialsFor(account) {
       return { user: account.provider === 'naver' ? 'test' : 'test@school.example.com', pass: 'app-password' };
@@ -207,6 +212,7 @@ function fakeImap() {
       const rows = () => state.rows[path] || [];
       return {
         async connect() {
+          connections.push(credentials.user);
           if (state.unavailable) throw new Error('isolated mock failure');
         },
         async logout() {},
@@ -242,10 +248,9 @@ function fakeImap() {
         async *fetch(set, query, options) {
           assert.ok(path);
           assert.equal(options.uid, true);
-          assert.equal(query.source, undefined);
           const ids = new Set(set.split(',').map(Number));
-          calls.push({ path, operation: 'FETCH', ids: [...ids] });
-          for (const row of rows().filter(row => ids.has(row.uid))) yield { ...row, source: undefined };
+          calls.push({ path, operation: 'FETCH', ids: [...ids], metadata: Boolean(query.envelope), source: Boolean(query.source) });
+          for (const row of rows().filter(row => ids.has(row.uid))) yield { ...row, source: query.source ? row.source : undefined };
         },
         async fetchOne(uid, query, options) {
           assert.ok(path);
@@ -257,7 +262,7 @@ function fakeImap() {
       };
     },
   });
-  return { naver, works, calls, adapter };
+  return { naver, works, calls, connections, adapter };
 }
 
 function fixture(t, smartEnabled = false) {
@@ -554,6 +559,154 @@ test('an unavailable account leaves healthy inbox rows and reports old cached me
   const mismatch = await f.service.inbox(null, 10);
   assert.deepEqual(mismatch.sources.map(source => source.status), ['unavailable', 'fresh']);
   assert.equal(mismatch.sources[0].failure.code, 'MAIL_CLIENT_ACCOUNT_MISMATCH');
+});
+
+test('a unified page fetches metadata only for the rows it emits and continues exactly on the next page', async t => {
+  const f = fixture(t);
+  const naver = f.addAccount('naver', 'test@naver.com');
+  f.imap.naver.rows.INBOX = Array.from({ length: 60 }, (_, i) => imapMessage(i + 1, NOW - 1 - i));
+  await f.service.mailboxes(naver);
+  f.imap.connections.length = 0;
+  f.imap.calls.length = 0;
+  const first = await f.service.inbox(null, 20);
+  assert.deepEqual(first.messages.map(row => row.receivedAt), Array.from({ length: 20 }, (_, i) => NOW - 1 - i));
+  const metadataRows = () => f.imap.calls.filter(call => call.operation === 'FETCH' && call.metadata).flatMap(call => call.ids);
+  assert.equal(metadataRows().length, 20);
+  assert.equal(f.imap.calls.filter(call => call.operation === 'PEEK').length, 0);
+  assert.equal(f.imap.connections.length, 1);
+  const next = await f.service.inbox(first.nextCursor, 20);
+  assert.deepEqual(next.messages.map(row => row.receivedAt), Array.from({ length: 20 }, (_, i) => NOW - 21 - i));
+  assert.equal(metadataRows().length, 40);
+  assert.equal((await f.service.detail(first.messages[0].id)).subject, 'Original subject');
+
+  const g = fixture(t);
+  g.addAccount('gmail', 'test@gmail.com');
+  g.gmail.setMessages(Array.from({ length: 60 }, (_, i) => gmailMessage('m' + i, NOW - 1 - i, ['INBOX'])));
+  const page = await g.service.inbox(null, 20);
+  assert.deepEqual(page.messages.map(row => row.providerMessageId), Array.from({ length: 20 }, (_, i) => 'm' + i));
+  const gets = g.gmail.calls.filter(call => call.endpoint.startsWith('/messages/')).length;
+  assert.ok(gets >= 20 && gets <= 24, 'metadata GETs: ' + gets);
+});
+
+test('the raw proof for UIDVALIDITY 0 happens in the same IMAP session as the list read', async t => {
+  const f = fixture(t);
+  const naver = f.addAccount('naver', 'test@naver.com');
+  const works = f.addAccount('works', 'test@school.example.com');
+  await Promise.all([f.service.mailboxes(naver), f.service.mailboxes(works)]);
+  f.imap.connections.length = 0;
+  const page = await f.service.inbox(null, 20);
+  assert.deepEqual(f.imap.connections.sort(), ['test', 'test@school.example.com']);
+  assert.equal(page.incomplete, false);
+  assert.equal(page.messages.filter(row => row.accountId === naver).length, 2);
+  const stored = row => JSON.parse(f.db.prepare('SELECT locator_json AS json FROM mail_client_messages WHERE id = ?').get(row.id).json);
+  const proven = page.messages.find(row => row.accountId === naver);
+  assert.ok(stored(proven).rawProof);
+  assert.equal(stored(page.messages.find(row => row.accountId === works)).rawProof, null);
+  assert.ok(f.imap.calls.some(call => call.operation === 'FETCH' && call.source));
+});
+
+test('unified sent, drafts, junk and trash span providers and exclude an account without the folder', async t => {
+  const f = fixture(t);
+  const gmail = f.addAccount('gmail', 'test@gmail.com');
+  const naver = f.addAccount('naver', 'test@naver.com');
+  const works = f.addAccount('works', 'test@school.example.com');
+  f.gmail.setMessages([
+    gmailMessage('g-inbox', NOW - 5, ['INBOX']), gmailMessage('g-sent', NOW - 30, ['SENT']),
+    gmailMessage('g-draft', NOW - 31, ['DRAFT']), gmailMessage('g-spam', NOW - 32, ['SPAM']), gmailMessage('g-trash', NOW - 33, ['TRASH']),
+  ]);
+  for (const [path, role, uid] of [['Sent', '\\Sent', 7], ['Drafts', '\\Drafts', 8], ['Spam', '\\Junk', 9], ['Bin', '\\Trash', 10]]) {
+    f.imap.naver.folders.push({ path, name: path, specialUse: role, flags: new Set() });
+    f.imap.naver.rows[path] = [imapMessage(uid, NOW - 20 - uid)];
+  }
+  f.imap.works.rows['Sent Messages'] = [imapMessage(5, NOW - 10)];
+  const stored = row => JSON.parse(f.db.prepare('SELECT locator_json AS json FROM mail_client_messages WHERE id = ?').get(row.id).json);
+
+  const sent = await f.service.unified('sent', null, 20);
+  assert.deepEqual(sent.messages.map(row => row.accountId), [works, naver, gmail]);
+  assert.deepEqual(sent.sources.map(source => source.status), ['fresh', 'fresh', 'fresh']);
+  assert.equal(sent.incomplete, false);
+  assert.ok(sent.messages.every(row => stored(row).inbox === false));
+  assert.equal(sent.messages[2].providerMessageId, 'g-sent');
+
+  const expected = { drafts: 'g-draft', junk: 'g-spam', trash: 'g-trash' };
+  for (const [role, id] of Object.entries(expected)) {
+    const page = await f.service.unified(role, null, 20);
+    assert.ok(page.messages.some(row => row.accountId === gmail && row.providerMessageId === id));
+    assert.equal(page.messages.filter(row => row.accountId === naver).length, 1);
+    assert.equal(page.messages.some(row => row.accountId === works), false);
+    assert.deepEqual(page.sources.map(source => [source.accountId, source.status, source.failure?.code]), [
+      [gmail, 'fresh', undefined], [naver, 'fresh', undefined], [works, 'unavailable', 'MAIL_CLIENT_MAILBOX_UNAVAILABLE'],
+    ]);
+    assert.equal(page.incomplete, false);
+  }
+  assert.equal(stored((await f.service.unified('inbox', null, 20)).messages[0]).inbox, true);
+  await assert.rejects(f.service.unified('archive', null, 20), { code: 'MAIL_CLIENT_INVALID_REQUEST' });
+
+  const search = await f.service.search({ role: 'drafts' }, null, null, 20);
+  assert.deepEqual(search.sources.map(source => [source.status, source.failure?.code]), [
+    ['fresh', undefined], ['fresh', undefined], ['unavailable', 'MAIL_CLIENT_MAILBOX_UNAVAILABLE'],
+  ]);
+  assert.deepEqual(search.messages.map(row => row.folderPath ?? row.providerMessageId).sort(), ['Drafts', 'g-draft']);
+  assert.throws(() => f.service.search({ role: 'archive' }, null, null, 20), { code: 'MAIL_CLIENT_SEARCH_INVALID' });
+});
+
+test('an account missing the folder for a role is unavailable without failing the unified page', async t => {
+  const f = fixture(t);
+  const naver = f.addAccount('naver', 'test@naver.com');
+  const page = await f.service.unified('junk', null, 20);
+  assert.deepEqual(page.messages, []);
+  assert.equal(page.incomplete, false);
+  assert.equal(page.nextCursor, null);
+  assert.deepEqual(page.sources.map(source => [source.accountId, source.status, source.failure.code]),
+    [[naver, 'unavailable', 'MAIL_CLIENT_MAILBOX_UNAVAILABLE']]);
+});
+
+test('Gmail rate limits are not reported as an expired login', async t => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const f = fixture(t);
+  const account = f.addAccount('gmail', 'test@gmail.com');
+  const cases = [
+    [403, { error: { code: 403, errors: [{ reason: 'userRateLimitExceeded' }], status: 'PERMISSION_DENIED' } }, 'MAIL_CLIENT_PROVIDER_RATE_LIMITED', 'userRateLimitExceeded'],
+    [403, { error: { errors: [{ reason: 'insufficientPermissions' }] } }, 'MAIL_CLIENT_AUTH_REQUIRED', 'insufficientPermissions'],
+    [429, { error: { status: 'RESOURCE_EXHAUSTED' } }, 'MAIL_CLIENT_PROVIDER_RATE_LIMITED', 'RESOURCE_EXHAUSTED'],
+    [403, null, 'MAIL_CLIENT_AUTH_REQUIRED', 'unknown'],
+  ];
+  for (const [status, body, code, reason] of cases) {
+    f.gmail.setRejection(status, body);
+    await assert.rejects(f.service.mailboxes(account), { code, statusCode: 503 });
+    assert.equal(warn.mock.calls.at(-1).arguments[0], 'Mail Workspace Gmail ' + status + ' reason=' + reason);
+  }
+  f.gmail.setRejection(429, { error: {} });
+  const page = await f.service.inbox(null, 10);
+  assert.equal(page.sources[0].failure.code, 'MAIL_CLIENT_PROVIDER_RATE_LIMITED');
+  assert.equal(page.incomplete, true);
+});
+
+test('a write confirmed during a first page retries it, while a cursor page keeps the strict 409', async t => {
+  const f = fixture(t);
+  f.addAccount('gmail', 'test@gmail.com');
+  let service;
+  let bump = true;
+  const providers = { gmail: { ...f.gmail.adapter, openStream(...args) {
+    const stream = f.gmail.adapter.openStream(...args);
+    const open = stream.open;
+    stream.open = async options => {
+      const result = await open(options);
+      if (bump) {
+        bump = false;
+        service.invalidateCursors();
+      }
+      return result;
+    };
+    return stream;
+  } } };
+  service = createMailClient({ db: f.db, agentStore: f.store, providers, now: () => NOW });
+  const first = await service.inbox(null, 1);
+  assert.equal(bump, false);
+  assert.deepEqual(first.messages.map(row => row.providerMessageId), ['g-inbox']);
+  assert.ok(first.nextCursor);
+  bump = true;
+  await assert.rejects(service.inbox(first.nextCursor, 1), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
 });
 
 test('a cached Naver mailbox page keeps the last verified IDs and marks the observation stale', async t => {

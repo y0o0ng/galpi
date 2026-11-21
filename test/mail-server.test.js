@@ -155,6 +155,15 @@ test('Mail Client uses the existing HTTP authentication and runs independently f
   assert.equal((await fetch(url + '/api/mail-client/messages/1/inline-images/0')).status, 401);
   assert.equal((await api(url, '/api/mail-client/messages/1/inline-images/0')).body.code, 'MAIL_CLIENT_MESSAGE_NOT_FOUND');
   assert.equal((await api(url, '/api/mail-client/inbox?limit=100')).response.status, 400);
+  const unified = await api(url, '/api/mail-client/unified/archive');
+  assert.equal(unified.response.status, 400);
+  assert.equal(unified.body.code, 'MAIL_CLIENT_INVALID_REQUEST');
+  assert.equal((await api(url, '/api/mail-client/unified/sent?limit=100')).response.status, 400);
+  assert.equal((await api(url, '/api/mail-client/unified/sent?cursor=bad')).response.status, 400);
+  assert.equal((await fetch(url + '/api/mail-client/unified/sent')).status, 401);
+  for (const role of ['inbox', 'sent', 'drafts', 'junk', 'trash']) {
+    assert.deepEqual((await api(url, '/api/mail-client/unified/' + role)).body, { success: true, messages: [], sources: [], incomplete: false, nextCursor: null });
+  }
   const contactsPath = '/api/mail-client/contacts';
   assert.equal((await fetch(url + contactsPath)).status, 401);
   assert.deepEqual((await api(url, contactsPath)).body, { success: true, contacts: [], total: 0, collectionEnabled: false });

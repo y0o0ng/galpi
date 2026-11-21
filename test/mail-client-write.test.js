@@ -144,9 +144,8 @@ function imapMock() {
       },
       async *fetch(set, fields, { uid }) {
         assert.equal(uid, true);
-        assert.equal(fields.source, undefined);
         for (const row of rows().filter(entry => set.split(',').includes(String(entry.uid)))) {
-          yield { ...row, source: undefined };
+          yield { ...row, source: fields.source ? row.source : undefined };
         }
       },
       async fetchOne(uid, fields, options) {
@@ -448,18 +447,23 @@ test('confirmed writes invalidate account observations and issued unified cursor
   assert.equal(current.messages.some(message => message.accountId === f.account.gmail), false);
 });
 
-test('a list read already in flight cannot restore a pre-mutation cache observation', async t => {
+test('a first-page read already in flight is retried after a write instead of restoring a pre-mutation observation', async t => {
   const f = fixture(t);
   const id = await f.locate('gmail');
   let started;
   let release;
   const received = new Promise(resolve => { started = resolve; });
-  f.gmail.state.afterMetadata = () => new Promise(resolve => { release = resolve; started(); });
+  f.gmail.state.afterMetadata = () => {
+    f.gmail.state.afterMetadata = null;
+    return new Promise(resolve => { release = resolve; started(); });
+  };
   const oldList = f.reader.mailbox(f.account.gmail, 'all', null, 1);
   await received;
   assert.equal((await f.single('invalidate-while-loading', id, 'archive')).state, 'confirmed');
   release();
-  await assert.rejects(oldList, { code: 'MAIL_CLIENT_CURSOR_INVALID' });
-  const cached = f.db.prepare("SELECT count(*) AS n FROM mail_client_cache WHERE cache_key LIKE 'page:%'").get();
-  assert.equal(cached.n, 0);
+  const page = await oldList;
+  assert.equal(page.messages[0].labelIds.includes('INBOX'), false);
+  const cached = f.db.prepare("SELECT observation_json AS json FROM mail_client_cache WHERE cache_key LIKE 'page:%'").all();
+  assert.equal(cached.length, 1);
+  assert.equal(JSON.parse(cached[0].json).rows[0].metadata.labelIds.includes('INBOX'), false);
 });

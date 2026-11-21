@@ -707,3 +707,13 @@ test('Reels episode card keeps model strings as text, revokes blobs, and hides w
   assert.match(panel, /state\.reelsEpisode = data\.episode \|\| null/);
   assert.match(panel, /function openSummary\(\) \{\s*releaseReelsMedia\(\)/);
 });
+
+test('Mail Workspace unified folders load from the unified endpoint when no account is selected', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'public/mail-workspace.js'), 'utf8');
+  assert.match(source, /const unifiedRoles = \['inbox', 'sent', 'drafts', 'junk', 'trash'\];/);
+  assert.match(source, /!scope\.account && unifiedRoles\.includes\(role\) \? \(\) => changeScope\(\{ role, title \}\)/);
+  assert.match(source, /endpoint = '\/unified\/' \+ scope\.role;/);
+  assert.match(source, /else if \(unified\) params\.role = scope\.role;/);
+  assert.match(source, /MAIL_CLIENT_MAILBOX_UNAVAILABLE/);
+  assert.match(source, /'\/accounts\/' \+ message\.accountId \+ '\/messages\/' \+ message\.id \+ '\/draft'/);
+});

@@ -17,7 +17,7 @@
 
 ### 추가한 인증 API
 
-- `GET /api/mail-client/search`는 Gmail·Naver·NAVER WORKS에서 아직 열지 않은 과거 메일까지 검색한다. 검색어는 제목·발신자·받는 사람(To)에서 찾고, 발신자 전용 조건과 계정·메일함·기간·첨부·별표·읽음 필터를 함께 적용할 수 있다. 검색어 없이 필터만 적용해도 제공자 범위는 같다. 스팸·휴지통·초안은 기본 검색에서 제외하며 해당 라벨이나 폴더를 직접 선택하면 포함한다.
+- `GET /api/mail-client/search`는 Gmail·Naver·NAVER WORKS에서 아직 열지 않은 과거 메일까지 검색한다. 검색어는 제목·발신자·받는 사람(To)에서 찾고, 발신자 전용 조건과 계정·메일함·기간·첨부·별표·읽음 필터를 함께 적용할 수 있다. 검색어 없이 필터만 적용해도 제공자 범위는 같다. 스팸·휴지통·초안은 기본 검색에서 제외하며 해당 라벨이나 폴더를 직접 선택하면 포함한다. `role`(`inbox`·`sent`·`drafts`·`junk`·`trash`)은 `inbox=1`·`mailbox`와 함께 쓸 수 없는 대안으로, 계정마다 통합 폴더 규칙(위 `통합 폴더`)으로 폴더를 고르고 역할이 없는 계정은 `MAIL_CLIENT_MAILBOX_UNAVAILABLE`로 제외한다.
 - Gmail은 `messages.list`의 제목·주소·상태 검색과 라벨을 쓰고, Naver·NAVER WORKS는 실제 서버 폴더를 read-only로 열어 `UID SEARCH`를 실행한다. KST 기간과 헤더 조건은 반환 메타데이터에서 확인한다. IMAP 첨부 조건은 `BODYSTRUCTURE`로 확인하고, UIDVALIDITY가 없는 결과를 열 수 있는 ID로 바꿀 때만 기존 `BODY.PEEK` 원문 증명을 적용한다. 검색 본문과 별도 검색 색인은 두지 않는다. [Gmail 검색](https://developers.google.com/workspace/gmail/api/guides/filtering) · [IMAP SEARCH](https://imapflow.com/docs/guides/searching/)
 - 검색 커서는 계정·검색 조건·제공자별 위치에 묶이며 같은 커서의 응답을 재사용한다. Gmail 후보는 제공자 페이지 순서로, IMAP 후보는 폴더별 UID 범위로 가져오고 확보한 후보는 수신 시각으로 병합한다. IMAP에서 UID와 수신 시각 순서가 다른 경우 페이지 경계를 넘어 시각 순서가 바뀔 수 있다. `coverage=provider_mailboxes`이며 `total`은 해당 탐색에서 지금까지 확인한 수다. 필터를 적용한 뒤 후보가 남아 있으면 빈 페이지도 다음 커서를 가질 수 있다. 계정이나 폴더 조회가 실패하면 성공한 조회 결과와 `sources`·`incomplete`를 함께 돌려준다.
 - Gmail 상세는 현재 원본에서 확인한 thread ID로 `threads.get`을 호출해 같은 계정의 전체 스레드를 조회한다. 스레드에는 헤더와 MIME 메타데이터만 요청하며, 각 메일에 기존 메시지 ID를 발급해 `thread.messages`의 `id`·`from`·`subject`·`receivedAt` 형식으로 표시한다. 각 원문은 열 때 기존 상세 검증 경로에서 가져온다. 스레드 조회에 실패해도 열린 메일 본문은 표시한다. [Gmail 스레드 조회](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/get)
@@ -69,11 +69,17 @@ v45의 `mail_client_messages`에는 계정, 제공자 위치, 검증값, 발신�
 
 Agent 메시지·Attention 링크는 계정과 Agent identity, 해당 제공자 위치를 대조한다. IMAP은 INBOX에서 UID, 유효 UIDVALIDITY, 원본 identity, 발신 주소·제목·봉투 날짜를 함께 확인한다. 기존 Agent 행에는 RFC Message-ID가 있을 때 과거 원문 해시를 보관한 적이 없으므로, 이전 바이트와의 동일성은 새 Workspace 관측부터 적용된다. 한 번 확인된 링크는 그 상세 ID에 고정되고 새 위치를 가리키기 시작하면 위치 오류를 반환한다. 조회 결과를 `mail_messages`나 분석 큐에 기록하는 경로는 없다.
 
-## 통합 받은편지함
+## 통합 폴더
 
-통합 목록은 동일한 UTC 수신 시각 창에 대해 계정별 받은편지함을 병렬 조회한다. 완료한 창의 메시지는 수신 시각 내림차순으로 정렬하고, 동률은 계정 ID와 제공자 위치로 고정한다. UID 할당 순서와 수신 날짜가 다른 IMAP 메일도 같은 시각 정렬을 적용한다. 기본 7일 창에 계정별 후보가 200건을 넘으면 채우기 전에 창을 양분한다. 같은 1초에 모인 메일은 동률 정렬을 위해 그 범위 전체를 조회한다. 과거 창으로 이동할 때 제공자의 날짜 검색은 ID와 날짜만 조사하며 메타데이터는 요청 범위 안에서 읽는다.
+통합 목록은 받은편지함·보낸편지함·임시보관함·스팸함·휴지통(`inbox`·`sent`·`drafts`·`junk`·`trash`)을 지원한다. 보관함은 계정마다 폴더 의미가 달라 지원하지 않는다. 계정별 폴더는 IMAP LIST Special-Use(`\Inbox`·`\Sent`·`\Drafts`·`\Junk`·`\Trash`)에서 선택 가능한 폴더가 정확히 하나일 때만 고르고, Gmail은 시스템 라벨(`INBOX`·`SENT`·`DRAFT`·`SPAM`·`TRASH`)을 쓴다. 해당 역할의 폴더가 없는 계정은 `unavailable`과 `MAIL_CLIENT_MAILBOX_UNAVAILABLE`로 제외하며 페이지 실패나 `incomplete`로 보지 않는다. 행의 `locator.inbox`는 받은편지함 역할일 때만 참이다.
 
-커서는 서버에서 발급하는 불투명 토큰으로 10분 동안 유지한다. 같은 커서 재시도에는 같은 페이지를 반환하며, 재시작·만료 후 첫 페이지에서 다시 시작한다. 요청한 개수에 도달하거나 과거 메일이 끝날 때까지 날짜 창을 이어 읽는다. 한 요청에서 새 창은 최대 3개 읽으며, 더 탐색해야 하면 후속 커서를 반환한다. 계정별 `fresh`·`stale`·`unavailable`과 `incomplete`를 명시한다. 한 페이지에 여러 창의 결과가 들어와도 행마다 해당 관측 시각과 캐시 상태를 유지한다. 범위를 제공하지 못한 계정은 후속 탐색에서 제외하되 이미 조회한 메시지는 보존한다. 새 첫 페이지에서 해당 계정을 다시 시도한다. 새 메일 유입이나 제공자 삭제에 따라 아직 읽지 않은 날짜 창의 관측은 달라질 수 있다.
+통합 목록은 UTC 7일 수신 시각 창 안에서 계정별 후보 스트림을 만들고 수신 시각이 가장 새로운 머리부터 합친다(수신 시각 내림차순, 동률은 계정 ID와 제공자 위치). 메타데이터는 페이지에 실린 행에만 읽는다. IMAP은 SEARCH와 `{uid, internalDate}` FETCH로 후보의 정확한 시각만 알고, 한 요청 동안 연결 하나(EXAMINE 유지)에서 실린 UID만 한 번에 가져온 뒤 로그아웃한다. UIDVALIDITY가 0이거나 없으면 같은 세션에서 원문(PEEK)으로 증명 해시까지 만든다. Naver·NAVER WORKS의 INBOX는 UIDVALIDITY `0`을 보고한다(2026-11-22 STATUS·EXAMINE으로 확인, Sent는 `1`). 이전의 증명용 두 번째 연결과 행별 순차 조회는 없다. Gmail은 창의 ID를 목록으로 받고(새 메일 먼저) 8건씩 머리가 필요할 때만 메타데이터를 읽는다. 청크 사이 순서는 Gmail 목록 순서(최신순)를 전제하고 청크 안에서는 수신 시각으로 정렬한다.
+
+기본 7일 창에 후보가 200건을 넘으면 채우기 전에 창을 양분한다. 같은 1초에 모인 메일은 동률 정렬을 위해 그 범위 전체를 조회한다. 페이지에 싣지 않은 후보와 이미 읽은 행은 커서 상태에 남겨 다음 페이지가 그대로 이어진다(다음 페이지는 새 세션을 열 수 있다).
+
+커서는 서버에서 발급하는 불투명 토큰으로 10분 동안 유지한다. 같은 커서 재시도에는 같은 페이지를 반환하며, 재시작·만료 후 첫 페이지에서 다시 시작한다. 요청한 개수에 도달하거나 과거 메일이 끝날 때까지 날짜 창을 이어 읽는다. 한 요청에서 새 창은 최대 3개 읽으며, 더 탐색해야 하면 후속 커서를 반환한다. 계정별 `fresh`·`stale`·`unavailable`과 `incomplete`를 명시한다. 창을 읽지 못한 계정은 그 창에 대해 마지막 성공 때 실었던 행(`unified:<역할>:<창>` 관측)이 있으면 `stale`로 대신하고, 없으면 후속 탐색에서 제외하되 이미 조회한 메시지는 보존한다. 새 첫 페이지에서 해당 계정을 다시 시도한다. 새 메일 유입이나 제공자 삭제에 따라 아직 읽지 않은 날짜 창의 관측은 달라질 수 있다.
+
+첫 페이지(커서 없음)를 읽는 동안 확정된 쓰기로 세대가 바뀌면 새 세대로 한 번 다시 읽는다. 커서 페이지는 기존처럼 `409 MAIL_CLIENT_CURSOR_INVALID`를 반환한다. Gmail의 403·429 중 요청 제한 사유(`rateLimitExceeded`·`userRateLimitExceeded`·`quotaExceeded`·`dailyLimitExceeded`·`backendError`, 상태 `RESOURCE_EXHAUSTED`, HTTP 429)는 `MAIL_CLIENT_PROVIDER_RATE_LIMITED`(503)이며 로그인 만료로 보지 않는다. 그 밖의 403은 `MAIL_CLIENT_AUTH_REQUIRED`다. 로그에는 사유 코드만 남긴다.
 
 ## 상세와 첨부
 
@@ -88,7 +94,8 @@ Gmail 상세는 Workspace 전용 `format=raw`, IMAP 상세는 검증을 함께 �
 | `/api/mail-client/accounts` | 연결 계정 ID, 제공자, 주소, 상태 |
 | `/api/mail-client/accounts/:accountId/mailboxes` | 실제 메일함·라벨과 관측 상태 |
 | `/api/mail-client/accounts/:accountId/messages?mailbox=…&cursor=…` | 선택 목록, 원본 관측 상태, 후속 커서 |
-| `/api/mail-client/inbox?cursor=…` | 통합 목록, 계정별 관측 상태, 불완전 여부와 후속 커서 |
+| `/api/mail-client/inbox?cursor=…` | 통합 받은편지함(`/unified/inbox`와 같다), 계정별 관측 상태, 불완전 여부와 후속 커서 |
+| `/api/mail-client/unified/:role?cursor=…` | `inbox`·`sent`·`drafts`·`junk`·`trash` 통합 목록. 그 밖의 역할은 `400 MAIL_CLIENT_INVALID_REQUEST` |
 | `/api/mail-client/messages/:messageId` | 메일 상세, 평문과 선택적 HTML, 송수신 정보, 스레드 관계와 첨부 메타데이터 |
 | `/api/mail-client/messages/:messageId/attachments` | 첨부 메타데이터 |
 | `/api/mail-client/messages/:messageId/inline-images/:index` | 원본 메시지에서 검증한 래스터 인라인 이미지 바이트 |
