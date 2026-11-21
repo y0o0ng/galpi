@@ -32,7 +32,12 @@ function gmailFixture() {
       const payload = init.body && JSON.parse(init.body);
       calls.push({ path, method: init.method, payload });
       if (path === '/profile') return json({ emailAddress: control.address ?? ACCOUNTS[0].address });
-      if (path === '/drafts' && init.method === 'GET') return json({ drafts: [...drafts.values()] });
+      if (path === '/drafts' && init.method === 'GET') {
+        const fields = new URL(url).searchParams.get('fields');
+        if (!drafts.size) return fields.split(',').includes('resultSizeEstimate')
+          ? json({ resultSizeEstimate: 0 }) : new Response(null, { status: 204 });
+        return json({ drafts: [...drafts.values()] });
+      }
       if (path === '/messages/send' || path === '/drafts/send') {
         if (control.unknown) throw new Error('timeout');
         if (control.status) return json({}, control.status);
@@ -96,6 +101,7 @@ function imapFixture() {
         async search(query, options) {
           assert.equal(options.uid, true);
           events.push(['search', query]);
+          if (control.missingHeaderSearch && query.header) return [];
           const [low, high] = query.uid.split(':').map(Number);
           return [...box.messages].filter(([uid, raw]) => uid >= low && uid <= high
             && (!query.header || raw.includes(query.header['X-Galpi-Draft-Id']))).map(([uid]) => uid);
@@ -114,7 +120,9 @@ function imapFixture() {
           events.push(['append', path]);
           if (control.appendNeverVisible) throw new Error('append response lost');
           const uid = box.next++;
-          box.messages.set(uid, Buffer.from(raw));
+          const stored = control.storeDraft ? control.storeDraft(raw) : Buffer.from(raw);
+          for (let i = 0; i < (control.extraCopies || 0); i += 1) box.messages.set(box.next++, stored);
+          box.messages.set(uid, stored);
           if (control.loseAppendAck) throw new Error('append response lost after commit');
           return control.noUid ? {} : { uid, uidValidity: control.validity };
         },
@@ -182,6 +190,11 @@ function sourceMessage() {
   ];
   return Buffer.from(head.join('\r\n'));
 }
+
+test('Gmail returns an empty drafts page when the account has no drafts', async t => {
+  const { api } = setup(t);
+  assert.deepEqual(await api.list(1, null, 10), { drafts: [], nextCursor: null });
+});
 
 test('Gmail creates, reads, updates and sends a draft with stable draft ID and fresh message ID', async t => {
   const { api, g, observations } = setup(t);
@@ -276,6 +289,60 @@ test('IMAP replacement keeps the previous draft until confirmed and does not app
   assert.equal((await api.detail(2, draft.id)).text.trim(), COMPOSE.text);
   assert.equal(i.events.filter(([op]) => op === 'append').length, 3);
 });
+
+const naverAppendHeader = 'X-Naver-IMAP-Append: provider-generated\r\n';
+
+for (const [provider, accountId, user] of [['Naver', 2, 'me'], ['Works', 3, ACCOUNTS[2].address]]) {
+  test(provider + ' verifies one server-added header and finds the draft when HEADER search misses', async t => {
+    const { api, i } = setup(t);
+    i.control.validity = 42n;
+    i.control.noUid = true;
+    i.control.missingHeaderSearch = true;
+    i.control.storeDraft = raw => Buffer.concat([Buffer.from(naverAppendHeader), raw]);
+    const saved = await api.save(accountId, 'imap-create', COMPOSE);
+    assert.equal(saved.state, 'saved');
+    const before = await api.detail(accountId, saved.draftId);
+    const replacement = await api.save(accountId, 'imap-replace', { ...COMPOSE, text: 'edited' }, before.id, before.version);
+    assert.equal(replacement.state, 'saved');
+    assert.equal(replacement.cleanup, 'confirmed');
+    assert.equal((await api.detail(accountId, replacement.draftId)).text.trim(), 'edited');
+    assert.deepEqual(i.events.filter(([op]) => op === 'move'), [['move', 1]]);
+    assert.deepEqual(i.events.filter(([op, query]) => op === 'search' && query.draft).map(([, query]) => query.uid), ['1:1', '2:2']);
+
+    const messages = i.boxStore(user).messages;
+    const [uid, raw] = [...messages][0];
+    messages.set(uid, Buffer.from(raw.toString().replace('provider-generated', 'different-stamp')));
+    await assert.rejects(api.detail(accountId, replacement.draftId), { code: 'MAIL_CLIENT_DRAFT_CONFLICT' });
+  });
+
+  test(provider + ' only accepts the single server-added APPEND header as a byte difference', async t => {
+    const { api, i } = setup(t);
+    i.control.validity = 42n;
+    const prefix = (value, raw) => Buffer.concat([Buffer.from(value), raw]);
+    i.control.storeDraft = raw => prefix(naverAppendHeader, raw);
+    assert.equal((await api.save(accountId, 'imap-appended-uid', COMPOSE)).state, 'saved');
+    i.control.storeDraft = raw => prefix(naverAppendHeader.repeat(2), raw);
+    assert.equal((await api.save(accountId, 'imap-duplicate-stamp', COMPOSE)).state, 'unknown');
+    i.control.storeDraft = raw => prefix(naverAppendHeader + 'X-Other: changed\r\n', raw);
+    assert.equal((await api.save(accountId, 'imap-other-header', COMPOSE)).state, 'unknown');
+    i.control.storeDraft = raw => prefix(naverAppendHeader, Buffer.from(raw.toString().replace(COMPOSE.text, 'edited')));
+    assert.equal((await api.save(accountId, 'imap-changed-body', COMPOSE)).state, 'unknown');
+  });
+
+  test(provider + ' fallback cannot confirm an ambiguous or oversized draft search', async t => {
+    const { api, i } = setup(t);
+    i.control.noUid = true;
+    i.control.missingHeaderSearch = true;
+    i.control.extraCopies = 1;
+    const duplicate = await api.save(accountId, 'imap-duplicates', COMPOSE);
+    assert.equal(duplicate.state, 'unknown');
+    assert.deepEqual(await api.save(accountId, 'imap-duplicates', COMPOSE), duplicate);
+    i.control.extraCopies = 30;
+    const oversized = await api.save(accountId, 'imap-candidate-limit', COMPOSE);
+    assert.equal(oversized.state, 'unknown');
+    assert.equal(i.events.filter(([op]) => op === 'append').length, 2);
+  });
+}
 
 test('Works replacement with tagged APPENDUID uses native Trash move and paginates remaining drafts', async t => {
   const { api, i } = setup(t);
@@ -444,6 +511,49 @@ test('attachments are one-shot, bound to account, expiring and checked after MIM
   await new Promise(resolve => setTimeout(resolve, 8));
   assert.throws(() => expiring.claim(2, [short.id]), { code: 'MAIL_CLIENT_UPLOAD_NOT_FOUND' });
   assert.equal(observations.smtp.length, 1);
+});
+
+for (const invalidHandle of ['expired', 'foreign', 'missing']) {
+  test('a valid attachment survives a failed claim with an invalid handle (' + invalidHandle + ')', async t => {
+    const uploads = createComposeUploads(invalidHandle === 'expired' ? { ttl: 10 } : undefined);
+    const { api, g, observations } = setup(t, { uploads });
+    const accountId = invalidHandle === 'missing' ? 1 : 2;
+    const upload = owner => api.upload(owner, Readable.from([Buffer.from('file')]), 'file.txt');
+    let badId = 'missing-handle';
+    if (invalidHandle !== 'missing') {
+      badId = (await upload(invalidHandle === 'foreign' ? 3 : accountId)).id;
+    }
+    if (invalidHandle === 'expired') await new Promise(resolve => setTimeout(resolve, 25));
+    const good = await upload(accountId);
+    const attachment = id => ({ kind: 'upload', id });
+    const invalid = { ...COMPOSE, attachments: [attachment(good.id), attachment(badId)] };
+    const failed = await api.send(accountId, 'invalid-attachments', invalid);
+    assert.equal(failed.state, 'failed');
+    assert.equal(failed.code, 'MAIL_CLIENT_UPLOAD_NOT_FOUND');
+    assert.deepEqual(await api.send(accountId, 'invalid-attachments', invalid), failed);
+    assert.deepEqual(g.calls, []);
+    assert.deepEqual(observations.smtp, []);
+
+    const corrected = { ...COMPOSE, attachments: [attachment(good.id)] };
+    assert.equal((await api.send(accountId, 'corrected-attachments', corrected)).state, 'sent');
+  });
+}
+
+test('duplicate attachment handles leave the original available and a valid batch consumes both', async () => {
+  const uploads = createComposeUploads();
+  const a = await uploads.upload(2, Readable.from([Buffer.from('a')]), 'a.txt');
+  const b = await uploads.upload(2, Readable.from([Buffer.from('b')]), 'b.txt');
+  assert.throws(() => uploads.claim(2, [a.id, b.id, a.id]), { code: 'MAIL_CLIENT_COMPOSE_INVALID' });
+
+  const claim = uploads.claim(2, [a.id, b.id]);
+  try {
+    assert.deepEqual(claim.parts.map(part => part.content.toString()), ['a', 'b']);
+    for (const id of [a.id, b.id]) {
+      assert.throws(() => uploads.claim(2, [id]), { code: 'MAIL_CLIENT_UPLOAD_NOT_FOUND' });
+    }
+  } finally {
+    claim.release();
+  }
 });
 
 test('existing draft files can be retained using provider attachment proof, then sent', async t => {

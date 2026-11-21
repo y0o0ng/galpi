@@ -97,6 +97,11 @@ function fakeGmail() {
       const offset = Number(parsed.searchParams.get('pageToken') || 0);
       const limit = Number(parsed.searchParams.get('maxResults') || 100);
       const messages = found.slice(offset, offset + limit).map(({ id }) => ({ id }));
+      const fields = parsed.searchParams.get('fields');
+      if (!found.length && fields) {
+        return fields.split(',').includes('resultSizeEstimate')
+          ? Response.json({ resultSizeEstimate: 0 }) : new Response(null, { status: 204 });
+      }
       return Response.json({
         messages,
         ...(offset + limit < found.length ? { nextPageToken: String(offset + limit) } : {}),
@@ -118,6 +123,17 @@ function fakeGmail() {
     setEmailAddress(value) { emailAddress = value; },
   };
 }
+
+test('an empty Gmail mailbox and inbox range stay available', async () => {
+  const gmail = fakeGmail();
+  gmail.setMessages([]);
+  const account = { address: 'test@gmail.com' };
+  const inbox = { providerId: 'INBOX' };
+  assert.deepEqual(await gmail.adapter.page(account, inbox, null, 20), { rows: [], next: null });
+  assert.deepEqual(await gmail.adapter.inboxRange(account, inbox, { from: NOW - 3600, to: NOW, maximum: 200 }), {
+    rows: [], earlier: false, anchor: null,
+  });
+});
 
 function imapMessage(uid, receivedAt, { source = SOURCE, flags = [], messageId = '<same@example.com>' } = {}) {
   return {
