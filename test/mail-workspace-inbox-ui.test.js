@@ -149,6 +149,7 @@ async function mockApp(t) {
     calls.push({ method: req.method, endpoint, query: Object.fromEntries(url.searchParams), payload });
     if (endpoint === '/api/config') return json({ requiresApiToken: false, gptChatBootstrapModel: 'mock' });
     if (endpoint === '/api/models/chat') return json({ selection: 'auto', options: [], resolvedModelId: null });
+    if (endpoint === '/api/mail/status') return json({ accounts });
     if (!endpoint.startsWith('/api/mail-client/')) return json({ messages: [], notes: [], models: [], notifications: [], ddays: [], chat: [] });
     if (endpoint.endsWith('/accounts')) return state.enabled ? json({ success: true, accounts })
       : json({ success: false, code: 'MAIL_CLIENT_DISABLED' }, 503);
@@ -192,6 +193,14 @@ async function mockApp(t) {
   return { url: 'http://127.0.0.1:' + server.address().port, calls, messages, state, routes };
 }
 
+const mailAgent = '#home-agents [aria-label="Mail 에이전트 열기"]';
+
+async function enterFromAgents(ui) {
+  await ui.click('[data-home-view="agents"]');
+  await ui.waitFor(ui.shown(mailAgent));
+  await ui.click(mailAgent);
+}
+
 const measures = selectors => `JSON.stringify(${JSON.stringify(selectors)}.map(selector => {
   const { x, y, width, height } = document.querySelector(selector).getBoundingClientRect();
   return [x,y,width,height];
@@ -203,8 +212,10 @@ test('desktop inbox renders base and selected exports, preserves explicit action
   await ui.metrics(1440, 900);
   await ui.call('Page.navigate', { url: app.url });
   await ui.waitFor(ui.shown('.home-card-mail'));
-  assert.equal(app.calls.some(call => call.endpoint.startsWith('/api/mail-client')), false);
   await ui.click('.home-card-mail');
+  await ui.waitFor(ui.shown('.home-card-mail.focused'));
+  assert.equal(app.calls.some(call => call.endpoint.startsWith('/api/mail-client')), false);
+  await enterFromAgents(ui);
   await ui.waitFor(ui.shown('#mail-workspace.active .mw-row'));
   assert.equal(await ui.evaluate('document.querySelectorAll("#global-nav").length'), 1);
   assert.equal(await ui.evaluate('document.querySelector("#home-page").classList.contains("active")'), false);
@@ -279,7 +290,7 @@ test('desktop inbox renders base and selected exports, preserves explicit action
   assert.deepEqual(actions().at(-1).payload.operations, [{ messageId: 3, action: 'trash' }]);
   assert.equal(app.calls.some(call => /\/smart\/|\/send$/.test(call.endpoint)), false);
   await ui.click('#global-nav [data-product-route="home"]');
-  await ui.waitFor(ui.shown('#home-page.active .home-card-mail'));
+  await ui.waitFor(ui.shown('#home-page.active ' + mailAgent));
   assert.equal(await ui.evaluate(ui.shown('#mail-workspace')), false);
 
   for (const [index] of app.routes.entries()) {
@@ -296,20 +307,20 @@ test('desktop inbox renders base and selected exports, preserves explicit action
   }
 });
 
-test('disabled Mail Workspace uses the existing Home mail card and respects the write gate', { skip: !chrome }, async t => {
+test('disabled Mail Workspace preserves Agent details and the existing write gate', { skip: !chrome }, async t => {
   const app = await mockApp(t);
   app.state.enabled = false;
   const ui = await browser(t);
   await ui.call('Page.navigate', { url: app.url });
   await ui.waitFor(ui.shown('.home-card-mail'));
-  await ui.click('.home-card-mail');
-  await ui.waitFor(ui.shown('.home-card-mail.focused'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('#home-agents .agent-detail-head h2'));
   assert.equal(await ui.evaluate(ui.shown('#mail-workspace.active')), false);
   app.state.enabled = true;
   app.state.outcome = 'disabled';
   await ui.call('Page.reload', { ignoreCache: true });
   await ui.waitFor(ui.shown('.home-card-mail'));
-  await ui.click('.home-card-mail');
+  await enterFromAgents(ui);
   await ui.waitFor(ui.shown('.mw-row'));
   await ui.click('[data-message-id="1"] .mw-row-star');
   await ui.waitFor('document.body.innerText.includes("메일 상태를 변경할 수 없어")');

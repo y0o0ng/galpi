@@ -73,7 +73,7 @@
     }).format(new Date());
   }
 
-  function card(id, title, meta, content, { focusable = true, activate } = {}) {
+  function card(id, title, meta, content, { focusable = true } = {}) {
     const article = node('article', `home-card home-card-${id}`);
     article.dataset.cardId = id;
     article.style.viewTransitionName = `home-card-${id}`;
@@ -85,7 +85,7 @@
       article.tabIndex = 0;
       article.setAttribute('role', 'button');
       article.setAttribute('aria-label', `${title} 자세히 보기`);
-      const focus = activate || (() => setFocusedCard(id));
+      const focus = () => setFocusedCard(id);
       article.addEventListener('click', event => {
         if (!event.target.closest('button, a, input, select, textarea')) {
           event.stopPropagation();
@@ -446,7 +446,7 @@
     if (!list.childElementCount) list.append(node('p', 'home-card-empty', `분석 대기 ${analysis.pending || 0} · 완료 ${analysis.done || 0}`));
     body.append(summary, list);
     if (state.focusedCard === 'mail') body.append(node('div', 'home-focus-extra'));
-    return card('mail', '메일', '', body, { activate: state.mailWorkspace ? openMail : null });
+    return card('mail', '메일', '', body);
   }
 
   function renderNotifications() {
@@ -795,20 +795,20 @@
     else renderOverview();
   }
 
-  async function openMail() {
+  async function openMailWorkspace(isCurrent) {
     const workspace = state.mailWorkspace;
-    if (!workspace || state.openingMail) return;
-    const focusedCard = state.focusedCard;
+    if (!workspace) return false;
+    if (state.openingMail) return true;
     state.openingMail = true;
     try {
       const available = await workspace.open();
-      if (state.route !== 'home' || state.homeView !== 'overview' || state.focusedCard !== focusedCard) return;
-      if (!available) return setFocusedCard('mail');
-      setRoute('home', 'overview');
+      if (state.route !== 'home' || state.homeView !== 'agents' || !isCurrent()) return true;
+      if (!available) return false;
       document.getElementById('home-page').classList.remove('active');
       document.getElementById('mail-workspace').classList.add('active');
       document.body.dataset.mailWorkspace = '';
       document.querySelector('#mail-workspace h1').focus();
+      return true;
     } finally {
       state.openingMail = false;
     }
@@ -964,5 +964,5 @@
     void refresh();
   }
 
-  global.HomeDashboard = { init, refresh, setRoute, setHomeView, setFocusedCard, openNotifications, openTasks, handleInitialUrl, notificationResolved };
+  global.HomeDashboard = { init, refresh, setRoute, setHomeView, setFocusedCard, openMailWorkspace, openNotifications, openTasks, handleInitialUrl, notificationResolved };
 })(window);

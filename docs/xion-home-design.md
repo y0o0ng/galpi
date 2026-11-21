@@ -170,7 +170,8 @@ Home의 Notes 카드 확장은 Note/Paper 패널 DOM과 controller를 그대로 
 Agents 메인은 Figma `392:958`(Desktop), `398:994`(Pad), `396:976`(Phone)을 따른다.
 Desktop은 큰 데이터 보드(800px 기준) + 오른쪽 상태 레일, Pad는 같은 2열,
 Phone은 압축형 2열 상태 카드가 위에 오고 데이터 보드가 아래에 온다.
-Mail·일정·Codex·Reels/Shorts 진입은 기존 상세 컨트롤러와 API를 사용한다.
+Mail 에이전트 카드에서 Mail Workspace 받은편지함을 연다. Workspace를 사용할 수 없는 환경에서는 기존 Mail 에이전트 상세가 열린다.
+일정·Codex·Reels/Shorts 진입은 기존 상세 컨트롤러와 API를 사용한다.
 
 - 데이터 보드는 설명 헤더 없이 그래프부터 표시한다. 우상단에 `인스타그램`, 좌상단에 작은 색상 범례를 두고, 일별 데이터 펼치기는 표시하지 않는다. 집계 기준은 그래프 접근성 설명에, 실제 값은 점의 툴팁에 남긴다. 그래프 높이는 최대 220px로 제한해 아래 YouTube 영역을 확보한다.
 - Instagram 조회수는 `/api/reels/instagram/insights`로 계정 전체 Reels(수동 게시 포함)의

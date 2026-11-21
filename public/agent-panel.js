@@ -694,6 +694,7 @@
         status: '오류',
         metric: state.mailError || 'Mail 상태를 불러오지 못했어',
         onOpen: openMail,
+        ariaLabel: 'Mail 에이전트 열기',
       });
     }
     const accounts = Array.isArray(state.mail.accounts) ? state.mail.accounts : [];
@@ -2559,6 +2560,7 @@
   }
 
   async function openMail() {
+    if (await global.HomeDashboard?.openMailWorkspace?.(() => state.mode === 'summary')) return;
     state.mode = 'mail';
     renderMailDetail();
     await refresh();
