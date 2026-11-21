@@ -83,17 +83,48 @@
     let writing = false;
     let loading = false;
     let writeDenied = false;
+    let listError = null;
+    let readError = null;
+    let inboxUnread = null;
+    const narrow = global.matchMedia('(max-width: 1100px)');
 
     const sidebar = node('aside', 'mw-sidebar');
     sidebar.setAttribute('aria-label', '메일함');
+    sidebar.id = 'mail-workspace-mailboxes';
+    const shade = node('div', 'mw-shade');
+    shade.setAttribute('aria-hidden', 'true');
+    shade.addEventListener('click', () => toggleMailboxes(false));
     const main = node('div', 'mw-main');
     const header = node('header', 'mw-header');
     const toolbar = node('div', 'mw-toolbar');
     const rows = node('div', 'mw-rows');
     rows.setAttribute('aria-label', '메일 목록');
     const footer = node('footer', 'mw-pagination');
-    main.append(header, toolbar, rows, footer);
-    mount.replaceChildren(sidebar, main);
+    const notices = node('div', 'mw-list-notices');
+    const compose = button('mw-compose mw-compose-fab', '메일 쓰기', null, { glyph: 'compose' });
+    const operationNotice = node('div', 'mw-operation-notices');
+    main.append(header, notices, toolbar, rows, footer, compose);
+    mount.replaceChildren(sidebar, main, shade, operationNotice);
+
+    function toggleMailboxes(open, restoreFocus = true) {
+      const opened = open && narrow.matches;
+      mount.classList.toggle('mw-mailboxes-open', opened);
+      main.inert = opened;
+      header.querySelector('.mw-menu')?.setAttribute('aria-expanded', String(opened));
+      if (opened) {
+        const close = sidebar.querySelector('.mw-close');
+        const firstFolder = sidebar.querySelector('[aria-current="page"]');
+        (close.getClientRects().length ? close : firstFolder)?.focus();
+      } else if (restoreFocus) header.querySelector('.mw-menu')?.focus();
+    }
+
+    narrow.addEventListener('change', () => toggleMailboxes(false, false));
+    mount.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && mount.classList.contains('mw-mailboxes-open')) {
+        event.preventDefault();
+        toggleMailboxes(false);
+      }
+    });
 
     async function get(endpoint, params = {}) {
       const query = new URLSearchParams(params).toString();
@@ -115,8 +146,8 @@
       return verified(message) && !unknown.has(message.id);
     }
 
-    function mailboxFor(role) {
-      const candidates = scope.account ? [scope.account] : accounts;
+    function mailboxFor(role, account) {
+      const candidates = account ? [account] : accounts;
       const matches = candidates.flatMap(account => (boxes.get(account.id) || [])
         .filter(box => box.selectable && roleOf(box) === role).map(box => ({ account, box })));
       if (matches.length === 1) return matches[0];
@@ -126,6 +157,9 @@
     function changeScope(next) {
       if (loading || writing) return;
       scope = next;
+      listError = null;
+      readError = null;
+      toggleMailboxes(false, false);
       history = [];
       page = 0;
       selected.clear();
@@ -133,7 +167,7 @@
     }
 
     function inbox(account) {
-      const box = (boxes.get(account?.id) || []).find(candidate => candidate.inbox && candidate.selectable);
+      const box = account ? mailboxFor('inbox', account)?.box : null;
       if (account && !box) return;
       changeScope({ role: 'inbox', title: '받은편지함', account, box });
     }
@@ -147,16 +181,30 @@
       return control;
     }
 
+    function problemSources() {
+      if (listError?.code === 'MAIL_CLIENT_AUTH_REQUIRED' && scope.account) {
+        return [{ accountId: scope.account.id, provider: scope.account.provider, failure: { code: listError.code } }];
+      }
+      const current = history[page];
+      return (current?.sources || [current?.source]).filter(source => source && source.status !== 'fresh');
+    }
+
     function renderSidebar(unread) {
       const top = node('div', 'mw-sidebar-head');
-      top.append(node('h2', '', '메일'), button('mw-compose', '메일 쓰기', null, { glyph: 'compose' }));
+      const compactHead = node('div', 'mw-mailbox-head');
+      compactHead.append(node('h2', '', '메일함'), button('mw-close', '메일함 메뉴 닫기', () => toggleMailboxes(false),
+        { glyph: 'close', size: 22, iconOnly: true }));
+      top.append(node('h2', 'mw-sidebar-title', '메일'), button('mw-compose', '메일 쓰기', null, { glyph: 'compose' }));
       const standard = node('nav', 'mw-nav');
       standard.setAttribute('aria-label', '기본 메일함');
       for (const [role, title, glyph] of folders) {
-        const target = role === 'inbox' ? null : mailboxFor(role);
-        const handler = role === 'inbox' ? () => inbox(scope.account)
+        const target = role === 'inbox' ? null : mailboxFor(role, scope.account);
+        const handler = role === 'inbox' ? () => inbox()
           : target && (() => changeScope({ ...target, role, title }));
-        standard.append(navRow(title, glyph, handler, scope.role === role, role === 'inbox' && scope.role === role ? unread : null));
+        const count = role === 'inbox' ? inboxUnread : role === 'drafts' && scope.role === role && unread != null ? messages().length : null;
+        const control = navRow(title, glyph, handler, scope.role === role, count);
+        control.dataset.mailboxRole = role;
+        standard.append(control);
       }
 
       const smartNav = node('nav', 'mw-nav');
@@ -167,6 +215,7 @@
       const accountNav = node('nav', 'mw-nav');
       accountNav.setAttribute('aria-label', '계정');
       accountNav.append(node('h3', 'mw-nav-title', '계정'));
+      const problems = problemSources();
       for (const account of accounts) {
         const custom = (boxes.get(account.id) || []).filter(box => box.selectable && (
           (box.kind === 'label' && box.type === 'user') || (box.kind === 'folder' && !roleOf(box))
@@ -182,6 +231,7 @@
         const address = node('span', 'mw-address', account.address);
         address.title = account.address;
         label.append(address);
+        if (problems.some(source => source.accountId === account.id)) label.append(icon('account-alert-dot', 6));
         accountNav.append(label);
         if (!expanded.has(account.id)) continue;
         for (const box of custom) {
@@ -193,24 +243,42 @@
       }
       const bottom = node('div', 'mw-sidebar-bottom');
       bottom.append(navRow('연락처', 'contacts', null), navRow('메일 설정', 'settings', null));
-      sidebar.replaceChildren(top, standard, smartNav, accountNav, bottom);
+      sidebar.replaceChildren(compactHead, top, standard, smartNav, accountNav, bottom);
     }
 
     function renderHeader(unread) {
+      const menu = button('mw-menu', '메일함 메뉴 열기', () => toggleMailboxes(true), { glyph: 'menu', size: 22, iconOnly: true });
+      menu.setAttribute('aria-expanded', String(mount.classList.contains('mw-mailboxes-open')));
+      menu.setAttribute('aria-controls', sidebar.id);
       const heading = node('h1', '', scope.title);
       heading.tabIndex = -1;
-      const total = node('span', 'mw-unread', unread == null ? '' : '안 읽음 ' + labels.format(unread));
-      total.title = '현재 페이지의 안 읽은 메일';
+      const title = node('div', 'mw-title');
+      const prefix = !scope.role ? providers[scope.account?.provider] + ' · ' : '';
+      let caption = '';
+      if (unread != null) {
+        if (scope.role === 'drafts') caption = '초안 ' + labels.format(messages().length) + '개';
+        else if (scope.role === 'trash' && !messages().length) caption = '0개';
+        else caption = prefix + '안 읽음 ' + labels.format(unread);
+      }
+      const total = node('span', 'mw-unread', caption);
+      total.title = '현재 페이지 기준';
+      title.append(heading, total);
       const chips = node('div', 'mw-chips');
       chips.setAttribute('role', 'group');
       chips.setAttribute('aria-label', '계정 범위');
-      for (const [provider, name] of [['', '전체'], ...Object.entries(providers)]) {
-        const account = accounts.find(item => item.provider === provider);
-        const active = !provider ? !scope.account : account != null && scope.account?.id === account.id;
-        const canOpen = !provider || (boxes.get(account?.id) || []).some(box => box.inbox && box.selectable);
-        const chip = button('mw-chip', name, canOpen && !writing && !loading ? () => inbox(account) : null);
-        chip.setAttribute('aria-pressed', String(active));
-        chips.append(chip);
+      if (scope.role) {
+        for (const [provider, name] of [['', '전체'], ...Object.entries(providers)]) {
+          const account = accounts.find(item => item.provider === provider);
+          const target = (!provider || account) ? mailboxFor(scope.role, account) : null;
+          const canOpen = (scope.role === 'inbox' && !provider) || target;
+          const active = !provider ? !scope.account : account != null && scope.account?.id === account.id;
+          const chip = button('mw-chip', name, canOpen && !writing && !loading ? () => {
+            if (scope.role === 'inbox') inbox(account);
+            else changeScope({ ...target, role: scope.role, title: scope.title });
+          } : null);
+          chip.setAttribute('aria-pressed', String(active));
+          chips.append(chip);
+        }
       }
       const search = node('div', 'mw-search');
       const input = node('input');
@@ -220,7 +288,8 @@
       input.setAttribute('aria-label', '메일 검색');
       search.append(icon('search', 18), input,
         button('mw-search-scope', '전체 계정', null, { glyph: 'chevron-down', size: 14 }));
-      header.replaceChildren(heading, total, node('span', 'mw-spacer'), chips, search);
+      const compactSearch = button('mw-compact-search', '메일 검색', null, { glyph: 'search', size: 22, iconOnly: true });
+      header.replaceChildren(menu, title, node('span', 'mw-spacer'), ...(scope.role ? [chips] : []), search, compactSearch);
     }
 
     function renderToolbar() {
@@ -232,10 +301,12 @@
         if (!all) available.forEach(message => selected.add(message.id));
         renderPage();
         toolbar.querySelector('.mw-select-page').focus();
-      } : null, { glyph: count ? 'checkbox-on' : 'checkbox-off', size: 20, iconOnly: true });
+      } : null, { glyph: count && !readError ? 'checkbox-on' : 'checkbox-off', size: 20, iconOnly: true });
       toggle.setAttribute('aria-pressed', String(all));
       const group = node('div', 'mw-actions');
+      toolbar.classList.toggle('mw-muted-controls', (loading && !history[page]) || (scope.role === 'trash' && !messages().length));
       for (const [label, glyph, action, value] of actions) {
+        if (scope.role === 'drafts' && action !== 'trash') continue;
         const control = button('mw-action', label, count && action && !writeDenied && !writing && !loading ? () => {
           void mutate(available.filter(message => selected.has(message.id)), action, value);
         } : null, { glyph, size: 16 });
@@ -244,7 +315,7 @@
       }
       const selection = [toggle];
       toggle.append(icon('chevron-down', 14));
-      if (count > 0) selection.push(node('span', 'mw-selection', labels.format(count) + '개 선택'));
+      if (count > 0 && !readError) selection.push(node('span', 'mw-selection', labels.format(count) + '개 선택'));
       toolbar.replaceChildren(...selection, node('span', 'mw-rule'), group, node('span', 'mw-spacer'),
         button('mw-action', '필터', null, { glyph: 'filter', size: 16 }),
         button('mw-square', '새로고침', !loading && !writing ? () => void loadPage(null, true) : null,
@@ -259,6 +330,7 @@
       el.dataset.checked = checked ? 'Yes' : 'No';
       el.dataset.state = unread ? 'Unread' : 'Read';
       el.dataset.attachment = String(message.hasAttachments === true);
+      el.dataset.starred = String(message.starred === true);
       el.dataset.showThread = 'false';
       const subject = message.subject || '(제목 없음)';
       const select = button('mw-row-select', subject + (checked ? ' 선택 해제' : ' 선택'),
@@ -273,12 +345,18 @@
         actionable(message) && !writeDenied && !writing && !loading ? () => void mutate([message], 'set_starred', !message.starred) : null,
         { glyph: message.starred ? 'star-on' : 'star', size: 20, iconOnly: true });
       star.setAttribute('aria-pressed', String(message.starred === true));
-      const sender = message.from?.[0];
-      const from = node('span', 'mw-sender', sender?.name || sender?.address || '');
+      const isDraft = scope.role === 'drafts';
+      const address = (isDraft ? message.to : message.from)?.[0];
+      const name = address?.name || address?.address || '';
+      const from = node('span', 'mw-sender', isDraft && name ? '받는 사람 · ' + name : name);
       const content = node('span', 'mw-content');
       content.append(node('span', 'mw-subject', subject));
       el.append(select, star, node('span', 'mw-unread-dot'), from, content);
-      if (message.hasAttachments === true) el.append(icon('paperclip', 16));
+      if (message.hasAttachments === true) {
+        const attachment = icon('paperclip', 16);
+        attachment.classList.add('mw-attachment');
+        el.append(attachment);
+      }
       el.append(node('span', 'mw-provider', providers[message.provider] || ''), node('span', 'mw-time', timeOf(message.receivedAt)));
       if (!actionable(message)) el.title = '현재 메일 위치 또는 변경 결과를 확인할 수 없어.';
       return el;
@@ -289,7 +367,11 @@
       const offset = history.slice(0, page).reduce((sum, entry) => sum + entry.messages.length, 0);
       const first = Math.max(0, page - 2);
       const last = Math.min(first + 5, history.length + Number(Boolean(history.at(-1)?.nextCursor)));
-      const parts = [node('span', '', count ? labels.format(offset + 1) + '–' + labels.format(offset + count) : ''),
+      const current = history[page];
+      const range = count ? labels.format(offset + 1) + '–' + labels.format(offset + count) : '';
+      const total = count && current?.nextCursor === null && history.slice(0, page + 1).every(entry => !entry.incomplete)
+        ? ' / ' + labels.format(offset + count) : '';
+      const parts = [node('span', '', range + total),
         node('span', 'mw-spacer'), button('mw-square', '이전 페이지', page > 0 && !loading && !writing ? () => go(page - 1) : null,
           { glyph: 'chevron-left', iconOnly: true })];
       for (let i = first; i < last; i++) {
@@ -299,23 +381,86 @@
       }
       parts.push(button('mw-square', '다음 페이지', page + 1 < last && !loading && !writing ? () => go(page + 1) : null,
         { glyph: 'chevron-right', iconOnly: true }));
+      footer.hidden = !history[page] || (!count && !history[page].nextCursor && !page);
       footer.replaceChildren(...parts);
+    }
+
+    function renderRows() {
+      rows.setAttribute('aria-busy', String(loading));
+      const items = messages();
+      const skeleton = loading && !history[page];
+      const emptyTrash = !loading && !listError && scope.role === 'trash' && history[page] && !history[page].incomplete && !items.length;
+      rows.classList.toggle('mw-empty-trash', Boolean(emptyTrash));
+      if (skeleton) {
+        rows.replaceChildren(...Array.from({ length: 10 }, () => {
+          const line = node('div', 'mw-skeleton');
+          line.setAttribute('aria-hidden', 'true');
+          line.append(...Array.from({ length: 5 }, () => node('span')));
+          return line;
+        }));
+      } else if (emptyTrash) rows.replaceChildren(icon('trash', 24), node('p', '', '휴지통이 비어 있어'));
+      else rows.replaceChildren(...items.map(row));
+    }
+
+    function renderNotices() {
+      const current = history[page];
+      const unhealthy = problemSources();
+      const auth = unhealthy.filter(source => source.failure?.code === 'MAIL_CLIENT_AUTH_REQUIRED');
+      const other = unhealthy.filter(source => !auth.includes(source));
+      notices.replaceChildren();
+      function notice(text, label, onClick) {
+        const box = node('div', 'mw-list-notice');
+        box.setAttribute('role', 'status');
+        const action = button('mw-notice-action', label, onClick);
+        if (label === '다시 로그인') action.classList.add('mw-reconnect');
+        box.append(icon('alert', 18), node('span', '', text), action);
+        notices.append(box);
+      }
+      if (auth.length) {
+        const names = auth.map(source => providers[source.provider]).filter(Boolean).join(', ');
+        notice(names + ' 로그인이 만료됐어. 다시 로그인할 때까지 ' + names + ' 새 메일을 못 가져와.', '다시 로그인', null);
+      }
+      if ((listError && !auth.length) || other.length || (current?.incomplete && !auth.length)) {
+        const names = other.map(source => providers[source.provider]).filter(Boolean).join(', ');
+        const text = listError ? '메일 목록을 불러오지 못했어.'
+          : (names ? names + ' · ' : '') + '일부 메일이 최신 상태가 아닐 수 있어.';
+        notice(text, '지금 다시 시도', loading || writing ? null : () => void loadPage(null, true));
+      }
+      operationNotice.replaceChildren();
+      if (readError) {
+        const { items, value } = readError;
+        const box = node('div', 'mw-operation-notice');
+        box.setAttribute('role', 'status');
+        const unchanged = messages().filter(message => items.includes(message.id)).every(message => message.read === !value);
+        const text = !unchanged ? '읽음 상태를 바꾸지 못했어.' : value
+          ? '읽음으로 바꾸지 못했어. 메일은 그대로 안 읽음이야.'
+          : '안 읽음으로 바꾸지 못했어. 메일은 그대로 읽음이야.';
+        box.append(icon('alert', 18), node('span', '', text),
+        button('mw-notice-action', '다시 시도', loading || writing ? null : () => {
+          const targets = messages().filter(message => items.includes(message.id) && actionable(message));
+          if (targets.length) void mutate(targets, 'set_read', value);
+        }));
+        operationNotice.append(box);
+      }
     }
 
     function renderPage() {
       const current = history[page];
       const unread = current ? current.messages.filter(message => message.read === false).length : null;
-      rows.setAttribute('aria-busy', String(loading));
-      rows.replaceChildren(...messages().map(row));
+      if (scope.role === 'inbox' && !scope.account && !page && unread != null) inboxUnread = unread;
+      renderRows();
       renderSidebar(unread);
       renderHeader(unread);
       renderToolbar();
       renderFooter();
+      renderNotices();
     }
 
     async function loadPage(cursor, refresh = false) {
       if (loading || writing) return;
       loading = true;
+      listError = null;
+      readError = null;
       renderPage();
       try {
         const params = { limit };
@@ -333,18 +478,13 @@
         if (refresh && !result.incomplete) {
           for (const message of result.messages.filter(verified)) unknown.delete(message.id);
         }
-        const unavailable = (result.sources || [result.source]).filter(source => source && source.status !== 'fresh');
-        if (unavailable.length || result.incomplete) {
-          const names = unavailable.map(source => providers[source.provider]).filter(Boolean).join(', ');
-          showToast((names ? names + ' · ' : '') + '일부 메일이 최신 상태가 아닐 수 있어.');
-        }
       } catch (error) {
         if (cursor && error.code === 'MAIL_CLIENT_CURSOR_INVALID') {
           history = [];
           page = 0;
           selected.clear();
-          showToast('메일 목록이 갱신됐어. 새로고침으로 첫 페이지를 열어 줘.');
-        } else showToast('메일 목록을 불러오지 못했어.');
+        }
+        listError = error;
       } finally {
         loading = false;
         renderPage();
@@ -355,6 +495,8 @@
       if (loading || writing) return;
       if (history[index]) {
         selected.clear();
+        listError = null;
+        readError = null;
         page = index;
         renderPage();
       } else if (history[page]?.nextCursor) {
@@ -365,6 +507,7 @@
     async function mutate(items, action, value) {
       if (writing || loading || writeDenied || !items.length || items.some(message => !actionable(message))) return;
       writing = true;
+      readError = null;
       renderPage();
       let refresh = false;
       try {
@@ -385,7 +528,7 @@
           showToast('이 환경에서는 메일 상태를 변경할 수 없어.');
           return;
         }
-        let failures = 0;
+        const failures = [];
         for (const message of items) {
           const result = data.results?.find(receipt => receipt.messageId === message.id);
           if (result?.state === 'confirmed') {
@@ -395,12 +538,13 @@
               history[page].messages = messages().filter(item => item.id !== message.id);
             }
             refresh = true;
-          } else if (result?.state === 'failed') failures++;
+          } else if (result?.state === 'failed') failures.push(message.id);
           else unknown.add(message.id);
-          selected.delete(message.id);
+          if (!failures.includes(message.id) || action !== 'set_read') selected.delete(message.id);
         }
         if (items.some(message => unknown.has(message.id))) showToast('결과를 확인할 수 없는 메일이 있어. 새로고침으로 확인해 줘.');
-        else if (failures) showToast('일부 메일을 변경하지 못했어.');
+        else if (failures.length && action === 'set_read' && !refresh) readError = { items: failures, value };
+        else if (failures.length) showToast('일부 메일을 변경하지 못했어.');
       } catch {
         items.forEach(message => unknown.add(message.id));
         selected.clear();
@@ -433,6 +577,8 @@
         }
       }));
       scope = { role: 'inbox', title: '받은편지함' };
+      inboxUnread = null;
+      toggleMailboxes(false, false);
       selected.clear();
       history = [];
       page = 0;

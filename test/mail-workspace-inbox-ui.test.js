@@ -112,7 +112,7 @@ async function mockApp(t) {
       receivedAt: now - 2, read: true, starred: false },
   ];
   const calls = [];
-  const state = { enabled: true, outcome: 'confirmed', incomplete: false, inboxError: false };
+  const state = { enabled: true, outcome: 'confirmed', incomplete: false, authExpired: false, inboxError: false, holdInbox: null };
   const routes = process.env.MAIL_INBOX_EXPORTS ? JSON.parse(process.env.MAIL_INBOX_EXPORTS) : [];
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
   const server = http.createServer(async (req, res) => {
@@ -156,22 +156,34 @@ async function mockApp(t) {
     if (endpoint.endsWith('/mailboxes')) {
       const id = Number(endpoint.split('/').at(-2));
       const mailboxes = [{ id: 'inbox', inbox: true, selectable: true, name: '받은편지함' }];
-      if (id === 1) mailboxes.push(...['연구실', '지원서'].map(name => ({ id: name, name, kind: 'label', type: 'user', selectable: true })));
+      if (id === 1) {
+        mailboxes.push(...['연구실', '지원서'].map(name => ({ id: name, name, kind: 'label', type: 'user', selectable: true })));
+        mailboxes.push(
+          { id: 'drafts', name: '임시보관함', kind: 'label', type: 'system', providerId: 'DRAFT', selectable: true },
+          { id: 'trash', name: '휴지통', kind: 'label', type: 'system', providerId: 'TRASH', selectable: true },
+        );
+      }
       return json({ success: true, mailboxes });
     }
     if (endpoint.endsWith('/inbox')) {
+      if (state.holdInbox) await state.holdInbox;
       if (state.inboxError) return json({ success: false, code: 'MAIL_CLIENT_PROVIDER_UNAVAILABLE' }, 503);
       if (url.searchParams.has('cursor')) return json({ success: true, messages: [
         { ...messages[0], id: 40, subject: '이전 메일' },
       ], nextCursor: null });
       return json({ success: true, messages: messages.filter(message => !message.removed),
-        incomplete: state.incomplete, sources: accounts.map(account => ({
-          ...account, status: state.incomplete && account.id === 3 ? 'unavailable' : 'fresh',
+        incomplete: state.incomplete || state.authExpired, sources: accounts.map(account => ({
+          ...account, status: (state.incomplete || state.authExpired) && account.id === 3 ? 'unavailable' : 'fresh',
+          failure: state.authExpired && account.id === 3 ? { code: 'MAIL_CLIENT_AUTH_REQUIRED' } : undefined,
         })), nextCursor: '00000000-0000-4000-8000-000000000001' });
     }
     if (endpoint.endsWith('/messages')) {
       const id = Number(endpoint.split('/').at(-2));
-      return json({ success: true, messages: messages.filter(message => message.accountId === id && !message.removed) });
+      const mailbox = url.searchParams.get('mailbox');
+      const folder = messages.filter(message => message.accountId === id && !message.removed);
+      const draft = { ...folder[0], read: true, to: [{ name: '최유진 교수' }] };
+      return json({ success: true, messages: mailbox === 'trash' ? []
+        : mailbox === 'drafts' ? [draft] : folder, nextCursor: null });
     }
     if (endpoint.endsWith('/messages/actions')) {
       if (state.outcome === 'disabled') return json({ success: false, code: 'MAIL_CLIENT_WRITE_DISABLED' }, 503);
@@ -256,6 +268,8 @@ test('desktop inbox renders base and selected exports, preserves explicit action
   await ui.waitFor('document.querySelector("[data-message-id=\\"1\\"] .mw-row-star")?.disabled');
   assert.ok(await ui.evaluate(ui.shown('[data-message-id="1"]')));
   assert.equal(actions().length, 3);
+  await ui.waitFor('document.body.innerText.includes("결과를 확인할 수 없는 메일")');
+  assert.equal(await ui.evaluate(ui.shown('.mw-operation-notice')), false);
   app.state.incomplete = true;
   await ui.press('새로고침');
   await ui.waitFor('document.querySelector(".mw-rows").getAttribute("aria-busy") === "false"');
@@ -326,4 +340,109 @@ test('disabled Mail Workspace preserves Agent details and the existing write gat
   await ui.waitFor('document.body.innerText.includes("메일 상태를 변경할 수 없어")');
   assert.equal(await ui.evaluate('document.querySelector("[data-message-id=\\"1\\"] .mw-row-star").disabled'), true);
   assert.equal(app.calls.filter(call => call.method === 'POST').length, 1);
+});
+
+test('tablet and phone show only the controls and mailbox layouts from their Figma frames', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ui = await browser(t);
+  await ui.metrics(820, 1180);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-sidebar')), false);
+  assert.equal(await ui.evaluate(ui.shown('.mw-toolbar')), true);
+  assert.deepEqual(JSON.parse(await ui.evaluate(measures(['.mw-header', '.mw-toolbar', '.mw-row']))),
+    [[24, 84, 772, 40], [24, 140, 772, 32], [24, 188, 772, 44]]);
+  await ui.capture('tablet-entry.png');
+  await ui.press('메일함 메뉴 열기');
+  await ui.waitFor(ui.shown('.mw-sidebar'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-close')), false);
+  assert.deepEqual(JSON.parse(await ui.evaluate(measures(['.mw-sidebar']))), [[0, 0, 280, 1180]]);
+  await ui.capture('tablet-mailboxes.png');
+  await ui.evaluate('document.querySelector("#mail-workspace").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))');
+  await ui.waitFor('!' + ui.shown('.mw-sidebar'));
+
+  await ui.metrics(390, 844);
+  await ui.waitFor(ui.shown('.mw-compose-fab'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-toolbar')), false);
+  assert.equal(await ui.evaluate(ui.shown('.mw-pagination')), false);
+  assert.equal(await ui.evaluate(ui.shown('.mw-row-select')), false);
+  assert.equal(await ui.evaluate(ui.shown('.mw-compact-search')), true);
+  assert.equal(await ui.evaluate('document.querySelector("#mail-workspace").scrollWidth'), 390);
+  assert.deepEqual(JSON.parse(await ui.evaluate(measures(['.mw-header', '.mw-row', '.mw-compose-fab'])))
+    .map(([x, y, w, h]) => [x, y, Math.floor(w), h]),
+  [[0, 56, 390, 104], [0, 161, 390, 72], [262, 693, 108, 48]]);
+  await ui.capture('phone-entry.png');
+  await ui.press('메일함 메뉴 열기');
+  await ui.waitFor(ui.shown('.mw-close'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-main')), false);
+  assert.equal(await ui.evaluate('getComputedStyle(document.querySelector("[data-mailbox-role=inbox]")).order'), '-1');
+  await ui.capture('phone-mailboxes.png');
+  await ui.press('메일함 메뉴 닫기');
+  await ui.waitFor(ui.shown('.mw-row'));
+  assert.equal(app.calls.some(call => call.method === 'POST' && call.endpoint.startsWith('/api/mail-client')), false);
+});
+
+test('list variants keep the designed actions and surface only verified failures', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  let release;
+  app.state.holdInbox = new Promise(resolve => { release = resolve; });
+  t.after(release);
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-skeleton'));
+  assert.equal(await ui.evaluate('document.querySelectorAll(".mw-skeleton").length'), 10);
+  assert.equal(await ui.evaluate(ui.shown('.mw-pagination')), false);
+  await ui.capture('desktop-list-loading.png');
+  release();
+  await ui.waitFor(ui.shown('.mw-row'));
+
+  await ui.press('연구실', '.mw-sidebar button');
+  await ui.waitFor(ui.text('Gmail · 안 읽음'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-chips')), false);
+  await ui.capture('desktop-account-folder.png');
+  await ui.press('임시보관함', '.mw-sidebar button');
+  await ui.waitFor(ui.text('초안 1개'));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-actions").textContent'), '휴지통');
+  assert.equal(await ui.evaluate(ui.text('받는 사람 · 최유진 교수')), true);
+  await ui.capture('desktop-drafts.png');
+
+  await ui.press('휴지통', '.mw-sidebar button');
+  await ui.waitFor(ui.text('휴지통이 비어 있어'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-pagination')), false);
+  await ui.capture('desktop-trash-empty.png');
+  await ui.click('[data-mailbox-role="inbox"]');
+  await ui.waitFor(ui.shown('.mw-row'));
+
+  app.state.authExpired = true;
+  await ui.press('새로고침');
+  await ui.waitFor(ui.text('Works 로그인이 만료됐어.'));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-reconnect").disabled'), true);
+  await ui.capture('desktop-account-expired.png');
+  app.state.authExpired = false;
+  app.state.incomplete = true;
+  await ui.press('새로고침');
+  await ui.waitFor(ui.text('일부 메일이 최신 상태가 아닐 수 있어.'));
+  await ui.capture('desktop-sync-error.png');
+  app.state.incomplete = false;
+  await ui.press('지금 다시 시도');
+  await ui.waitFor('!' + ui.shown('.mw-list-notice'));
+
+  app.state.outcome = 'failed';
+  await ui.click('[data-message-id="1"] .mw-row-select');
+  await ui.press('읽음');
+  await ui.waitFor(ui.shown('.mw-operation-notice'));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-row[data-checked=Yes]").dataset.state'), 'Unread');
+  await ui.capture('desktop-read-error.png');
+  const writes = () => app.calls.filter(call => call.endpoint.endsWith('/messages/actions'));
+  assert.equal(writes().length, 1);
+  app.state.outcome = 'confirmed';
+  await ui.press('다시 시도');
+  await ui.waitFor('!document.querySelector(".mw-row[data-message-id=\\"1\\"][data-state=Unread]")');
+  assert.deepEqual(writes().map(call => call.payload.operations), Array.from({ length: 2 },
+    () => [{ messageId: 1, action: 'set_read', value: true }]));
 });
