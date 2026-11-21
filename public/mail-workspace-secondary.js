@@ -10,9 +10,10 @@
     contactPicker.accept = '.csv,text/csv';
     contactPicker.hidden = true;
     const kst = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const koreanDate = new Intl.DateTimeFormat('ko', { timeZone: 'Asia/Seoul', dateStyle: 'medium' });
+    const calendarDate = new Intl.DateTimeFormat('ko', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short' });
     const time = new Intl.DateTimeFormat('ko', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     const labels = { personal: '개인', official: '공식', deadline: '마감' };
+    let refreshCalendar;
     const preferenceLabels = { suppress_notification: '알림 억제', skip_analysis: '분석 제외',
       always_notify: '중요로 알림', archive_quietly: '조용히 보관' };
 
@@ -389,11 +390,67 @@
       const header = node('header', 'mw-aux-head');
       const work = node('div', 'mw-calendar-grid');
       const grid = node('div', 'mw-view-card mw-calendar-month');
+      const right = node('div', 'mw-calendar-right');
       const dayPanel = node('aside', 'mw-view-card mw-calendar-day');
-      work.append(grid, dayPanel);
+      const undated = node('aside', 'mw-view-card mw-calendar-undated');
+      const undatedCount = node('span', 'mw-muted');
+      const undatedTitle = node('header', 'mw-calendar-undated-title');
+      undatedTitle.append(node('h2', '', '미확정'), undatedCount);
+      const undatedItems = node('div', 'mw-calendar-undated-items');
+      undatedItems.tabIndex = 0;
+      undatedItems.setAttribute('aria-label', '미확정 일정');
+      undated.append(undatedTitle, undatedItems);
+      right.append(dayPanel, undated);
+      work.append(grid, right);
       panel.append(header, work);
+      let undatedVersion = 0;
+      let undatedCursor = null;
+      let undatedLoading = false;
+      const undatedIds = new Set();
+      const observer = new IntersectionObserver(([entry]) => {
+        if (!panel.isConnected) observer.disconnect();
+        else if (entry.isIntersecting && entry.target === undatedItems.lastElementChild && undatedCursor) {
+          void fetchUndated(undatedCursor);
+        }
+      }, { root: undatedItems });
+      refreshCalendar = () => {
+        if (!panel.isConnected) return;
+        void fetchMonth();
+        void fetchUndated();
+      };
       render();
-      void fetchMonth();
+      refreshCalendar();
+
+      async function fetchUndated(cursor) {
+        if (cursor && undatedLoading) return;
+        const sequence = cursor ? undatedVersion : ++undatedVersion;
+        undatedLoading = true;
+        try {
+          const result = await get('/smart/calendar', { section: 'unresolved', limit: 13, ...(cursor ? { cursor } : {}) });
+          if (sequence !== undatedVersion || !panel.isConnected) return;
+          if (!cursor) {
+            undatedItems.replaceChildren();
+            undatedIds.clear();
+          }
+          for (const event of result.events) {
+            if (undatedIds.has(event.id)) continue;
+            undatedIds.add(event.id);
+            const card = node('article', 'mw-calendar-event');
+            card.append(node('strong', '', event.title), node('p', 'mw-muted', '“' + event.originalDateText + '”'), openOriginal(event));
+            undatedItems.append(card);
+          }
+          undatedCount.textContent = Math.max(result.total ?? 0, undatedIds.size) + '개';
+          undatedCursor = result.nextCursor;
+          observer.disconnect();
+          if (undatedCursor && undatedItems.lastElementChild) observer.observe(undatedItems.lastElementChild);
+        } catch {
+          if (sequence === undatedVersion && panel.isConnected && !undatedIds.size) {
+            undatedItems.replaceChildren(node('p', 'mw-muted', '일정을 연결하지 못했어.'));
+          }
+        } finally {
+          if (sequence === undatedVersion) undatedLoading = false;
+        }
+      }
 
       async function fetchMonth() {
         const version = ++token;
@@ -427,13 +484,28 @@
         return chip;
       }
 
+      function openOriginal(event) {
+        const action = control('원본 메일 열기', async () => {
+          const data = await get('/smart/calendar/' + event.id).catch(() => null);
+          if (!panel.isConnected) return;
+          if (data?.event?.messageId) openMessage({ id: data.event.messageId });
+          else notify('원본 메일을 확인하지 못했어.');
+        }, undefined, 'mw-view-action');
+        action.append(icon('chevron-right', 14));
+        return action;
+      }
+
       function render() {
         const [year, number] = month.split('-').map(Number);
-        header.replaceChildren(node('h1', '', '일정'), node('span', 'mw-spacer'),
-          ...Object.keys(labels).map(kindBadge), control('오늘', () => step(0)),
+        const legend = node('div', 'mw-calendar-legend');
+        legend.append(...Object.keys(labels).map(kindBadge));
+        const controls = node('div', 'mw-calendar-controls');
+        controls.append(control('오늘', () => step(0)),
           button('mw-square', '이전 달', () => step(-1), { glyph: 'chevron-left', iconOnly: true }),
           node('strong', '', year + '년 ' + number + '월'),
           button('mw-square', '다음 달', () => step(1), { glyph: 'chevron-right', iconOnly: true }));
+        header.replaceChildren(button('mw-menu', '메일함 메뉴 열기', () => toggleMailboxes(true), { glyph: 'menu', size: 22, iconOnly: true }),
+          node('h1', '', '일정'), legend, controls);
         grid.replaceChildren(...['월','화','수','목','금','토','일'].map(day => node('span', 'mw-weekday', day)));
         const first = new Date(Date.UTC(year, number - 1, 1));
         const shift = (first.getUTCDay() + 6) % 7;
@@ -453,25 +525,23 @@
           grid.append(cell);
         }
         const dayEvents = onDate(selected);
-        dayPanel.replaceChildren(node('h2', '', koreanDate.format(new Date(selected + 'T00:00:00+09:00'))),
+        dayPanel.replaceChildren(node('h2', '', calendarDate.format(new Date(selected + 'T00:00:00+09:00'))),
           node('p', 'mw-muted', failed ? '일정을 연결하지 못했어.' : '메일에서 찾은 일정 ' + dayEvents.length + '개'));
+        const dayItems = node('div', 'mw-calendar-day-items');
         for (const item of dayEvents) {
           const event = node('article', 'mw-calendar-event');
           const row = node('div');
           row.append(kindBadge(item.kind), node('span', 'mw-muted', item.startAt ? time.format(item.startAt * 1000) : ''));
           const account = accounts().find(account => account.id === item.accountId);
           event.append(row, node('strong', '', item.title), node('p', 'mw-muted', providers[account?.provider] || ''),
-            control('원본 메일 열기', async () => {
-              const data = await get('/smart/calendar/' + item.id).catch(() => null);
-              if (data?.event?.messageId && panel.isConnected) openMessage({ id: data.event.messageId });
-              else notify('원본 메일을 확인하지 못했어.');
-            }, undefined, 'mw-view-action'));
-          dayPanel.append(event);
+            openOriginal(item));
+          dayItems.append(event);
         }
+        dayPanel.append(dayItems);
       }
     }
 
-    return { contacts, settings, calendar };
+    return { contacts, settings, calendar, refreshCalendar: () => refreshCalendar?.() };
   }
 
   global.MailWorkspaceSecondary = { create };

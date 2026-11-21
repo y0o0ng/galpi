@@ -139,6 +139,31 @@ body[data-mail-workspace] #global-nav .shell-settings::before {
   font-size: 12px;
   font-weight: 590;
 }
+#mail-workspace .mw-smart-heading { display: flex; align-items: center; justify-content: space-between; min-height: 34px; padding: 4px 4px 4px 10px; gap: 4px; }
+#mail-workspace .mw-smart-heading .mw-nav-title { padding: 0; white-space: nowrap; }
+#mail-workspace .mw-analyze { display: flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px 0 8px; border-radius: 10px; color: var(--mw-accent); background: var(--mw-soft); font-size: 12px; font-weight: 590; white-space: nowrap; }
+#mail-workspace .mw-analyze[data-state="running"] { background: var(--mw-canvas); color: var(--mw-secondary); }
+#mail-workspace .mw-analyze[data-state="disabled"] { background: transparent; color: var(--mw-tertiary); }
+#mail-workspace .mw-analysis-dialog {
+  position: fixed; inset: 0; margin: auto; box-sizing: border-box; width: min(380px, calc(100vw - 32px));
+  padding: 22px 24px 18px; border: 0; border-radius: 12px; color: var(--mw-primary); background: var(--mw-surface);
+  box-shadow: 0 10px 28px rgba(28, 38, 33, .14); font-family: var(--mw-font);
+}
+#mail-workspace .mw-analysis-dialog::backdrop { background: rgba(28, 38, 33, .28); }
+#mail-workspace .mw-analysis-dialog h2 { margin: 0 0 8px; font-size: 17px; font-weight: 590; }
+#mail-workspace .mw-analysis-dialog p { margin: 0; font-size: 13px; color: var(--mw-secondary); }
+#mail-workspace .mw-analysis-dialog .mw-popover-footer { margin-top: 18px; padding: 0; border: 0; }
+#mail-workspace .mw-analysis-dialog .mw-popover-footer button { height: 36px; padding: 0 14px; }
+#mail-workspace .mw-analysis-notice:not([hidden]) {
+  position: fixed; z-index: 4; inset: auto 16px 32px 488px; margin-inline: auto; width: max-content; max-width: calc(100vw - 32px);
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px; min-height: 48px; box-sizing: border-box;
+  background: var(--mw-surface); color: var(--mw-primary); border: 1px solid var(--mw-border); border-radius: 12px;
+  box-shadow: 0 6px 10px rgba(28, 38, 33, .12); font-size: 13px; font-weight: 510;
+}
+#mail-workspace .mw-analysis-more { min-height: 32px; border-radius: 10px; padding: 0 10px; white-space: nowrap; }
+@media (max-width: 1100px) {
+  #mail-workspace .mw-analysis-notice:not([hidden]) { inset: auto 16px 104px; }
+}
 #mail-workspace .mw-folder,
 #mail-workspace .mw-account {
   display: flex;
@@ -985,7 +1010,10 @@ body[data-mail-workspace] #global-nav .shell-settings::before {
 #mail-workspace .mw-csv-pair:last-child { border: 0; }
 #mail-workspace .mw-csv-pair > div { flex: 1; min-width: 0; overflow: hidden; }
 #mail-workspace .mw-csv-pair > select { min-width: 156px; background: var(--mw-surface); color: var(--mw-primary); padding: 5px 10px; border: 1px solid var(--mw-border); border-radius: 10px; }
-#mail-workspace .mw-calendar-grid { flex: 1; display: grid; grid-template-columns: minmax(0, 2fr) minmax(230px, .95fr); gap: 16px; }
+#mail-workspace .mw-calendar-grid { display: grid; grid-template-columns: minmax(0, 1fr) 288px; grid-template-rows: minmax(0, 1fr); height: max(550px, calc(100dvh - 108px)); gap: 16px; }
+#mail-workspace :is(.mw-calendar-legend, .mw-calendar-controls) { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+#mail-workspace .mw-calendar-legend { margin-left: auto; }
+#mail-workspace .mw-calendar-right { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 #mail-workspace .mw-calendar-month {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -1002,7 +1030,12 @@ body[data-mail-workspace] #global-nav .shell-settings::before {
 #mail-workspace .mw-calendar-date { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; min-width: 0; overflow: hidden; }
 #mail-workspace .mw-calendar-date[data-other-month="true"] { color: var(--mw-tertiary); }
 #mail-workspace .mw-calendar-date[aria-pressed="true"] { background: var(--mw-soft); }
-#mail-workspace .mw-calendar-date[data-today="true"] > span:first-child { color: var(--mw-accent); font-weight: 590; }
+#mail-workspace .mw-weekday:nth-child(7),
+#mail-workspace .mw-calendar-date:nth-child(7n):not([data-other-month="true"], [data-today="true"]) > span:first-child { color: #b55454; }
+#mail-workspace .mw-calendar-date[data-today="true"] > span:first-child {
+  display: grid; place-items: center; width: 24px; height: 24px; margin: -3px 0 0 -4px;
+  border-radius: 50%; background: var(--mw-accent); color: var(--mw-surface); font-weight: 590;
+}
 #mail-workspace .mw-event {
   max-width: 100%;
   padding: 2px 8px;
@@ -1017,13 +1050,32 @@ body[data-mail-workspace] #global-nav .shell-settings::before {
 #mail-workspace .mw-event[data-kind="official"] { color: var(--mw-accent); background: transparent; border: 1px solid var(--mw-accent); }
 #mail-workspace .mw-event[data-kind="deadline"] { color: #b55454; background: transparent; }
 #mail-workspace .mw-event[data-kind="deadline"]::before { content: "• "; }
-#mail-workspace .mw-calendar-day { padding: 18px; }
+#mail-workspace :is(.mw-calendar-day, .mw-calendar-undated) { display: flex; flex-direction: column; min-height: 0; padding: 18px; overflow: hidden; }
+#mail-workspace .mw-calendar-day { flex: 0 0 min(523px, 66%); }
+#mail-workspace .mw-calendar-undated { flex: 1; gap: 12px; }
+#mail-workspace .mw-calendar-undated-title { display: flex; gap: 6px; align-items: baseline; }
+#mail-workspace .mw-calendar-undated-title .mw-muted { font-size: 12px; }
+#mail-workspace :is(.mw-calendar-day-items, .mw-calendar-undated-items) { min-height: 0; overflow-y: auto; scrollbar-width: none; }
+#mail-workspace .mw-calendar-undated-items { display: flex; flex-direction: column; gap: 8px; }
 #mail-workspace .mw-calendar-event { display: grid; gap: 3px; background: var(--mw-canvas); padding: 12px 14px; border-radius: 12px; margin-top: 12px; }
+#mail-workspace .mw-calendar-event > strong { font-weight: 590; }
+#mail-workspace .mw-calendar-undated .mw-calendar-event { flex: 0 0 auto; gap: 4px; margin: 0; border-radius: 10px; }
+#mail-workspace .mw-calendar-undated .mw-calendar-event > strong { font-size: 14px; }
+#mail-workspace .mw-calendar-undated .mw-calendar-event > p { font-size: 12px; }
 #mail-workspace .mw-calendar-event > div { display: flex; align-items: center; gap: 8px; }
-#mail-workspace .mw-calendar-event .mw-view-action { justify-self: start; padding: 0; min-height: 24px; color: var(--mw-accent); }
+#mail-workspace .mw-calendar-event .mw-view-action { justify-self: start; padding: 0; min-height: 18px; gap: 2px; color: var(--mw-accent); font-size: 12px; font-weight: 590; }
 
 @media (max-width: 860px) {
   #mail-workspace :is(.mw-settings-grid, .mw-calendar-grid) { grid-template-columns: minmax(0, 1fr); }
+  #mail-workspace .mw-calendar-grid { height: auto; grid-template-rows: auto auto; }
+  #mail-workspace .mw-calendar-day { flex-basis: auto; }
+  #mail-workspace .mw-calendar-undated-items { max-height: 320px; }
+}
+@media (max-width: 480px) {
+  #mail-workspace .mw-calendar .mw-aux-head { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; }
+  #mail-workspace .mw-calendar-legend { grid-column: 2 / -1; grid-row: 2; margin-left: 0; }
+  #mail-workspace .mw-calendar-controls { grid-column: 3; grid-row: 1; gap: 2px; }
+  #mail-workspace .mw-calendar-controls .mw-square { width: 26px; }
 }
 @media (max-width: 640px) {
   #mail-workspace .mw-search-editing .mw-search {

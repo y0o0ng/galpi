@@ -360,6 +360,56 @@ test('unresolved candidates are shown separately and cannot produce an existing 
   assert.equal(f.smart.messages('deadline', {}).messages.length, 0);
 });
 
+test('unbounded unresolved pages span months, sort by received time and use their own cursor scope', async t => {
+  const f = fixture(t);
+  const body = '다음 달 중 면담 예정';
+  const mail = ['2026-11-10', '2026-11-10', '2026-08-20'].map((date, index) =>
+    f.add({ providerId: 'undated-' + index, receivedAt: epoch(date + 'T12:00:00+09:00'), body }).id);
+  f.setReply(() => ({ ...CALENDAR, events: [{ ...CALENDAR.events[1], title: '면담', dateText: '다음 달 중', evidence: body,
+    direction: 'future', directionEvidence: '예정' }] }));
+  await f.smart.analyze(mail, 'calendar');
+  for (const id of mail) await f.smart.tick();
+  const scope = { section: 'unresolved', limit: 1, accountId: f.accountId };
+  const first = f.smart.calendar(scope);
+  assert.equal(first.total, 3);
+  assert.equal(first.events[0].messageId, mail[1]);
+  assert.equal(first.events[0].startDate, null);
+  const second = f.smart.calendar({ ...scope, cursor: first.nextCursor });
+  assert.equal(second.events[0].messageId, mail[0]);
+  const last = f.smart.calendar({ ...scope, cursor: second.nextCursor });
+  assert.equal(last.events[0].messageId, mail[2]);
+  assert.equal(last.nextCursor, null);
+  const month = f.smart.calendar({ ...scope, month: '2026-11' });
+  assert.equal(month.events[0].messageId, mail[0]);
+  assert.throws(() => f.smart.calendar({ ...scope, month: '2026-11', cursor: first.nextCursor }), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
+  assert.throws(() => f.smart.calendar({ ...scope, cursor: month.nextCursor }), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
+  assert.throws(() => f.smart.calendar({}), { code: 'MAIL_CLIENT_SMART_INVALID_REQUEST' });
+});
+
+test('bulk targets and progress are read-only and honor exclusions, in-flight jobs and terminal failures', async t => {
+  const f = fixture(t);
+  const eligible = Array.from({ length: 12 }, (_, i) => f.add({ providerId: 'bulk-' + i }).id);
+  const queued = f.add({ providerId: 'already-queued' }).id;
+  const failed = f.add({ providerId: 'terminal' }).id;
+  f.add({ providerId: 'sent', labels: ['SENT'] });
+  f.add({ providerId: 'classified-agent', link: true });
+  await f.smart.analyze([queued, failed], 'classification');
+  f.db.prepare("UPDATE mail_workspace_analysis_jobs SET state = 'failed' WHERE client_message_id = ?").run(failed);
+  let reads = 0;
+  f.overrideSource(source => { reads++; return source; });
+  assert.deepEqual(f.smart.analysisTargets(), { total: 12 });
+  assert.deepEqual(f.smart.analysisTargets(true), { total: 12, messageIds: [...eligible].reverse() });
+  const status = await f.smart.results([queued, failed], true);
+  assert.deepEqual(status.results.map(row => row.classificationStatus.state), ['pending', 'failed']);
+  f.db.prepare("INSERT INTO mail_preferences (preference_type, target, action, created_at, updated_at) VALUES ('sender', ?, 'skip_analysis', ?, ?)")
+    .run(FROM, NOW, NOW);
+  assert.deepEqual(f.smart.analysisTargets(true), { total: 0, messageIds: [] });
+  assert.equal(reads, 0);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.count('mail_workspace_analysis_jobs'), 2);
+  assert.equal(f.count('mail_attention'), 0);
+});
+
 test('short model date quotes cannot discard explicit source years or adjacent timezone evidence', async () => {
   const evidence = '2027년 1월 15일 16:00 UTC 설명회 예정';
   const output = { ...CALENDAR, events: [{ ...CALENDAR.events[1], dateText: '1월 15일', evidence }] };

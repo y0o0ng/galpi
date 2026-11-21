@@ -237,6 +237,12 @@ test('Workspace smart endpoints default off, require read enablement and authent
   const page = await api(enabled.url, smartPath + '/messages?filter=unclassified');
   assert.equal(page.response.status, 200);
   assert.equal(page.body.coverage.scope, 'observed_workspace');
+  const undated = await api(enabled.url, smartPath + '/calendar?section=unresolved');
+  assert.equal(undated.response.status, 200);
+  assert.equal(undated.body.total, 0);
+  assert.deepEqual(undated.body.events, []);
+  const targets = await api(enabled.url, smartPath + '/analysis-targets?snapshot=1');
+  assert.deepEqual(targets.body, { success: true, total: 0, messageIds: [] });
   const post = await fetch(enabled.url + smartPath + '/analyze', {
     method: 'POST', headers: { 'X-API-Token': API_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messageIds: [99], kind: 'both' }),

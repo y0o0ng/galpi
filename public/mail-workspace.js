@@ -24,6 +24,7 @@
   };
   const limit = 13;
   const SMART_REFRESH_MS = 15000;
+  const ANALYSIS_POLL_MS = 5000;
   const zone = { timeZone: 'Asia/Seoul' };
   const day = new Intl.DateTimeFormat('en-CA', { ...zone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const clock = new Intl.DateTimeFormat('ko', { ...zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -101,6 +102,11 @@
     let smartVariant = 0;
     let smartRefreshTimer;
     let smartRefreshRequest;
+    let analysisTotal = 0;
+    let analysisCountVersion = 0;
+    let analysisChecking = false;
+    let analysisRun;
+    let analysisToastTimer;
     const narrow = global.matchMedia('(max-width: 1100px)');
 
     const sidebar = node('aside', 'mw-sidebar');
@@ -118,10 +124,13 @@
     const notices = node('div', 'mw-list-notices');
     const compose = button('mw-compose mw-compose-fab', '메일 쓰기', () => messageViews.openCompose({ kind: 'new' }), { glyph: 'compose' });
     const operationNotice = node('div', 'mw-operation-notices');
+    const analysisNotice = node('div', 'mw-analysis-notice');
+    analysisNotice.hidden = true;
+    analysisNotice.setAttribute('role', 'status');
     const extra = node('div', 'mw-extra');
     extra.hidden = true;
     main.append(header, notices, toolbar, rows, footer, compose, extra);
-    mount.replaceChildren(sidebar, main, shade, operationNotice);
+    mount.replaceChildren(sidebar, main, shade, operationNotice, analysisNotice);
 
     function toggleMailboxes(open, restoreFocus = true) {
       const opened = open && narrow.matches;
@@ -193,6 +202,127 @@
       const target = account && mailboxFor('sent', account);
       if (target) changeScope({ ...target, role: 'sent', title: '보낸편지함' });
       else showToast('이 계정의 보낸편지함을 찾을 수 없어.');
+    }
+
+    function renderAnalyzeButton(slot = sidebar.querySelector('.mw-analyze-slot')) {
+      if (!slot) return;
+      const state = analysisRun ? 'running' : analysisTotal ? 'idle' : 'disabled';
+      const caption = analysisRun ? `분석 중 ${labels.format(analysisRun.finished)}/${labels.format(analysisRun.total)}`
+        : analysisTotal ? '분석 ' + labels.format(analysisTotal) : '분석';
+      const control = button('mw-analyze', caption, state === 'idle' && !analysisChecking ? askAnalysis : null,
+        { glyph: 'analyze-' + state, size: 14 });
+      control.dataset.state = state;
+      slot.replaceChildren(control);
+    }
+
+    async function updateAnalysisCount() {
+      const version = ++analysisCountVersion;
+      const data = await get('/smart/analysis-targets').catch(() => null);
+      if (version !== analysisCountVersion || !data) return;
+      analysisTotal = data.total;
+      renderAnalyzeButton();
+    }
+
+    async function askAnalysis() {
+      if (analysisChecking || analysisRun) return;
+      const origin = scope;
+      const originScreen = screen;
+      analysisChecking = true;
+      renderAnalyzeButton();
+      ++analysisCountVersion;
+      const data = await get('/smart/analysis-targets', { snapshot: 1 }).catch(() => null);
+      analysisChecking = false;
+      if (!Array.isArray(data?.messageIds)) {
+        renderAnalyzeButton();
+        if (mount.classList.contains('active')) showToast('분석 대상을 확인하지 못했어.');
+        return;
+      }
+      const ids = [...new Set(data.messageIds)];
+      analysisTotal = ids.length;
+      renderAnalyzeButton();
+      if (!ids.length || origin !== scope || originScreen !== screen || !mount.classList.contains('active')) return;
+
+      const dialog = node('dialog', 'mw-analysis-dialog');
+      const title = node('h2', '', `미분류 ${labels.format(ids.length)}통을 분석할까?`);
+      title.id = 'mw-analysis-heading';
+      dialog.setAttribute('aria-labelledby', title.id);
+      const footer = node('footer', 'mw-popover-footer');
+      footer.append(button('mw-popover-secondary', '취소', () => dialog.close()), button('mw-popover-primary', '분석', () => {
+        dialog.close();
+        if (!analysisRun) void runAnalysis(ids);
+      }));
+      dialog.append(title, node('p', '', '분석이 끝나면 스마트 메일함이 갱신돼.'), footer);
+      dialog.addEventListener('close', () => {
+        dialog.remove();
+        sidebar.querySelector('.mw-analyze:not(:disabled)')?.focus();
+      }, { once: true });
+      mount.append(dialog);
+      dialog.showModal();
+    }
+
+    async function runAnalysis(ids) {
+      global.clearTimeout(analysisToastTimer);
+      analysisNotice.hidden = true;
+      analysisRun = { total: ids.length, finished: 0 };
+      let done = 0;
+      let failed = 0;
+      let remaining = 0;
+      const pending = new Set();
+      renderAnalyzeButton();
+
+      function record(id, states) {
+        if (states.some(state => state === 'pending' || state === 'analyzing')) { pending.add(id); return; }
+        pending.delete(id);
+        if (states.length === 2 && states.every(state => state === 'done')) done += 1;
+        else if (states.includes('failed')) failed += 1;
+        else remaining += 1;
+        analysisRun.finished += 1;
+      }
+
+      for (let start = 0; start < ids.length; start += 10) {
+        const batch = ids.slice(start, start + 10);
+        const response = await request('/smart/analyze', { method: 'POST', json: { messageIds: batch, kind: 'both' } }).catch(() => null);
+        if (!Array.isArray(response?.results)) { batch.forEach(id => pending.add(id)); continue; }
+        const results = new Map(response.results.map(result => [result.id, result.jobs]));
+        for (const id of batch) record(id, (results.get(id) || []).map(job => job.state));
+        renderAnalyzeButton();
+      }
+
+      let unanswered = 0;
+      while (pending.size) {
+        await new Promise(resolve => global.setTimeout(resolve, ANALYSIS_POLL_MS));
+        const active = [...pending];
+        let answered = false;
+        for (let start = 0; start < active.length; start += 10) {
+          const batch = active.slice(start, start + 10);
+          const response = await get('/smart/results', { messageIds: batch.join(','), statusOnly: 1 }).catch(() => null);
+          for (const result of response?.results || []) {
+            if (!batch.includes(result.id) || !pending.has(result.id)) continue;
+            answered = true;
+            record(result.id, [result.classificationStatus?.state, result.calendarStatus?.state]);
+          }
+        }
+        unanswered = answered ? 0 : unanswered + 1;
+        if (unanswered >= 3) for (const id of pending) record(id, []);
+        renderAnalyzeButton();
+      }
+
+      analysisRun = null;
+      analysisTotal = 0;
+      renderAnalyzeButton();
+      void updateAnalysisCount();
+      const summary = [labels.format(done) + '통 분석했어', failed ? labels.format(failed) + '통 실패' : '',
+        remaining ? labels.format(remaining) + '통 미처리' : ''].filter(Boolean).join(' · ');
+      analysisNotice.replaceChildren(icon(failed || remaining ? 'alert' : 'analyze-done', 18), node('span', '', summary));
+      if (failed || remaining) analysisNotice.append(button('mw-analysis-more', '미분류 보기', () => {
+        if (loading || writing) return;
+        analysisNotice.hidden = true;
+        changeScope({ filter: 'unclassified', title: '미분류' });
+      }));
+      analysisNotice.hidden = false;
+      analysisToastTimer = global.setTimeout(() => { analysisNotice.hidden = true; }, 7000);
+      if (canRefreshSmart()) { stopSmartRefresh(); void refreshSmart(); }
+      else if (screen === 'calendar' && mount.classList.contains('active')) auxiliary?.refreshCalendar();
     }
 
     const viewApi = {
@@ -385,7 +515,12 @@
 
       const smartNav = node('nav', 'mw-nav');
       smartNav.setAttribute('aria-label', '스마트 메일함');
-      smartNav.append(node('h3', 'mw-nav-title', '스마트 메일함'));
+      const smartHeading = node('div', 'mw-smart-heading');
+      const analyzeSlot = node('span', 'mw-analyze-slot');
+      analyzeSlot.setAttribute('aria-live', 'polite');
+      renderAnalyzeButton(analyzeSlot);
+      smartHeading.append(node('h3', 'mw-nav-title', '스마트 메일함'), analyzeSlot);
+      smartNav.append(smartHeading);
       for (const [label, glyph, filter] of smart) {
         const run = filter === 'schedule' ? auxiliary?.calendar : () => changeScope({ filter, title: label });
         smartNav.append(navRow(label, glyph, run,
@@ -843,6 +978,7 @@
           Object.assign(params, smartParams(cursor));
         }
         const result = await get(endpoint, params);
+        if (endpoint !== '/smart/messages' && !analysisRun) void updateAnalysisCount();
         if (!cursor) history = [];
         history.push(result);
         page = history.length - 1;

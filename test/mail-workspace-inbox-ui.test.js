@@ -219,11 +219,31 @@ async function mockApp(t) {
       return json({ success: true, messages: (nextPage ? state.smartSecondPage : state.smartMessages) ?? [messages[0]],
         nextCursor: nextPage ? null : state.smartNextCursor ?? null });
     }
+    if (endpoint.endsWith('/smart/analysis-targets')) {
+      const ids = state.analysisTargets || [];
+      return json({ success: true, total: new Set(ids).size, ...(url.searchParams.has('snapshot') ? { messageIds: ids } : {}) });
+    }
+    if (endpoint.endsWith('/smart/analyze')) return json({ success: true, results: payload.messageIds.map(id => ({
+      id, jobs: [{ kind: 'classification', state: 'pending' }, { kind: 'calendar', state: 'pending' }],
+    })) }, 202);
+    if (endpoint.endsWith('/smart/results')) return json({ success: true, results: url.searchParams.get('messageIds').split(',').map(Number).map(id => ({
+      id, classificationStatus: { state: state.analysisStates?.[id] || 'pending' },
+      calendarStatus: { state: state.analysisStates?.[id] || 'pending' },
+    })) });
+    if (endpoint.endsWith('/smart/calendar') && url.searchParams.get('section') === 'unresolved') {
+      const cursor = url.searchParams.get('cursor');
+      const events = state.undated || [];
+      return json({ success: true, events: cursor ? events.slice(13) : events.slice(0, 13), total: events.length,
+        nextCursor: !cursor && events.length > 13 ? 'undated-next' : null });
+    }
     if (endpoint.endsWith('/smart/calendar')) return json({ success: true, events: [{
       id: 7, messageId: 1, accountId: 1, kind: 'personal', title: '연구실 면담',
       startDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
     }], nextCursor: null });
     if (endpoint.endsWith('/smart/calendar/7')) return json({ success: true, event: { id: 7, messageId: 1 } });
+    if (state.undated && /\/smart\/calendar\/\d+$/u.test(endpoint)) {
+      return json({ success: true, event: { id: Number(endpoint.split('/').at(-1)), messageId: 1 } });
+    }
     if (endpoint.endsWith('/contacts')) {
       if (state.contactsUnavailable) return json({ success: false, code: 'MOCK_NOT_FOUND' }, 404);
       const from = url.searchParams.get('source');
@@ -404,7 +424,7 @@ test('desktop inbox renders base and selected exports, preserves explicit action
   await ui.press('휴지통', '.mw-toolbar button');
   await ui.waitFor('!' + ui.shown('[data-message-id="3"]') + ' && document.querySelector(".mw-rows").getAttribute("aria-busy") === "false"');
   assert.deepEqual(actions().at(-1).payload.operations, [{ messageId: 3, action: 'trash' }]);
-  assert.equal(app.calls.some(call => /\/smart\/|\/send$/.test(call.endpoint)), false);
+  assert.equal(app.calls.some(call => /\/smart\/analyze$|\/send$/.test(call.endpoint)), false);
   await ui.click('#global-nav [data-product-route="home"]');
   await ui.waitFor(ui.shown('#home-page.active ' + mailAgent));
   assert.equal(await ui.evaluate(ui.shown('#mail-workspace')), false);
@@ -871,6 +891,123 @@ test('smart mailbox refresh updates visible results and ignores responses after 
   await ui.waitFor('window.smartPoll.queued() === 0');
   assert.equal(await ui.evaluate(ui.shown('#mail-workspace.active')), false);
   assert.equal(app.calls.some(call => call.method === 'POST' && call.endpoint.startsWith('/api/mail-client/smart/')), false);
+});
+
+test('calendar keeps all undated events on a separate scrolling page across month changes', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  app.state.undated = Array.from({ length: 14 }, (_, i) => ({ id: 100 + i, title: '미확정 후보 ' + (i + 1),
+    originalDateText: '다음 달 중', dateProvenance: 'unresolved', startDate: null }));
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  await ui.press('일정', '.mw-sidebar button');
+  await ui.waitFor(ui.text('미확정 후보 1'));
+  await ui.waitFor(ui.text('연구실 면담'));
+  const unresolved = () => app.calls.filter(call => call.endpoint.endsWith('/smart/calendar') && call.query.section === 'unresolved');
+  assert.equal(unresolved().length, 1);
+  assert.equal(unresolved()[0].query.month, undefined);
+  assert.equal(await ui.evaluate('document.querySelector(".mw-calendar-undated-title .mw-muted").textContent'), '14개');
+  assert.equal(await ui.evaluate('document.querySelector(".mw-calendar-month").textContent.includes("미확정 후보")'), false);
+  assert.ok(await ui.evaluate(`(() => {
+    const month = document.querySelector('.mw-calendar-month').getBoundingClientRect();
+    const panel = document.querySelector('.mw-calendar-undated').getBoundingClientRect();
+    return panel.width === 288 && panel.left > month.right && panel.bottom === month.bottom && panel.bottom <= 900;
+  })()`));
+  await ui.capture('mail-calendar-undated.png');
+  await ui.press('다음 달');
+  assert.equal(await ui.evaluate(ui.text('미확정 후보 1')), true);
+  assert.equal(unresolved().length, 1);
+  await ui.evaluate('document.querySelector(".mw-calendar-undated-items").scrollTop = 100000');
+  await ui.waitFor(ui.text('미확정 후보 14'));
+  assert.equal(unresolved()[1].query.cursor, 'undated-next');
+  await ui.metrics(390, 844);
+  assert.ok(await ui.evaluate('document.querySelector(".mw-calendar-undated").getBoundingClientRect().width <= 390'));
+  await ui.evaluate('document.querySelector(".mw-calendar-undated").scrollIntoView({ block: "end" }); document.querySelector(".mw-calendar-undated-items").scrollTop = 0');
+  await ui.capture('mail-calendar-undated-phone.png');
+  await ui.click('.mw-calendar-undated .mw-calendar-event:last-child button');
+  await ui.waitFor(ui.shown('.mw-detail-body'));
+  assert.ok(app.calls.some(call => call.endpoint.endsWith('/smart/calendar/113')));
+});
+
+test('sidebar analysis confirms once, starts batches of ten and shows real partial results', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ids = Array.from({ length: 12 }, (_, i) => i + 1);
+  app.state.analysisTargets = [...ids, ids[0]];
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await ui.evaluate(`(() => {
+    const schedule = window.setTimeout.bind(window);
+    window.setTimeout = (run, ms, ...args) => ms === 5000
+      ? (window.runAnalysisPoll = () => { window.runAnalysisPoll = null; run(...args); }, -12)
+      : schedule(run, ms, ...args);
+  })()`);
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.text('분석 12'));
+  const posts = () => app.calls.filter(call => call.endpoint.endsWith('/smart/analyze'));
+  await ui.click('.mw-analyze');
+  await ui.waitFor(ui.text('미분류 12통을 분석할까?'));
+  await ui.capture('mail-analysis-a1.png');
+  await ui.metrics(820, 1180);
+  assert.equal(await ui.evaluate('document.querySelector(".mw-analysis-dialog").getBoundingClientRect().width'), 380);
+  await ui.capture('mail-analysis-a1-tablet.png');
+  await ui.metrics(1440, 900);
+  await ui.press('취소', 'dialog button');
+  assert.equal(posts().length, 0);
+  await ui.click('.mw-analyze');
+  await ui.waitFor(ui.shown('.mw-analysis-dialog[open]'));
+  await ui.press('분석', 'dialog button');
+  await ui.waitFor('Boolean(window.runAnalysisPoll)');
+  assert.deepEqual(posts().map(call => call.payload), [ids.slice(0, 10), ids.slice(10)].map(messageIds => ({ messageIds, kind: 'both' })));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-analyze").disabled'), true);
+  assert.equal(await ui.evaluate(ui.text('분석 중 0/12')), true);
+  await ui.capture('mail-analysis-a2.png');
+  app.state.analysisStates = Object.fromEntries(ids.slice(0, 10).map(id => [id, id === 9 ? 'failed' : id === 10 ? 'skipped' : 'done']));
+  await ui.evaluate('window.runAnalysisPoll()');
+  await ui.waitFor(ui.text('분석 중 10/12'));
+  await ui.press('중요', '.mw-sidebar button');
+  await ui.waitFor(ui.text('논문 피드백 전달'));
+  const before = app.calls.filter(call => call.endpoint.endsWith('/smart/messages')).length;
+  app.state.analysisStates[11] = app.state.analysisStates[12] = 'done';
+  app.state.analysisTargets = [];
+  await ui.waitFor('Boolean(window.runAnalysisPoll)');
+  await ui.evaluate('window.runAnalysisPoll()');
+  await ui.waitFor(ui.text('10통 분석했어 · 1통 실패 · 1통 미처리'));
+  await ui.waitFor('document.querySelector(".mw-analyze").dataset.state === "disabled"');
+  assert.ok(app.calls.filter(call => call.endpoint.endsWith('/smart/messages')).length > before);
+  assert.equal(posts().length, 2);
+  assert.equal(app.calls.some(call => call.method === 'POST' && call.endpoint.endsWith('/messages/actions')), false);
+  await ui.click('.mw-sidebar [data-mailbox-role="inbox"]');
+  await ui.waitFor(ui.text('신소재 실험 결과 공유'));
+  await ui.capture('mail-analysis-a3.png');
+  await ui.click('.mw-analyze');
+  assert.equal(posts().length, 2);
+  await ui.press('미분류 보기', '.mw-analysis-notice button');
+  await ui.waitFor('document.querySelector("#mail-workspace h1").textContent === "미분류"');
+  await ui.waitFor('document.querySelector(".mw-rows").getAttribute("aria-busy") === "false"');
+  await ui.click('.mw-sidebar [data-mailbox-role="inbox"]');
+  await ui.waitFor(ui.text('신소재 실험 결과 공유'));
+  await ui.capture('mail-analysis-a4.png');
+  assert.equal(await ui.evaluate('Boolean(window.runAnalysisPoll)'), false);
+
+  app.state.analysisTargets = [13];
+  await ui.press('새로고침');
+  await ui.waitFor(ui.text('분석 1'));
+  await ui.click('.mw-analyze');
+  await ui.waitFor(ui.shown('.mw-analysis-dialog[open]'));
+  await ui.press('분석', 'dialog button');
+  await ui.waitFor('Boolean(window.runAnalysisPoll)');
+  app.state.analysisStates[13] = 'done';
+  app.state.analysisTargets = [];
+  await ui.evaluate('window.runAnalysisPoll()');
+  await ui.waitFor(ui.text('1통 분석했어'));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-analysis-notice img").getAttribute("src").endsWith("analyze-done.svg")'), true);
+  assert.ok(await ui.evaluate('!document.querySelector(".mw-analysis-notice button")'));
+  await ui.capture('mail-analysis-done.png');
 });
 
 test('filter, search results, smart lists, calendar and contact import use Workspace APIs', { skip: !chrome }, async t => {
