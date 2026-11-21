@@ -47,7 +47,7 @@ async function stopServer(child) {
   });
 }
 
-async function startServer(t, mailEnabled) {
+async function startServer(t, mailEnabled, clientEnabled = false) {
   const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'mail-server-'));
   const vaultPath = path.join(appRoot, 'vault');
   await fs.mkdir(vaultPath);
@@ -71,6 +71,7 @@ async function startServer(t, mailEnabled) {
       BACKUP_DIR: path.join(appRoot, 'backups'),
       CODEX_RUNNER_MODE: 'heuristic',
       MAIL_AGENT_ENABLED: mailEnabled ? 'true' : 'false',
+      MAIL_CLIENT_ENABLED: clientEnabled ? 'true' : 'false',
       // 자격증명은 넣지 않는다. 계정이 하나도 없으므로 provider는 호출되지 않는다.
       MAIL_GMAIL_CLIENT_ID: '',
       MAIL_GMAIL_CLIENT_SECRET: '',
@@ -112,12 +113,29 @@ test('the schema lands even while the mail agent stays off', async t => {
     ORDER BY name
   `).all().map(row => row.name);
   assert.deepEqual(tables, [
-    'mail_accounts', 'mail_attention', 'mail_messages',
+    'mail_accounts', 'mail_attention', 'mail_client_cache', 'mail_client_messages', 'mail_messages',
     'mail_notification_batches', 'mail_preferences',
     'mail_push_deliveries', 'mail_reply_attempts', 'mail_sync_state',
   ]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_accounts').get().n, 0);
   db.close();
+});
+
+test('Mail Client uses the existing HTTP authentication and runs independently from the Mail Agent', async t => {
+  const { url, logs } = await startServer(t, false, true);
+  const unauthenticated = await fetch(url + '/api/mail-client/accounts');
+  assert.equal(unauthenticated.status, 401);
+  const { response, body } = await api(url, '/api/mail-client/accounts');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(body, { success: true, accounts: [] });
+  assert.equal((await api(url, '/api/mail-client/inbox?limit=100')).response.status, 400);
+  assert.equal((await api(url, '/api/mail/status')).body.code, 'MAIL_AGENT_DISABLED');
+  assert.equal(logs.join('').includes('Provider 동기화 worker'), false);
+  const rejectedWrite = await fetch(url + '/api/mail-client/inbox', {
+    method: 'POST', headers: { 'X-API-Token': API_TOKEN },
+  });
+  assert.equal(rejectedWrite.status, 404);
 });
 
 test('turning the flag on starts the worker and opens the status route', async t => {

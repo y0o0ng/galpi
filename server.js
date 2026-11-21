@@ -54,6 +54,10 @@ const {
 const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
+const { createMailClient } = require('./lib/mail/client');
+const { createGmailMailClient } = require('./lib/mail/client-gmail');
+const { createImapMailClient } = require('./lib/mail/client-imap');
+const { registerMailClientRoutes } = require('./lib/mail/client-routes');
 const { createMailBodyReader } = require('./lib/mail/body');
 const { createMailSearchSession } = require('./lib/mail/search-tool');
 const { createMailPreferenceSession } = require('./lib/mail/preference-tool');
@@ -247,6 +251,7 @@ const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 // MAIL-1 Provider 동기화. 실계정 인수 전까지 false 유지.
 const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
 const MAIL_REPLY_ENABLED = MAIL_AGENT_ENABLED && process.env.MAIL_REPLY_ENABLED === 'true';
+const MAIL_CLIENT_ENABLED = process.env.MAIL_CLIENT_ENABLED === 'true';
 // News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
 const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
@@ -905,6 +910,9 @@ const voiceShortcut = createVoiceShortcutService(db, {
   enabled: VOICE_SHORTCUT_ENABLED,
 });
 const mailStore = createMailStore(db);
+const gmailReadTokens = MAIL_AGENT_ENABLED || MAIL_CLIENT_ENABLED
+  ? createGoogleTokenSource({ credentials: MAIL_GMAIL_CREDENTIALS })
+  : null;
 // 플래그가 꺼져 있으면 worker도 provider도 만들지 않는다. 표만 비어 있는 상태가 된다.
 // provider는 동기화와 분석이 같은 인스턴스를 쓴다 — Gmail token source를 따로 만들면
 // 토큰을 두 번 갈면서 서로의 만료를 모른다.
@@ -914,9 +922,7 @@ const mailProviders = MAIL_AGENT_ENABLED
     // 같은 IMAP 구현이고 접속 정보만 다르다. 인스턴스를 나누는 것은 두 사서함의
     // 연결을 섞지 않기 위해서다.
     works: createNaverProvider(),
-    gmail: createGmailProvider({
-      tokenSource: createGoogleTokenSource({ credentials: MAIL_GMAIL_CREDENTIALS }),
-    }),
+    gmail: createGmailProvider({ tokenSource: gmailReadTokens }),
   }
   : null;
 const MAIL_CREDENTIALS_BY_PROVIDER = {
@@ -926,6 +932,14 @@ const MAIL_CREDENTIALS_BY_PROVIDER = {
   works: MAIL_WORKS_CREDENTIALS,
 };
 const mailCredentialsFor = account => MAIL_CREDENTIALS_BY_PROVIDER[account.provider] || {};
+const mailClient = MAIL_CLIENT_ENABLED ? (() => {
+  const imap = createImapMailClient({ credentialsFor: mailCredentialsFor });
+  return createMailClient({
+    db,
+    agentStore: mailStore,
+    providers: { gmail: createGmailMailClient({ tokenSource: gmailReadTokens }), naver: imap, works: imap },
+  });
+})() : null;
 const mailBodyReader = MAIL_AGENT_ENABLED
   ? createMailBodyReader({ store: mailStore, providers: mailProviders, credentials: mailCredentialsFor })
   : null;
@@ -4921,6 +4935,7 @@ registerMailRoutes({
   // 되돌린 즉시 한 바퀴 돌린다. 다음 주기를 기다리면 눌러놓고 아무 일도 안 일어난다.
   onRequeued: () => { void mailAgent?.tick(); },
 });
+registerMailClientRoutes({ app, service: mailClient });
 const shortcutRoutes = createVoiceShortcutRoutes({
   app,
   service: voiceShortcut,

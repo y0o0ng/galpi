@@ -2174,6 +2174,8 @@ Naver = IMAP + UIDVALIDITY/UID locator + message identity
 
 # 23. 화면 상세 — Mail Detail 페이지를 만들지 않는다
 
+이 절은 기존 Agent 알림 카드의 계약이다. 일반 메일 목록과 상세를 위한 후속 제품 범위는 [Mail Workspace 설계](mail-workspace-design.md)에서 정의한다.
+
 v1에서 "메일 상세"는 알림 탭 카드의 확장이다.
 
 ```text

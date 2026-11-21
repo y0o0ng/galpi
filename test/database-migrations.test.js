@@ -363,6 +363,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 42, name: 'reels_candidate_everyday_door' },
     { version: 43, name: 'card_news_pipeline' },
     { version: 44, name: 'mail_reply_attempts' },
+    { version: 45, name: 'mail_client_cache' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -380,7 +381,8 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
   );
   assert.deepEqual(
     db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN (
-      'ddays', 'mail_reply_attempts', 'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
+      'ddays', 'mail_reply_attempts', 'mail_client_cache', 'mail_client_messages',
+      'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
       'memory_general_fact_transitions', 'memory_general_fact_transition_evidence', 'memory_general_fact_reviews'
     ) AND name NOT LIKE 'lecture_%' AND name NOT LIKE 'reels_%' AND name NOT LIKE 'cards_%' ORDER BY name`).all(),
     tablesBefore,
@@ -1098,6 +1100,7 @@ test('schema v42 adds the reels candidate everyday_door column and keeps existin
     { version: 42, name: 'reels_candidate_everyday_door' },
     { version: 43, name: 'card_news_pipeline' },
     { version: 44, name: 'mail_reply_attempts' },
+    { version: 45, name: 'mail_client_cache' },
   ]);
   assert.deepEqual(runDatabaseMigrations(db).applied, []);
   assert.deepEqual(
