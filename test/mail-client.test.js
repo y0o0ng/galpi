@@ -85,6 +85,7 @@ function fakeGmail() {
     if (endpoint === '/profile') return Response.json({ emailAddress });
     if (endpoint === '/labels') return Response.json({ labels: [
       { id: 'INBOX', name: 'INBOX', type: 'system' }, { id: 'Label_2', name: 'Project', type: 'user' },
+      ...['SPAM', 'TRASH', 'DRAFT'].map(id => ({ id, name: id, type: 'system' })),
     ] });
     if (endpoint === '/messages') {
       const query = parsed.searchParams.get('q') || '';
@@ -92,8 +93,20 @@ function fakeGmail() {
       const before = Number(query.match(/before:(\d+)/)?.[1] ?? Infinity);
       if (after >= 0 && before === unavailableWindowEnd) return Response.json({}, { status: 503 });
       const label = parsed.searchParams.get('labelIds');
+      const fieldsOnly = [...query.matchAll(/(subject|from|to):"([^"]+)"/g)];
+      const orEnd = query.indexOf('}');
+      const matches = (row, [, field, term]) => row.payload.headers.find(header => header.name.toLowerCase() === field)
+        ?.value.toLowerCase().includes(term);
       const found = mail.filter(row => (!label || row.labelIds.includes(label))
-        && Number(row.internalDate) / 1000 > after && Number(row.internalDate) / 1000 < before);
+        && Number(row.internalDate) / 1000 > after && Number(row.internalDate) / 1000 < before
+        && (parsed.searchParams.has('includeSpamTrash') || !row.labelIds.some(value => ['SPAM', 'TRASH'].includes(value)))
+        && (!query.includes('-in:drafts') || !row.labelIds.includes('DRAFT'))
+        && (!query.includes('is:unread') || row.labelIds.includes('UNREAD'))
+        && (!query.includes('is:read') || !row.labelIds.includes('UNREAD'))
+        && (!query.includes('is:starred') || row.labelIds.includes('STARRED'))
+        && (!query.includes('has:attachment') || row.payload.parts?.some(part => part.filename))
+        && (orEnd < 0 || fieldsOnly.filter(match => match.index < orEnd).some(match => matches(row, match)))
+        && fieldsOnly.filter(match => match.index > orEnd).every(match => matches(row, match)));
       const offset = Number(parsed.searchParams.get('pageToken') || 0);
       const limit = Number(parsed.searchParams.get('maxResults') || 100);
       const messages = found.slice(offset, offset + limit).map(({ id }) => ({ id }));
@@ -108,6 +121,10 @@ function fakeGmail() {
       });
     }
     const id = endpoint.split('/').at(-1);
+    if (endpoint.startsWith('/threads/')) {
+      const messages = mail.filter(row => row.threadId === id).map(({ raw, ...metadata }) => metadata);
+      return messages.length ? Response.json({ id, messages }) : Response.json({}, { status: 404 });
+    }
     const message = mail.find(row => row.id === id);
     return message ? Response.json(message) : Response.json({}, { status: 404 });
   }
@@ -208,10 +225,18 @@ function fakeImap() {
         async search(terms, options) {
           assert.ok(path);
           assert.equal(options.uid, true);
+          calls.push({ path, operation: 'SEARCH', terms });
           const [low, high] = terms.uid.split(':').map(Number);
+          const textMatches = (row, filters) => (!filters.subject || row.envelope.subject.toLowerCase().includes(filters.subject))
+            && ['from', 'to'].every(key => !filters[key] || row.envelope[key].some(({ name, address }) =>
+              name.toLowerCase().includes(filters[key]) || address.toLowerCase().includes(filters[key])));
+          const hasFlag = (row, field, flag) => terms[field] === undefined || row.flags.has(flag) === terms[field];
           const found = rows().filter(row => row.uid >= low && row.uid <= high
             && (!terms.since || row.internalDate >= terms.since)
-            && (!terms.before || row.internalDate < terms.before)).map(row => row.uid);
+            && (!terms.before || row.internalDate < terms.before)
+            && hasFlag(row, 'seen', '\\Seen') && hasFlag(row, 'flagged', '\\Flagged')
+            && hasFlag(row, 'draft', '\\Draft') && hasFlag(row, 'deleted', '\\Deleted')
+            && textMatches(row, terms) && (!terms.or || terms.or.some(filter => textMatches(row, filter)))).map(row => row.uid);
           return options.returnOptions ? { count: found.length } : found;
         },
         async *fetch(set, query, options) {
@@ -219,6 +244,7 @@ function fakeImap() {
           assert.equal(options.uid, true);
           assert.equal(query.source, undefined);
           const ids = new Set(set.split(',').map(Number));
+          calls.push({ path, operation: 'FETCH', ids: [...ids] });
           for (const row of rows().filter(row => ids.has(row.uid))) yield { ...row, source: undefined };
         },
         async fetchOne(uid, query, options) {
@@ -256,6 +282,7 @@ test('Gmail labels and All Mail cover archived messages with a shared read token
   const { mailboxes } = await f.service.mailboxes(accountId);
   assert.deepEqual(mailboxes.map(({ id, kind }) => [id, kind]), [
     ['all', 'all'], ['label:INBOX', 'label'], ['label:Label_2', 'label'],
+    ['label:SPAM', 'label'], ['label:TRASH', 'label'], ['label:DRAFT', 'label'],
   ]);
   const all = await f.service.mailbox(accountId, 'all', null, 1);
   assert.equal(all.messages[0].providerMessageId, 'archived');
@@ -571,7 +598,7 @@ test('Attention links verify account, INBOX location and independent envelope ev
   await assert.rejects(f.service.detail(link.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
 });
 
-test('HTML-only mail is returned as text without script content or attachment bytes', async t => {
+test('HTML-only mail retains original markup and a clean plain-text fallback without attachment bytes', async t => {
   const f = fixture(t);
   const account = f.addAccount('works', 'test@school.example.com');
   const source = Buffer.from([
@@ -585,8 +612,40 @@ test('HTML-only mail is returned as text without script content or attachment by
   f.imap.works.rows.Received = [imapMessage(3, NOW - 5, { source })];
   const page = await f.service.mailbox(account, 'folder:Received', null, 1);
   const detail = await f.service.detail(page.messages[0].id);
-  assert.deepEqual(detail.body, { format: 'text', text: 'Safe visible text.', blockedRemoteImages: 1 });
+  assert.equal(detail.body.format, 'text');
+  assert.equal(detail.body.text, 'Safe visible text.');
+  assert.match(detail.body.html, /<p>Safe visible text\.<\/p>/u);
+  assert.equal(detail.body.blockedRemoteImages, 1);
   assert.equal(detail.hasAttachments, false);
+});
+
+test('CID image bytes come from the verified message and only raster inline parts can be read', async t => {
+  const f = fixture(t);
+  const account = f.addAccount('gmail', 'test@gmail.com');
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l8sAAAAASUVORK5CYII=';
+  const raw = Buffer.from([
+    'From: Teacher <teacher@example.com>', 'Subject: HTML with inline image', 'MIME-Version: 1.0',
+    'Content-Type: multipart/related; boundary=body', '', '--body', 'Content-Type: text/html', '',
+    '<p>본문 그림</p><img src="cid:logo@example.com">', '--body', 'Content-Type: image/png',
+    'Content-ID: <logo@example.com>', 'Content-Disposition: inline', 'Content-Transfer-Encoding: base64', '', png,
+    '--body', 'Content-Type: image/svg+xml', 'Content-ID: <script@example.com>', 'Content-Disposition: inline', '',
+    '<svg xmlns="http://www.w3.org/2000/svg"><script>bad()</script></svg>',
+    '--body', 'Content-Type: image/png', 'Content-ID: <fake@example.com>', 'Content-Disposition: inline', '',
+    '<html>Not a PNG</html>', '--body--', '',
+  ].join('\r\n'));
+  const message = gmailMessage('cid', NOW, ['UNREAD'], raw);
+  f.gmail.setMessages([message]);
+  const { messages: [item] } = await f.service.mailbox(account, 'all', null, 10);
+  const detail = await f.service.detail(item.id);
+  const indexOf = cid => detail.attachments.findIndex(attachment => attachment.contentId === `<${cid}@example.com>`);
+  assert.match(detail.body.html, /cid:logo@example.com/);
+  assert.ok(!JSON.stringify(detail).includes(png));
+  assert.deepEqual(await f.service.inlineImage(item.id, indexOf('logo')), { contentType: 'image/png', bytes: Buffer.from(png, 'base64') });
+  for (const cid of ['script', 'fake']) await assert.rejects(f.service.inlineImage(item.id, indexOf(cid)), { code: 'MAIL_CLIENT_ATTACHMENT_NOT_FOUND' });
+  await assert.rejects(f.service.attachment(item.id, indexOf('logo')), { code: 'MAIL_CLIENT_ATTACHMENT_NOT_FOUND' });
+  assert.deepEqual(message.labelIds, ['UNREAD']);
+  f.gmail.setMessages([]);
+  await assert.rejects(f.service.inlineImage(item.id, indexOf('logo')), { code: 'MAIL_CLIENT_MESSAGE_GONE' });
 });
 
 test('smart source checks freshly read Gmail labels and rejects reused IDs before opening content', async t => {
@@ -643,28 +702,211 @@ test('smart IMAP eligibility uses server roles, retains distinct locations and r
   await assert.rejects(f.service.openAnalysisSource(replacement.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
   f.imap.naver.rows['Projects/2026'] = [];
   await assert.rejects(f.service.openAnalysisSource(ordinary.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
-  assert.ok(f.imap.calls.every(call => ['EXAMINE', 'PEEK'].includes(call.operation)));
+  assert.ok(f.imap.calls.every(call => ['EXAMINE', 'PEEK', 'SEARCH', 'FETCH'].includes(call.operation)));
 });
 
-test('Workspace search combines observed folder, sender and flags and keeps its cursor scoped', async t => {
+test('Workspace searches unobserved historical messages across Gmail, Naver and Works, using headers only', async t => {
   const f = fixture(t);
   const gmail = f.addAccount('gmail', 'test@gmail.com');
   const naver = f.addAccount('naver', 'test@naver.com');
-  await f.service.mailbox(gmail, 'all', null, 20);
-  await f.service.mailbox(naver, 'folder:INBOX', null, 20);
-  const all = await f.service.search({ q: 'Original subject', sender: 'TEACHER', attachments: 'true' }, null, null, 2);
-  assert.equal(all.coverage, 'observed_workspace');
-  assert.ok(all.total > 2);
-  assert.equal(all.messages.length, 2);
-  assert.ok(all.messages.every(message => message.stale));
-  const next = await f.service.search({ q: 'Original subject', sender: 'TEACHER', attachments: 'true' }, null, all.nextCursor, 2);
-  assert.ok(next.messages.every(message => !all.messages.some(item => item.id === message.id)));
-  assert.throws(() => f.service.search({ q: 'different' }, null, all.nextCursor, 2), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
-  const unread = await f.service.search({ q: 'Teacher', accountId: String(naver), mailbox: 'folder:INBOX', read: 'unread' }, naver, null, 10);
-  assert.equal(unread.total, 1);
-  assert.equal(unread.messages[0].accountId, naver);
-  assert.equal(unread.messages[0].read, false);
+  const works = f.addAccount('works', 'test@school.example.com');
+  const old = Date.parse('2022-03-18T12:00:00Z') / 1000;
+  const g = gmailMessage('old-gmail', old + 2, ['Label_2', 'STARRED']);
+  g.payload.headers.find(header => header.name === 'Subject').value = '오래된 연구 기록';
+  f.gmail.setMessages([g]);
+  const n = imapMessage(23, old + 1);
+  n.envelope.from[0].name = '오래된 연구팀';
+  f.imap.naver.rows['Projects/2026'] = [n];
+  const w = imapMessage(9, old, { flags: ['\\Flagged'] });
+  w.envelope.to[0].name = '오래된 기록 수신자';
+  f.imap.works.rows['Sent Messages'] = [w];
+
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM mail_client_messages').get().n, 0);
+  const query = { q: '오래된' };
+  const first = await f.service.search(query, null, null, 2);
+  assert.equal(first.coverage, 'provider_mailboxes');
+  assert.deepEqual(first.messages.map(row => row.accountId), [gmail, naver]);
+  assert.ok(first.messages.every(row => !row.stale && row.id));
+  assert.equal(first.total, 3);
+  assert.ok(first.nextCursor);
+  const next = await f.service.search(query, null, first.nextCursor, 2);
+  assert.deepEqual(next.messages.map(row => row.accountId), [works]);
+  assert.equal(next.nextCursor, null);
+  const callCount = f.imap.calls.length + f.gmail.calls.length;
+  assert.deepEqual(await f.service.search(query, null, first.nextCursor, 2), next);
+  assert.equal(f.imap.calls.length + f.gmail.calls.length, callCount);
+  assert.throws(() => f.service.search({ q: 'different' }, null, first.nextCursor, 2), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
+  f.advance(601);
+  assert.throws(() => f.service.search(query, null, first.nextCursor, 2), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
+  assert.equal((await f.service.detail(first.messages[1].id)).read, false);
+  assert.equal(n.flags.has('\\Seen'), false);
+  n.source = Buffer.from(SOURCE.toString().replace('end-of-full-body', 'new-of-full-body'));
+  await assert.rejects(f.service.detail(first.messages[1].id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
+  assert.equal(f.store.countMessages(naver), 0);
+  assert.ok(f.gmail.calls.find(call => call.endpoint === '/messages' && call.query.get('q')
+    ?.includes('{subject:"오래된" from:"오래된" to:"오래된"}')));
+  assert.ok(f.imap.calls.find(call => call.operation === 'SEARCH' && call.terms.or?.some(term => term.to === '오래된')));
+  const body = await f.service.search({ q: 'end-of-full-body' }, null, null, 10);
+  assert.deepEqual(body.messages, []);
+  assert.equal(body.total, 0);
+});
+
+test('related mail finds exact case-insensitive From and To addresses across providers, excluding subject and display-name matches', async t => {
+  const f = fixture(t);
+  const gmail = f.addAccount('gmail', 'test@gmail.com');
+  const naver = f.addAccount('naver', 'test@naver.com');
+  const works = f.addAccount('works', 'test@school.example.com');
+  const g = gmailMessage('sender', NOW - 500 * DAY, []);
+  g.payload.headers.find(header => header.name === 'From').value = 'Friend <ALICE@example.com>';
+  const subjectOnly = gmailMessage('subject', NOW - 2, []);
+  subjectOnly.payload.headers.find(header => header.name === 'Subject').value = 'For alice@example.com';
+  f.gmail.setMessages([subjectOnly, g]);
+  const n = imapMessage(9, NOW - 600 * DAY);
+  n.envelope.to = [{ name: 'Alice', address: 'alice@EXAMPLE.com' }];
+  const displayOnly = imapMessage(10, NOW - 300 * DAY);
+  displayOnly.envelope.from = [{ name: 'alice@example.com', address: 'other@example.com' }];
+  const partial = imapMessage(11, NOW - 310 * DAY);
+  partial.envelope.to = [{ address: 'not-alice@example.com', name: 'Partial result' }];
+  f.imap.naver.rows['Projects/2026'] = [n, displayOnly, partial];
+  const w = imapMessage(4, NOW - 700 * DAY);
+  w.envelope.from = [{ address: 'Alice@example.com', name: 'Alice' }];
+  f.imap.works.rows['Sent Messages'] = [w];
+  const exact = { contactEmail: 'Alice@Example.COM' };
+  const first = await f.service.search(exact, null, null, 1);
+  assert.equal(first.messages[0].accountId, gmail);
+  assert.throws(() => f.service.search({ q: 'alice@example.com' }, null, first.nextCursor, 1), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
+  const next = await f.service.search(exact, null, first.nextCursor, 1);
+  assert.equal(next.messages[0].accountId, naver);
+  const last = await f.service.search(exact, null, next.nextCursor, 1);
+  assert.equal(last.messages[0].accountId, works);
+  assert.equal(last.nextCursor, null);
+  assert.equal(last.total, 3);
+  const plain = await f.service.search({ q: 'alice@example.com' }, null, null, 20);
+  assert.ok(plain.messages.some(row => row.providerMessageId === 'subject'));
+  assert.throws(() => f.service.search({ contactEmail: 'alice' }, null, null, 1), { code: 'MAIL_CLIENT_SEARCH_INVALID' });
+});
+
+test('Workspace filter-only search uses actual folder scopes, flags and exact KST dates', async t => {
+  const f = fixture(t);
+  const gmail = f.addAccount('gmail', 'test@gmail.com');
+  const naver = f.addAccount('naver', 'test@naver.com');
+  f.addAccount('works', 'test@school.example.com');
+  const from = Date.parse('2022-03-17T15:00:00Z') / 1000;
+  const mail = [
+    gmailMessage('g-spam', from + 5, ['SPAM', 'STARRED', 'UNREAD']),
+    gmailMessage('g-trash', from + 4, ['TRASH', 'STARRED', 'UNREAD']),
+    gmailMessage('g-draft', from + 3, ['DRAFT', 'STARRED', 'UNREAD']),
+    gmailMessage('g-archived', from, ['Label_2', 'STARRED', 'UNREAD']),
+    gmailMessage('g-before', from - 1, ['STARRED', 'UNREAD']),
+  ];
+  f.gmail.setMessages(mail);
+  const project = f.imap.naver.rows['Projects/2026'] = [
+    imapMessage(13, from - 1, { flags: ['\\Flagged'] }),
+    imapMessage(15, from + DAY, { flags: ['\\Flagged'] }),
+    imapMessage(23, from + 2, { flags: ['\\Flagged', '\\Seen'] }),
+    imapMessage(32, from + 1, { flags: ['\\Flagged'] }),
+    imapMessage(36, from + 1, { flags: ['\\Flagged'] }),
+  ];
+  project.at(-1).bodyStructure = {};
+  f.imap.naver.rows.INBOX.push(imapMessage(92, from + 1, { flags: ['\\Draft', '\\Flagged'] }));
+  for (const [path, role] of [['스팸메일함', '\\Junk'], ['휴지통', '\\Trash'], ['임시보관함', '\\Drafts']]) {
+    f.imap.naver.folders.push({ path, flags: new Set([role]) });
+    f.imap.naver.rows[path] = [imapMessage(1, from + 9, { flags: ['\\Flagged', ...(role === '\\Drafts' ? ['\\Draft'] : [])] })];
+  }
+  const query = { read: 'unread', starred: 'true', attachments: 'true', from: '2022-03-18', until: '2022-03-18' };
+  const all = await f.service.search(query, null, null, 20);
+  assert.deepEqual(all.messages.map(row => [row.accountId, row.providerMessageId, row.folderPath]),
+    [[naver, null, 'Projects/2026'], [gmail, 'g-archived', null]]);
+  assert.equal(all.total, 2);
+  assert.equal(all.nextCursor, null);
+  const inbox = await f.service.search({ ...query, inbox: '1' }, null, null, 20);
+  assert.deepEqual(inbox.messages, []);
+  for (const label of ['SPAM', 'TRASH', 'DRAFT']) {
+    const direct = await f.service.search({ ...query, accountId: String(gmail), mailbox: 'label:' + label }, gmail, null, 20);
+    assert.equal(direct.messages[0].providerMessageId, 'g-' + label.toLowerCase());
+  }
+  for (const path of ['스팸메일함', '휴지통', '임시보관함']) {
+    const direct = await f.service.search({ ...query, accountId: String(naver), mailbox: 'folder:' + path }, naver, null, 20);
+    assert.equal(direct.messages[0].folderPath, path);
+  }
+  const bySender = await f.service.search({ ...query, sender: 'office' }, null, null, 20);
+  assert.deepEqual(bySender.messages, []);
   assert.throws(() => f.service.search({ from: '2026-02-31' }, naver, null, 10), { code: 'MAIL_CLIENT_SEARCH_INVALID' });
+});
+
+test('Workspace search pages provider candidates on demand and reports partial account failures', async t => {
+  const f = fixture(t);
+  f.addAccount('gmail', 'test@gmail.com');
+  const naver = f.addAccount('naver', 'test@naver.com');
+  const works = f.addAccount('works', 'test@school.example.com');
+  f.gmail.setUnavailable(true);
+  f.imap.naver.rows['Projects/2026'] = Array.from({ length: 42 }, (_, index) => imapMessage(index + 1, NOW - 4000 + index));
+  const query = { q: 'friend@example.com' };
+  const first = await f.service.search(query, null, null, 20);
+  assert.ok(first.incomplete);
+  assert.deepEqual(first.sources.map(source => source.status).sort(), ['fresh', 'fresh', 'unavailable']);
+  assert.equal(first.messages[0].accountId, naver);
+  assert.ok(first.messages.some(row => row.accountId === works));
+  assert.equal(first.messages.length, 20);
+  assert.ok(!f.imap.calls.some(call => call.path === 'Projects/2026' && call.operation === 'FETCH' && call.ids.includes(1)));
+  const ids = first.messages.map(row => row.id);
+  for (let cursor = first.nextCursor; cursor;) {
+    const next = await f.service.search(query, null, cursor, 20);
+    assert.ok(next.incomplete);
+    for (const row of next.messages) {
+      assert.ok(!ids.includes(row.id));
+      ids.push(row.id);
+    }
+    cursor = next.nextCursor;
+  }
+  assert.equal(ids.length, 45);
+});
+
+test('Gmail search continues with the provider page token and does not fetch the whole mailbox up front', async t => {
+  const f = fixture(t);
+  const account = f.addAccount('gmail', 'test@gmail.com');
+  const mail = Array.from({ length: 25 }, (_, index) => gmailMessage('archived-' + index, NOW - DAY * 100 - index, ['STARRED']));
+  f.gmail.setMessages(mail);
+  const query = { starred: 'true' };
+  const first = await f.service.search(query, account, null, 20);
+  assert.deepEqual(first.messages.map(row => row.providerMessageId), mail.slice(0, 20).map(row => row.id));
+  assert.equal(f.gmail.calls.filter(call => call.endpoint.startsWith('/messages/')).length, 20);
+  const next = await f.service.search(query, account, first.nextCursor, 20);
+  assert.deepEqual(next.messages.map(row => row.providerMessageId), mail.slice(20).map(row => row.id));
+  assert.equal(next.total, 25);
+  assert.equal(next.nextCursor, null);
+  assert.ok(f.gmail.calls.some(call => call.endpoint === '/messages' && call.query.get('pageToken') === '20'));
+  assert.ok(f.gmail.calls.filter(call => call.endpoint.startsWith('/messages/')).every(call =>
+    !/\b(?:body|raw)\b/.test(call.query.get('fields'))));
+});
+
+test('Gmail details load the actual thread and give unobserved messages stable, openable IDs', async t => {
+  const f = fixture(t);
+  const account = f.addAccount('gmail', 'test@gmail.com');
+  const active = gmailMessage('active', NOW, ['INBOX', 'UNREAD']);
+  const older = gmailMessage('older', NOW - DAY, ['UNREAD', 'STARRED']);
+  const sent = gmailMessage('sent', NOW - DAY + 20, ['SENT']);
+  older.threadId = sent.threadId = active.threadId;
+  f.gmail.setMessages([active, older, sent]);
+  const page = await f.service.mailbox(account, 'label:INBOX', null, 1);
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM mail_client_messages').get().n, 1);
+  const detail = await f.service.detail(page.messages[0].id);
+  assert.deepEqual(detail.thread.messages.map(row => row.receivedAt), [NOW - DAY, NOW - DAY + 20]);
+  assert.ok(detail.thread.messages.every(row => row.from.length && Object.keys(row).sort().join() === 'from,id,receivedAt,subject'));
+  const request = f.gmail.calls.find(call => call.endpoint === '/threads/thread-active');
+  assert.ok(request);
+  assert.doesNotMatch(request.query.get('fields'), /\b(?:body|raw)\b/);
+  const related = await f.service.detail(detail.thread.messages[0].id);
+  assert.equal(related.providerMessageId, 'older');
+  assert.equal(related.body.text.trim(), SOURCE_BODY);
+  assert.equal(related.read, false);
+  assert.equal(related.starred, true);
+  assert.deepEqual(older.labelIds, ['UNREAD', 'STARRED']);
+  assert.deepEqual(related.thread.messages.map(row => row.id), [detail.thread.messages[1].id, page.messages[0].id]);
+
+  const threadGets = f.gmail.calls.filter(call => call.endpoint === '/threads/thread-active').length;
+  await f.service.detail(detail.id, { includeThread: false });
+  assert.equal(f.gmail.calls.filter(call => call.endpoint === '/threads/thread-active').length, threadGets);
 });
 
 test('Workspace downloads only the selected verified non-inline attachment', async t => {

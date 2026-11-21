@@ -726,6 +726,8 @@ body[data-mail-workspace] #global-nav .shell-settings::before {
   font-size: 13px;
 }
 #mail-workspace .mw-detail-body { margin-block: 18px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+#mail-workspace iframe.mw-detail-body { display: block; width: 100%; border: 0; }
+#mail-workspace iframe.mw-detail-body[hidden] { display: none; }
 #mail-workspace .mw-file-heading { align-items: center; color: var(--mw-secondary); font-size: 13px; margin-bottom: 8px; }
 #mail-workspace .mw-file-tiles { display: flex; flex-wrap: wrap; gap: 10px; }
 #mail-workspace .mw-file-tile {

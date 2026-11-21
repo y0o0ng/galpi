@@ -17,12 +17,13 @@
   ];
   const smartTabs = {
     important: [['전체', 'all'], ['시온 분류', ''], ['내가 표시', 'starred']],
-    action_required: [['전체', ''], ['답장', null], ['확인', null], ['제출', null]],
+    action_required: [['전체', ''], ['답장', 'reply'], ['확인', 'confirm'], ['제출', 'submit']],
     deadline: [['다가오는 마감', 'upcoming'], ['지난 마감', 'past']],
     ignore: [['전체', 'all'], ['시온 판정', ''], ['분석 제외 규칙', 'rules']],
     unclassified: [['전체', ''], ['분석 대기', 'pending'], ['분석 실패', 'failed']],
   };
   const limit = 13;
+  const SMART_REFRESH_MS = 15000;
   const zone = { timeZone: 'Asia/Seoul' };
   const day = new Intl.DateTimeFormat('en-CA', { ...zone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const clock = new Intl.DateTimeFormat('ko', { ...zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -98,6 +99,8 @@
     let appliedFilters = {};
     let searchEditing = false;
     let smartVariant = 0;
+    let smartRefreshTimer;
+    let smartRefreshRequest;
     const narrow = global.matchMedia('(max-width: 1100px)');
 
     const sidebar = node('aside', 'mw-sidebar');
@@ -139,6 +142,8 @@
         toggleMailboxes(false);
       }
     });
+    new MutationObserver(syncSmartRefresh).observe(mount, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('visibilitychange', syncSmartRefresh);
 
     async function request(endpoint, options = {}, { binary = false } = {}) {
       const { json, ...init } = options;
@@ -154,9 +159,9 @@
       return data;
     }
 
-    function get(endpoint, params = {}) {
+    function get(endpoint, params = {}, options) {
       const query = new URLSearchParams(params).toString();
-      return request(endpoint + (query ? '?' + query : ''));
+      return request(endpoint + (query ? '?' + query : ''), options);
     }
 
     function requestId() {
@@ -169,6 +174,7 @@
       mount.dataset.screen = screenName;
       extra.hidden = false;
       extra.replaceChildren(content);
+      stopSmartRefresh();
       toggleMailboxes(false, false);
       renderSidebar(history[page]?.messages.filter(message => message.read === false).length);
       main.scrollTop = 0;
@@ -195,7 +201,7 @@
       openMessage: message => messageViews.detail(message, [], 0, { title: '메일', role: 'other' }),
       searchHistory: value => {
         searchTerm = value;
-        changeScope({ role: 'inbox', title: '검색 결과', search: true });
+        changeScope({ role: 'inbox', title: '검색 결과', search: true, contactEmail: value });
       },
       toggleMailboxes,
       compose: options => messageViews.openCompose(options),
@@ -423,16 +429,7 @@
       const heading = node('h1', '', scope.title);
       heading.tabIndex = -1;
       const title = node('div', 'mw-title');
-      const prefix = !scope.role ? providers[scope.account?.provider] + ' · ' : '';
-      let caption = '';
-      if (unread != null) {
-        if (scope.search) caption = '‘' + searchTerm + '’ · ' + (scope.account ? providers[scope.account.provider] : '전체 계정')
-          + ' · ' + labels.format(history[page]?.total ?? messages().length) + '건';
-        else if (scope.role === 'drafts') caption = '초안 ' + labels.format(messages().length) + '개';
-        else if (scope.role === 'trash' && !messages().length) caption = '0개';
-        else caption = prefix + '안 읽음 ' + labels.format(unread);
-      }
-      const total = node('span', 'mw-unread', caption);
+      const total = node('span', 'mw-unread', listCaption(unread));
       total.title = '현재 페이지 기준';
       title.append(heading, total);
       const chips = node('div', 'mw-chips');
@@ -445,7 +442,7 @@
           const canOpen = (scope.role === 'inbox' && !provider) || target;
           const active = !provider ? !scope.account : account != null && scope.account?.id === account.id;
           const chip = button('mw-chip', name, (scope.search ? (!provider || account) : canOpen) && !writing && !loading ? () => {
-            if (scope.search) searchFor(searchTerm, account);
+            if (scope.search) searchFor(searchTerm, account, scope.contactEmail);
             else if (scope.role === 'inbox') inbox(account);
             else changeScope({ ...target, role: scope.role, title: scope.title });
           } : null);
@@ -457,6 +454,7 @@
         for (const [index, [label, key]] of (smartTabs[scope.filter] || []).entries()) {
           const control = button('mw-chip', label, key !== null && !loading && !writing ? () => {
             smartVariant = index;
+            page = 0;
             void loadPage(null, true);
           } : null);
           control.setAttribute('aria-pressed', String(smartVariant === index));
@@ -470,9 +468,9 @@
       input.value = searchTerm;
       input.setAttribute('aria-label', '메일 검색');
       input.maxLength = 160;
-      function searchFor(value, account = scope.account) {
+      function searchFor(value, account = scope.account, contactEmail = null) {
         searchTerm = value.trim();
-        if (searchTerm) changeScope({ title: '검색 결과', role: 'inbox', account, search: true, keepFilters: true });
+        if (searchTerm) changeScope({ title: '검색 결과', role: 'inbox', account, search: true, keepFilters: true, contactEmail });
         else inbox(account);
       }
       search.addEventListener('submit', event => {
@@ -485,7 +483,7 @@
         for (const account of [null, ...accounts.filter(item => item.status !== 'disabled')]) {
           group.append(navRow(account ? providers[account.provider] : '전체 계정', undefined, () => {
             dialog.close();
-            if (input.value.trim()) searchFor(input.value, account);
+            if (input.value.trim()) searchFor(input.value, account, input.value.trim() === searchTerm ? scope.contactEmail : null);
             else inbox(account);
           }, (scope.account?.id ?? null) === (account?.id ?? null)));
         }
@@ -503,6 +501,16 @@
       }, { glyph: 'search', size: 22, iconOnly: true });
       header.classList.toggle('mw-search-editing', searchEditing);
       header.replaceChildren(menu, title, node('span', 'mw-spacer'), ...(scope.role || scope.filter ? [chips] : []), search, compactSearch);
+    }
+
+    function listCaption(unread) {
+      if (unread == null) return '';
+      if (scope.search) return '‘' + searchTerm + '’ · ' + (scope.account ? providers[scope.account.provider] : '전체 계정')
+        + ' · ' + labels.format(history[page]?.total ?? messages().length) + '건';
+      if (scope.role === 'drafts') return '초안 ' + labels.format(messages().length) + '개';
+      if (scope.role === 'trash' && !messages().length) return '0개';
+      const prefix = !scope.role ? providers[scope.account?.provider] + ' · ' : '';
+      return prefix + '안 읽음 ' + labels.format(unread);
     }
 
     function openFilters(anchor) {
@@ -737,20 +745,76 @@
       }
     }
 
-    function renderPage() {
+    function renderPage(background = false) {
       const current = history[page];
       const unread = current ? current.messages.filter(message => message.read === false).length : null;
       if (scope.role === 'inbox' && !scope.account && !page && unread != null) inboxUnread = unread;
       renderRows();
-      renderSidebar(unread);
-      renderHeader(unread);
+      if (background) header.querySelector('.mw-unread').textContent = listCaption(unread);
+      else {
+        renderSidebar(unread);
+        renderHeader(unread);
+      }
       renderToolbar();
       renderFooter();
       renderNotices();
+      syncSmartRefresh();
+    }
+
+    function smartParams(cursor) {
+      const variant = smartTabs[scope.filter]?.[smartVariant]?.[1];
+      return { limit, filter: scope.filter, ...(variant ? { variant } : {}), ...(cursor ? { cursor } : {}) };
+    }
+
+    function canRefreshSmart() {
+      return scope.filter && !screen && !loading && !writing && !document.hidden
+        && mount.classList.contains('active') && !mount.classList.contains('mw-mailboxes-open');
+    }
+
+    function stopSmartRefresh() {
+      global.clearTimeout(smartRefreshTimer);
+      smartRefreshTimer = undefined;
+      smartRefreshRequest?.abort();
+      smartRefreshRequest = undefined;
+    }
+
+    function syncSmartRefresh() {
+      if (!canRefreshSmart()) stopSmartRefresh();
+      else if (!smartRefreshTimer && !smartRefreshRequest) {
+        smartRefreshTimer = global.setTimeout(refreshSmart, SMART_REFRESH_MS);
+      }
+    }
+
+    async function refreshSmart() {
+      smartRefreshTimer = undefined;
+      if (!canRefreshSmart()) return;
+      if (mount.querySelector('dialog[open]')) { syncSmartRefresh(); return; }
+      const controller = new AbortController();
+      smartRefreshRequest = controller;
+      try {
+        const result = await get('/smart/messages', smartParams(history[page - 1]?.nextCursor), { signal: controller.signal });
+        if (smartRefreshRequest !== controller || !canRefreshSmart() || result.incomplete || !Array.isArray(result.messages)
+          || mount.querySelector('dialog[open]')) return;
+        if (!listError && JSON.stringify(history[page]) === JSON.stringify(result)) return;
+        if (history[page]?.nextCursor !== result.nextCursor) history.length = page + 1;
+        history[page] = result;
+        const visible = new Set(result.messages.map(message => message.id));
+        for (const id of selected) if (!visible.has(id)) selected.delete(id);
+        listError = null;
+        renderPage(true);
+      } catch {
+        // A later refresh can recover while the last successful page stays visible.
+      } finally {
+        if (smartRefreshRequest === controller) {
+          smartRefreshRequest = undefined;
+          syncSmartRefresh();
+        }
+      }
     }
 
     async function loadPage(cursor, refresh = false) {
       if (loading || writing) return;
+      stopSmartRefresh();
       loading = true;
       listError = null;
       actionError = null;
@@ -771,13 +835,12 @@
             else if (scope.role === 'inbox') params.inbox = '1';
           }
           if (scope.account) params.accountId = scope.account.id;
-          if (scope.search) params.q = searchTerm;
+          if (scope.contactEmail) params.contactEmail = scope.contactEmail;
+          else if (scope.search) params.q = searchTerm;
           Object.assign(params, appliedFilters);
         } else if (scope.filter) {
           endpoint = '/smart/messages';
-          params.filter = scope.filter;
-          const variant = smartTabs[scope.filter]?.[smartVariant]?.[1];
-          if (variant) params.variant = variant;
+          Object.assign(params, smartParams(cursor));
         }
         const result = await get(endpoint, params);
         if (!cursor) history = [];
@@ -803,6 +866,7 @@
     function go(index) {
       if (loading || writing) return;
       if (history[index]) {
+        stopSmartRefresh();
         selected.clear();
         listError = null;
         actionError = null;
@@ -813,8 +877,9 @@
       }
     }
 
-    async function mutate(items, action, value, folderScope = scope) {
+    async function mutate(items, action, value, folderScope = scope, origin = 'user') {
       if (writing || loading || writeDenied || !items.length || items.some(message => !actionable(message))) return;
+      const automatic = origin === 'auto';
       writing = true;
       actionError = null;
       renderPage();
@@ -827,6 +892,7 @@
             const source = gmailMoveSource(message, folderScope);
             if (source) operation.sourceMailbox = source;
           } else if (value !== undefined) operation.value = value;
+          if (automatic) operation.origin = origin;
           return operation;
         });
         const response = await apiFetch('/api/mail-client/messages/actions', {
@@ -839,13 +905,14 @@
         const data = await response.json();
         if (data.code === 'MAIL_CLIENT_WRITE_DISABLED') {
           writeDenied = true;
-          showToast('이 환경에서는 메일 상태를 변경할 수 없어.');
+          if (!automatic) showToast('이 환경에서는 메일 상태를 변경할 수 없어.');
           return;
         }
         const failures = [];
         for (const message of items) {
           const result = data.results?.find(receipt => receipt.messageId === message.id);
           if (result?.state === 'confirmed') {
+            if (result.code === 'MAIL_CLIENT_MANUAL_UNREAD_PRESERVED') continue;
             if (action === 'set_read') message.read = value;
             if (action === 'set_starred') message.starred = value;
             if ((action === 'archive' && scope.role === 'inbox') || (action === 'trash' && scope.role !== 'trash')) {
@@ -856,6 +923,7 @@
           else unknown.add(message.id);
           if (!failures.includes(message.id) || !['set_read', 'move'].includes(action)) selected.delete(message.id);
         }
+        if (automatic) return data.results;
         if (items.some(message => unknown.has(message.id))) showToast('결과를 확인할 수 없는 메일이 있어. 새로고침으로 확인해 줘.');
         else if (failures.length && ['set_read', 'move'].includes(action) && !refresh) {
           actionError = { items: failures, action, value, folderScope };
@@ -864,8 +932,10 @@
         return data.results;
       } catch {
         items.forEach(message => unknown.add(message.id));
-        selected.clear();
-        showToast('메일 변경 결과를 확인하지 못했어. 새로고침으로 확인해 줘.');
+        if (!automatic) {
+          selected.clear();
+          showToast('메일 변경 결과를 확인하지 못했어. 새로고침으로 확인해 줘.');
+        }
       } finally {
         writing = false;
         if (refresh) void loadPage();

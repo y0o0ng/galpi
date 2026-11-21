@@ -12,6 +12,7 @@ const { once } = require('node:events');
 const { setTimeout: delay } = require('node:timers/promises');
 
 const ROOT = path.join(__dirname, '../public');
+const INLINE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l8sAAAAASUVORK5CYII=', 'base64');
 const chrome = [
   process.env.CHROME_BIN, '/usr/bin/google-chrome', '/usr/bin/chromium',
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -104,7 +105,7 @@ async function mockApp(t) {
   const now = Math.floor(Date.now() / 1000);
   const fixture = process.env.MAIL_INBOX_FIXTURE;
   const messages = fixture ? JSON.parse(await fs.readFile(fixture, 'utf8')) : [
-    { id: 1, accountId: 1, provider: 'gmail', labelIds: ['INBOX'], subject: '논문 피드백 전달', from: [{ name: '최유진 교수' }],
+    { id: 1, accountId: 1, provider: 'gmail', labelIds: ['INBOX'], subject: '논문 피드백 전달', from: [{ name: '최유진 교수', address: 'sender@example.com' }],
       receivedAt: now, read: false, important: true, starred: true, hasAttachments: true },
     { id: 2, accountId: 3, provider: 'works', folderPath: 'INBOX', subject: '재료공학 과제 안내', from: [{ name: '김민수 교수' }],
       receivedAt: now - 1, read: false, starred: false, hasAttachments: true },
@@ -114,6 +115,7 @@ async function mockApp(t) {
   const calls = [];
   const state = { enabled: true, outcome: 'confirmed', incomplete: false, authExpired: false, inboxError: false,
     holdInbox: null, holdDetail: null, missingDetail: false, contactsUnavailable: false, submission: 'saved', send: 'sent' };
+  const manualUnread = new Set();
   const contacts = [{ id: 1, name: '최유진 교수', email: 'sender@example.com', organization: '연구실', source: 'csv' }];
   let draft = { id: 'draft-1', version: 'a'.repeat(64), subject: 'Re: 논문 피드백 전달', text: '', to: ['sender@example.com'],
     cc: [], bcc: [], attachments: [] };
@@ -136,10 +138,20 @@ async function mockApp(t) {
         + raw.replaceAll('font-family: SF Pro', 'font-family: ' + fallback));
       return;
     }
+    if (endpoint === '/mail-message-frame') {
+      const remote = url.searchParams.get('images') === '1' ? ' https: http:' : '';
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8',
+        'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; img-src blob:${remote}; frame-ancestors 'self'`,
+        'Referrer-Policy': 'no-referrer' });
+      res.end('<!doctype html><meta charset="utf-8"><style>body{margin:0;display:flow-root}img,table{max-width:100%}</style><body></body>');
+      return;
+    }
     if (!endpoint.startsWith('/api/')) {
       const file = path.join(ROOT, endpoint === '/' ? 'index.html' : endpoint);
       try {
         const data = await fs.readFile(file);
+        if (state.htmlDetail && endpoint === '/') res.setHeader('Content-Security-Policy',
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-ancestors 'none'");
         res.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'application/octet-stream' });
         res.end(data);
       } catch { res.writeHead(404).end(); }
@@ -194,11 +206,19 @@ async function mockApp(t) {
     }
     if (endpoint.endsWith('/search')) {
       const query = url.searchParams.get('q')?.toLowerCase();
+      const contactEmail = url.searchParams.get('contactEmail')?.toLowerCase();
       const found = messages.filter(message => (!query || message.subject.toLowerCase().includes(query) || query === 'sender@example.com')
+        && (!contactEmail || [...message.from, ...(message.to || [])].some(entry => entry.address?.toLowerCase() === contactEmail))
         && (url.searchParams.get('read') !== 'unread' || !message.read));
       return json({ success: true, messages: found, total: found.length, nextCursor: null });
     }
-    if (endpoint.endsWith('/smart/messages')) return json({ success: true, messages: [messages[0]], nextCursor: null });
+    if (endpoint.endsWith('/smart/messages')) {
+      if (state.holdSmart) await state.holdSmart;
+      if (state.smartError) return json({ success: false, code: 'MAIL_CLIENT_PROVIDER_UNAVAILABLE' }, 503);
+      const nextPage = url.searchParams.has('cursor');
+      return json({ success: true, messages: (nextPage ? state.smartSecondPage : state.smartMessages) ?? [messages[0]],
+        nextCursor: nextPage ? null : state.smartNextCursor ?? null });
+    }
     if (endpoint.endsWith('/smart/calendar')) return json({ success: true, events: [{
       id: 7, messageId: 1, accountId: 1, kind: 'personal', title: '연구실 면담',
       startDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
@@ -209,7 +229,10 @@ async function mockApp(t) {
       const from = url.searchParams.get('source');
       const q = url.searchParams.get('q');
       const entries = contacts.filter(item => (!from || from === item.source) && (!q || item.name.includes(q) || item.email.includes(q)));
-      return json({ success: true, contacts: entries, total: entries.length });
+      const offset = Number(url.searchParams.get('offset') || 0);
+      const end = offset + Number(url.searchParams.get('limit') || 100);
+      return json({ success: true, contacts: entries.slice(offset, end), total: entries.length,
+        ...(end < entries.length ? { nextOffset: end } : {}) });
     }
     if (endpoint.endsWith('/contacts/import')) {
       const found = payload.entries.filter(item => !contacts.some(contact => contact.email === item.email));
@@ -226,7 +249,13 @@ async function mockApp(t) {
         body: { format: 'text', text: '<img src="https://example.invalid/track">안녕하세요.\n\n> 앞선 답장입니다.', blockedRemoteImages: 1 },
         thread: { messages: source.id === 1 ? [{ id: 2, from: [{ name: '최유진 교수' }], subject: '앞선 답장', receivedAt: now - 800 }] : [] },
         attachments: [{ filename: '실험.pdf', size: 208, downloadable: true }],
+        ...(source.id === 1 ? state.htmlDetail : null),
       } });
+    }
+    if (endpoint.endsWith('/messages/1/inline-images/0')) {
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      res.end(INLINE_PNG);
+      return;
     }
     if (/\/mail-client\/messages\/\d+\/attachments\/\d+$/.test(endpoint)) return json({ success: false, code: 'MAIL_CLIENT_ATTACHMENT_NOT_FOUND' }, 404);
     if (endpoint.endsWith('/messages/1/draft')) return json({ success: true, draft });
@@ -254,7 +283,14 @@ async function mockApp(t) {
       return json({ success: state.outcome === 'confirmed', results: payload.operations.map(operation => {
         const message = messages.find(item => item.id === operation.messageId);
         if (state.outcome === 'confirmed') {
-          if (operation.action === 'set_read') message.read = operation.value;
+          if (operation.action === 'set_read') {
+            if (operation.origin === 'auto' && manualUnread.has(message.id)) {
+              return { messageId: message.id, state: 'confirmed', code: 'MAIL_CLIENT_MANUAL_UNREAD_PRESERVED' };
+            }
+            if (!operation.value) manualUnread.add(message.id);
+            else if (operation.origin !== 'auto') manualUnread.delete(message.id);
+            message.read = operation.value;
+          }
           if (operation.action === 'set_starred') message.starred = operation.value;
           if (operation.action === 'archive' || operation.action === 'trash') message.removed = true;
         }
@@ -266,7 +302,7 @@ async function mockApp(t) {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => { server.closeAllConnections(); server.close(); });
-  return { url: 'http://127.0.0.1:' + server.address().port, calls, messages, state, routes };
+  return { url: 'http://127.0.0.1:' + server.address().port, calls, contacts, messages, state, routes };
 }
 
 const mailAgent = '#home-agents [aria-label="Mail 에이전트 열기"]';
@@ -322,6 +358,7 @@ test('desktop inbox renders base and selected exports, preserves explicit action
   assert.deepEqual(actions()[0].payload.operations, [1, 3].map(messageId => ({ messageId, action: 'set_read', value: true })));
   assert.ok(actions()[0].payload.requestId);
   assert.equal(app.messages[0].important, fixtureImportance);
+  await ui.waitFor('!document.querySelector(\'[data-message-id="1"] .mw-row-star\').disabled');
   await ui.click('[data-message-id="1"] .mw-row-star');
   await ui.waitFor('document.querySelector("[data-message-id=\\"1\\"] .mw-row-star")?.getAttribute("aria-pressed") === "false"');
   assert.deepEqual(actions()[1].payload.operations, [{ messageId: 1, action: 'set_starred', value: false }]);
@@ -550,6 +587,67 @@ test('folder moves require a verified source, same provider target, and explicit
   ]);
 });
 
+test('opening a message marks it read after rendering and respects manual unread protection', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  const open = () => ui.click('[data-message-id="1"] .mw-subject');
+  const back = () => ui.press('목록', '.mw-detail-toolbar button');
+  const actions = () => app.calls.filter(call => call.endpoint.endsWith('/messages/actions'));
+  const inboxGets = () => app.calls.filter(call => call.endpoint.endsWith('/inbox')).length;
+  const rowState = state => `document.querySelector('[data-message-id="1"]')?.dataset.state === '${state}' &&
+    document.querySelector('.mw-rows').getAttribute('aria-busy') === 'false'`;
+  await ui.evaluate(`(() => {
+    window.autoReadBodies = [];
+    const originalFetch = window.fetch;
+    window.fetch = (url, options) => {
+      if (String(url).endsWith('/messages/actions') && JSON.parse(options.body).operations[0].origin === 'auto') {
+        window.autoReadBodies.push(document.querySelector('.mw-detail-body')?.textContent || '');
+      }
+      return originalFetch(url, options);
+    };
+  })()`);
+
+  app.state.missingDetail = true;
+  await open();
+  await ui.waitFor(ui.text('이 메일을 찾을 수 없어'));
+  assert.equal(actions().length, 0);
+  await back();
+
+  app.state.missingDetail = false;
+  await open();
+  await ui.waitFor(rowState('Read'));
+  assert.match((await ui.evaluate('window.autoReadBodies'))[0], /안녕하세요/);
+  assert.deepEqual(actions()[0].payload.operations, [{ messageId: 1, action: 'set_read', value: true, origin: 'auto' }]);
+  await ui.press('안 읽음', '.mw-detail-toolbar button');
+  await ui.waitFor(rowState('Unread'));
+  assert.deepEqual(actions()[1].payload.operations, [{ messageId: 1, action: 'set_read', value: false }]);
+  await back();
+
+  const before = inboxGets();
+  await open();
+  await ui.waitFor('window.autoReadBodies.length === 2 && !document.querySelector(`[data-message-id="1"] .mw-row-star`).disabled');
+  assert.equal(actions().length, 3);
+  assert.equal(inboxGets(), before);
+  assert.equal(app.messages[0].read, false);
+  await back();
+  assert.ok(await ui.evaluate(rowState('Unread')));
+
+  app.state.outcome = 'unknown';
+  await ui.click('[data-message-id="2"] .mw-subject');
+  await ui.waitFor('window.autoReadBodies.length === 3 && ' +
+    'document.querySelector(`[data-message-id="2"]`).title.includes("변경 결과") && ' +
+    '!document.querySelector(`[data-message-id="1"] .mw-row-star`).disabled');
+  assert.equal(inboxGets(), before);
+  assert.equal(app.messages[1].read, false);
+  await back();
+  assert.equal(await ui.evaluate('document.querySelector(`[data-message-id="2"]`).dataset.state'), 'Unread');
+});
+
 test('detail and reply preserve text boundaries, expose draft conflicts and issue one explicit send', { skip: !chrome }, async t => {
   const app = await mockApp(t);
   const ui = await browser(t);
@@ -596,6 +694,185 @@ test('detail and reply preserve text boundaries, expose draft conflicts and issu
   await ui.capture('mail-send-unknown.png');
 });
 
+test('HTML mail shows styled tables and CID images, and loads only approved remote images inside the reader', { skip: !chrome }, async t => {
+  const remoteRequests = [];
+  const remote = http.createServer((req, res) => {
+    remoteRequests.push({ path: req.url, referrer: req.headers.referer });
+    res.writeHead(200, { 'Content-Type': req.url === '/clicked' ? 'text/html' : 'image/png' });
+    res.end(req.url === '/clicked' ? '<title>외부 링크</title>' : INLINE_PNG);
+  });
+  remote.listen(0, '127.0.0.1');
+  await once(remote, 'listening');
+  t.after(() => { remote.closeAllConnections(); remote.close(); });
+  const external = 'http://127.0.0.1:' + remote.address().port;
+  const app = await mockApp(t);
+  app.messages[0].read = true;
+  app.state.htmlDetail = {
+    body: { format: 'text', text: '평문 인용', html: `<!doctype html><html><head><style>
+      @import url('${external}/style'); @font-face {font-family: remote; src: url('${external}/font')}
+      .content {color:#34754e;background:#eceff1 url('${external}/css-image');font-family:Arial,sans-serif}
+      @media (max-width:500px){.content{font-size:18px}}
+      </style></head><body><script>window.mailExecuted = true;</script><link rel="stylesheet" href="${external}/link">
+      <iframe src="${external}/frame"></iframe><table width="600"><tr><td class="content" id="mail-cell">HTML 원본 테이블
+      <img id="cid-image" src="cid:logo%40example.com" alt="내장 로고" width="20">
+      <img id="remote-image" src="${external}/pixel" srcset="${external}/srcset 1x" onload="window.mailExecuted = true" width="25">
+      <p style="background-image:image-set('${external}/inline-css' 1x); color:blue">본문 문단</p>
+      <a id="safe-link" href="${external}/clicked" target="_top">안전한 링크</a>
+      <a id="bad-link" href="javascript:window.mailExecuted=true">위험한 링크</a></td></tr></table></body></html>` },
+    attachments: [{ filename: 'logo.png', contentId: '<logo@example.com>', contentType: 'image/png', inline: true, size: INLINE_PNG.length }],
+  };
+  const ui = await browser(t);
+  const frame = 'document.querySelector("iframe.mw-detail-body")';
+  const inside = selector => frame + '?.contentDocument?.querySelector(' + JSON.stringify(selector) + ')';
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  const open = () => ui.click('[data-message-id="1"] .mw-subject');
+  await open();
+  await ui.waitFor(`${inside('#cid-image')}?.naturalWidth === 1`);
+  assert.equal(await ui.evaluate(`${inside('#mail-cell')}.ownerDocument.defaultView.getComputedStyle(${inside('#mail-cell')}).color`), 'rgb(52, 117, 78)');
+  assert.equal(await ui.evaluate(`${inside('#mail-cell')}.ownerDocument.defaultView.getComputedStyle(${inside('#mail-cell')}).backgroundColor`), 'rgb(236, 239, 241)');
+  assert.equal(await ui.evaluate(`${inside('#remote-image')}.hasAttribute('src')`), false);
+  assert.deepEqual(remoteRequests, []);
+  assert.ok(await ui.evaluate(ui.text('외부 이미지 1개를 차단했어.')));
+  assert.equal(await ui.evaluate(`Boolean(${frame}.contentWindow.mailExecuted || window.mailExecuted)`), false);
+  assert.equal(await ui.evaluate(`Boolean(${inside('script, iframe, link, [onload], [srcset]')})`), false);
+  assert.equal(await ui.evaluate(`${inside('#bad-link')}.hasAttribute('href')`), false);
+  assert.equal(await ui.evaluate(`${inside('#safe-link')}.target`), '_blank');
+  assert.equal(await ui.evaluate(`${inside('#safe-link')}.rel`), 'noopener noreferrer');
+  const link = await ui.evaluate(`(() => { const rect = ${inside('#safe-link')}.getBoundingClientRect();
+    const pane = ${frame}.getBoundingClientRect(); return { x: pane.x + rect.x + 5, y: pane.y + rect.y + 5 }; })()`);
+  const clicked = once(remote, 'request', { signal: AbortSignal.timeout(5000) });
+  await ui.call('Input.dispatchMouseEvent', { type: 'mousePressed', ...link, button: 'left', clickCount: 1 });
+  await ui.call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...link, button: 'left', clickCount: 1 });
+  const [navigation] = await clicked;
+  assert.equal(navigation.url, '/clicked');
+  assert.equal(navigation.headers.referer, undefined);
+  assert.equal(await ui.evaluate('location.origin'), app.url);
+  await ui.press('이미지 표시');
+  await ui.waitFor(`${inside('#remote-image')}?.naturalWidth === 1`);
+  assert.deepEqual(remoteRequests.filter(request => !['/clicked', '/favicon.ico'].includes(request.path)),
+    [{ path: '/pixel', referrer: undefined }]);
+  await ui.metrics(390, 844);
+  await ui.waitFor(`${inside('#mail-cell')}?.ownerDocument.defaultView.getComputedStyle(${inside('#mail-cell')}).fontSize === '18px'`);
+  assert.equal(await ui.evaluate(`${frame}.getBoundingClientRect().width <= 390 && ${frame}.getBoundingClientRect().height > 30`), true);
+  await ui.metrics(1440, 900);
+  await ui.press('목록', '.mw-detail-toolbar button');
+  const before = remoteRequests.filter(request => request.path === '/pixel').length;
+  await open();
+  await ui.waitFor(`${inside('#cid-image')}?.naturalWidth === 1`);
+  assert.equal(await ui.evaluate(`${inside('#remote-image')}.hasAttribute('src')`), false);
+  assert.equal(remoteRequests.filter(request => request.path === '/pixel').length, before);
+  await ui.press('답장', '.mw-detail-toolbar button');
+  await ui.waitFor(ui.shown('.mw-quote summary'));
+  await ui.click('.mw-quote summary');
+  await ui.waitFor(ui.text('평문 인용'));
+  assert.equal(await ui.evaluate(ui.shown('iframe.mw-detail-body')), false);
+});
+
+test('smart mailbox refresh updates visible results and ignores responses after navigation', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  app.state.smartMessages = [];
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await ui.evaluate(`(() => {
+    const schedule = window.setTimeout.bind(window);
+    const cancel = window.clearTimeout.bind(window);
+    const timers = new Map();
+    let timerId = -1;
+    window.setTimeout = (run, ms, ...args) => {
+      if (ms !== 15000) return schedule(run, ms, ...args);
+      const id = timerId--;
+      timers.set(id, () => run(...args));
+      return id;
+    };
+    window.clearTimeout = id => { if (!timers.delete(id)) cancel(id); };
+    const fetch = window.fetch.bind(window);
+    window.smartPoll = { queued: () => timers.size, requests: 0, aborted: 0, completed: 0, tick() {
+      const [id, run] = timers.entries().next().value;
+      timers.delete(id);
+      run();
+    } };
+    window.fetch = (url, options) => {
+      if (!String(url).startsWith('/api/mail-client/smart/messages?') || !options?.signal) return fetch(url, options);
+      const { signal, ...rest } = options;
+      window.smartPoll.requests++;
+      signal.addEventListener('abort', () => window.smartPoll.aborted++, { once: true });
+      // Let the mock return even after cancellation to exercise the stale-response guard.
+      return fetch(url, rest).then(response => {
+        const json = response.json.bind(response);
+        response.json = () => json().finally(() => window.smartPoll.completed++);
+        return response;
+      });
+    };
+  })()`);
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  await ui.press('중요', '.mw-sidebar button');
+  await ui.waitFor('window.smartPoll.queued() === 1');
+  await ui.press('내가 표시', '.mw-chips button');
+  await ui.waitFor('window.smartPoll.queued() === 1');
+  assert.equal(await ui.evaluate('document.querySelectorAll(".mw-row").length'), 0);
+
+  app.state.smartMessages = [app.messages[0]];
+  await ui.evaluate('window.smartPoll.tick()');
+  await ui.waitFor(ui.shown('[data-message-id="1"]'));
+  const smartCalls = () => app.calls.filter(call => call.endpoint.endsWith('/smart/messages'));
+  assert.equal(smartCalls().at(-1).query.variant, 'starred');
+  await ui.click('[data-message-id="1"] .mw-row-select');
+  app.state.smartMessages = app.messages.slice(0, 2);
+  await ui.waitFor('window.smartPoll.queued() === 1');
+  await ui.evaluate('window.smartPoll.tick()');
+  await ui.waitFor(ui.shown('[data-message-id="2"]'));
+  assert.equal(await ui.evaluate('document.querySelector(\'[data-message-id="1"]\').dataset.checked'), 'Yes');
+  assert.equal(await ui.evaluate('document.querySelector(\'.mw-chips [aria-pressed="true"]\').textContent'), '내가 표시');
+
+  app.state.smartError = true;
+  await ui.waitFor('window.smartPoll.queued() === 1');
+  await ui.evaluate('window.smartPoll.tick()');
+  await ui.waitFor('window.smartPoll.completed === 3 && window.smartPoll.queued() === 1');
+  assert.equal(await ui.evaluate(ui.shown('[data-message-id="2"]')), true);
+  assert.equal(await ui.evaluate(ui.text('메일 목록을 불러오지 못했어')), false);
+
+  app.state.smartError = false;
+  app.state.smartMessages = [{ ...app.messages[0], id: 40, subject: '늦게 도착한 스마트 응답' }];
+  let release;
+  app.state.holdSmart = new Promise(resolve => { release = resolve; });
+  t.after(release);
+  await ui.evaluate('window.smartPoll.tick()');
+  await ui.waitFor('window.smartPoll.requests === 4');
+  await ui.click('.mw-sidebar [data-mailbox-role="inbox"]');
+  await ui.waitFor(ui.text('신소재 실험 결과 공유'));
+  assert.equal(await ui.evaluate('window.smartPoll.aborted'), 1);
+  release();
+  await ui.waitFor('window.smartPoll.completed === 4');
+  assert.equal(await ui.evaluate(ui.text('늦게 도착한 스마트 응답')), false);
+  assert.equal(await ui.evaluate('window.smartPoll.queued()'), 0);
+
+  app.state.smartMessages = [app.messages[0]];
+  app.state.smartSecondPage = [app.messages[1]];
+  app.state.smartNextCursor = 'smart-page-2';
+  await ui.press('미분류', '.mw-sidebar button');
+  await ui.waitFor('window.smartPoll.queued() === 1');
+  await ui.press('다음 페이지');
+  await ui.waitFor(ui.shown('[data-message-id="2"]'));
+  app.state.smartSecondPage = [app.messages[2]];
+  await ui.waitFor('window.smartPoll.queued() === 1');
+  await ui.evaluate('window.smartPoll.tick()');
+  await ui.waitFor(ui.text('신소재 실험 결과 공유'));
+  assert.equal(smartCalls().at(-1).query.cursor, 'smart-page-2');
+  assert.equal(await ui.evaluate('document.querySelector(\'.mw-pagination [aria-current="page"]\').textContent'), '2');
+  await ui.waitFor('window.smartPoll.queued() === 1');
+  await ui.click('#global-nav [data-product-route="home"]');
+  await ui.waitFor('window.smartPoll.queued() === 0');
+  assert.equal(await ui.evaluate(ui.shown('#mail-workspace.active')), false);
+  assert.equal(app.calls.some(call => call.method === 'POST' && call.endpoint.startsWith('/api/mail-client/smart/')), false);
+});
+
 test('filter, search results, smart lists, calendar and contact import use Workspace APIs', { skip: !chrome }, async t => {
   const app = await mockApp(t);
   const ui = await browser(t);
@@ -623,6 +900,13 @@ test('filter, search results, smart lists, calendar and contact import use Works
     await ui.waitFor('!document.querySelector(".mw-square[aria-label=새로고침]").disabled');
     assert.ok(app.calls.some(call => call.endpoint.endsWith('/smart/messages') && call.query.filter === filter));
     await ui.capture('mail-smart-' + filter + '.png');
+    if (filter === 'action_required') {
+      for (const [label, variant] of [['답장', 'reply'], ['확인', 'confirm'], ['제출', 'submit']]) {
+        await ui.press(label, '.mw-chips button');
+        await ui.waitFor('!document.querySelector(".mw-square[aria-label=새로고침]").disabled');
+        assert.equal(app.calls.filter(call => call.endpoint.endsWith('/smart/messages')).at(-1).query.variant, variant);
+      }
+    }
   }
   await ui.press('일정', '.mw-sidebar button');
   await ui.waitFor(ui.text('연구실 면담'));
@@ -655,6 +939,52 @@ test('filter, search results, smart lists, calendar and contact import use Works
   await ui.press('1명 가져오기', 'dialog button');
   await ui.waitFor('!document.querySelector(".mw-csv-dialog")');
   assert.equal(app.calls.filter(call => call.endpoint.endsWith('/contacts/import') && !call.payload.preview).length, 1);
+});
+
+test('contact scrolling loads additional filtered pages and both history views use exact address search', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  for (const [source, name] of [['csv', '가져온'], ['observed', '관측']]) {
+    app.contacts.push(...Array.from({ length: 205 }, (_, index) => ({ id: source + index,
+      name: `${name} 연락처 ${index}`, email: `${source}${index}@example.com`, source })));
+  }
+  app.messages[2].subject = '제목에만 sender@example.com';
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  await ui.press('연락처', '.mw-sidebar button');
+  const count = value => `document.querySelectorAll('.mw-contact-list button').length === ${value}`;
+  await ui.waitFor(count(200));
+  await ui.press('CSV', '.mw-contacts .mw-chips button');
+  await ui.waitFor(ui.text('206명'));
+  await ui.evaluate('document.querySelector(".mw-contact-list button:last-child").scrollIntoView()');
+  await ui.waitFor(count(206));
+  assert.ok(app.calls.some(call => call.endpoint.endsWith('/contacts') && call.query.source === 'csv' && call.query.offset === '200'));
+  assert.equal(await ui.evaluate('new Set([...document.querySelectorAll(".mw-contact-email")].map(row => row.textContent)).size'), 206);
+
+  await ui.press('메일에서 수집', '.mw-contacts .mw-chips button');
+  await ui.waitFor(ui.text('205명'));
+  await ui.evaluate('document.querySelector(".mw-contacts input").value="관측"; document.querySelector(".mw-contacts form").requestSubmit()');
+  await ui.waitFor(count(200));
+  await ui.evaluate('document.querySelector(".mw-contact-list button:last-child").scrollIntoView()');
+  await ui.waitFor(count(205));
+  assert.ok(app.calls.some(call => call.endpoint.endsWith('/contacts') && call.query.source === 'observed'
+    && call.query.q === '관측' && call.query.offset === '200'));
+
+  await ui.press('CSV', '.mw-contacts .mw-chips button');
+  await ui.evaluate('document.querySelector(".mw-contacts input").value="sender@example.com"; document.querySelector(".mw-contacts form").requestSubmit()');
+  await ui.waitFor(count(1));
+  await ui.click('.mw-contact-list button');
+  await ui.waitFor(ui.text('주고받은 메일'));
+  assert.equal(await ui.evaluate(ui.text('제목에만 sender@example.com')), false);
+  await ui.press('모두 보기', '.mw-contact-history button');
+  await ui.waitFor(ui.shown('.mw-rows [data-message-id="1"]'));
+  assert.equal(await ui.evaluate(ui.text('제목에만 sender@example.com')), false);
+  const history = app.calls.filter(call => call.endpoint.endsWith('/search'));
+  assert.deepEqual(history.slice(-2).map(call => [call.query.contactEmail, call.query.q]),
+    Array(2).fill(['sender@example.com', undefined]));
 });
 
 test('tablet and phone detail and composer follow their visible actions and preserve the loading and missing states', { skip: !chrome }, async t => {

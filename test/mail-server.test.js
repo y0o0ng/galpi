@@ -135,6 +135,15 @@ test('Mail Client uses the existing HTTP authentication and runs independently f
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.deepEqual(body, { success: true, accounts: [] });
+  const reader = await fetch(url + '/mail-message-frame');
+  assert.match(reader.headers.get('content-security-policy'), /img-src blob:;/);
+  assert.equal(reader.headers.get('x-frame-options'), 'SAMEORIGIN');
+  assert.equal(reader.headers.get('cache-control'), 'no-store');
+  const readerWithImages = await fetch(url + '/mail-message-frame?images=1');
+  assert.match(readerWithImages.headers.get('content-security-policy'), /default-src 'none';.*img-src blob: https: http:;/);
+  assert.match((await fetch(url + '/')).headers.get('content-security-policy'), /img-src 'self' data: blob:;/);
+  assert.equal((await fetch(url + '/api/mail-client/messages/1/inline-images/0')).status, 401);
+  assert.equal((await api(url, '/api/mail-client/messages/1/inline-images/0')).body.code, 'MAIL_CLIENT_MESSAGE_NOT_FOUND');
   assert.equal((await api(url, '/api/mail-client/inbox?limit=100')).response.status, 400);
   const contactsPath = '/api/mail-client/contacts';
   assert.equal((await fetch(url + contactsPath)).status, 401);

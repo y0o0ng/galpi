@@ -1,6 +1,68 @@
 'use strict';
 
 (function register(global) {
+  const mailTags = 'a abbr b blockquote br caption center cite code col colgroup dd del div dl dt em font h1 h2 h3 h4 h5 h6 hr i img li ol p pre s small span strike strong style sub sup table tbody td tfoot th thead tr u ul wbr'.split(' ');
+  const mailAttrs = 'align alt bgcolor border cellpadding cellspacing class color colspan dir face height href id lang nowrap rowspan size src style title valign width'.split(' ');
+  const mailStyle = /^(?:background-color|color|display|box-sizing|float|clear|width|height|min-width|max-width|min-height|max-height|vertical-align|white-space|overflow-wrap|word-break|line-height|letter-spacing|word-spacing|direction|list-style-type|font(?:-(?:family|size|style|weight|variant))?|text-(?:align|decoration|indent|transform)|(?:margin|padding)(?:-(?:top|right|bottom|left))?|border(?:-(?:color|style|width|radius|collapse|spacing|(?:top|right|bottom|left)(?:-(?:color|style|width))?))?)$/u;
+
+  function safeDeclarations(style) {
+    const properties = new Set(Array.from(style).filter(name => mailStyle.test(name)));
+    // Keep the color from common background shorthands without carrying an image value.
+    if (style.backgroundColor) properties.add('background-color');
+    return [...properties].map(name => `${name}:${style.getPropertyValue(name)}${style.getPropertyPriority(name) ? ' !important' : ''};`).join('');
+  }
+
+  function safeRules(rules) {
+    return [...rules].map(rule => {
+      if (rule.type === CSSRule.STYLE_RULE) return `${rule.selectorText}{${safeDeclarations(rule.style)}}`;
+      if (rule.type === CSSRule.MEDIA_RULE) return `@media ${rule.conditionText}{${safeRules(rule.cssRules)}}`;
+      return '';
+    }).join('\n');
+  }
+
+  function webUrl(value) {
+    try {
+      const url = new URL(value.startsWith('//') ? 'https:' + value : value);
+      return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+    } catch { return null; }
+  }
+
+  function contentId(value) { return value.trim().replace(/^<|>$/gu, ''); }
+
+  function prepareMailHtml(html) {
+    if (!global.DOMPurify?.isSupported || typeof html !== 'string' || !html) return null;
+    // Parse inside the template's inert document before passing the detached tree to DOMPurify.
+    const inert = document.createElement('template').content.ownerDocument;
+    const range = inert.createRange();
+    range.selectNodeContents(inert.createElement('div'));
+    const fragment = global.DOMPurify.sanitize(range.createContextualFragment(html), {
+      RETURN_DOM_FRAGMENT: true, ALLOWED_TAGS: mailTags, ALLOWED_ATTR: mailAttrs, ALLOW_DATA_ATTR: false,
+    });
+    for (const entry of fragment.querySelectorAll('[style]')) entry.setAttribute('style', safeDeclarations(entry.style));
+    for (const style of fragment.querySelectorAll('style')) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(style.textContent);
+      style.textContent = safeRules(sheet.cssRules);
+    }
+    for (const link of fragment.querySelectorAll('a[href]')) {
+      const href = link.getAttribute('href');
+      const url = webUrl(href) || (/^mailto:[^\s]+$/iu.test(href) ? href : null);
+      if (!url) { link.removeAttribute('href'); continue; }
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+    }
+    const images = [...fragment.querySelectorAll('img[src]')].map(image => {
+      const src = image.getAttribute('src');
+      image.removeAttribute('src');
+      if (!/^cid:/iu.test(src)) return { image, remote: webUrl(src) };
+      let cid;
+      try { cid = contentId(decodeURIComponent(src.slice(4))); } catch { /* Invalid CID reference. */ }
+      return { image, cid };
+    });
+    return { fragment, images };
+  }
+
   function create(ui) {
     const { node, button, icon, providers, timeOf, get, request, show, close, accounts, openMove,
       mutate, openSent, requestId, notify } = ui;
@@ -36,6 +98,7 @@
       let fetchingFile = false;
       let threadOpen = false;
       let recipientsOpen = false;
+      let showRemoteImages = false;
       const go = step => {
         const next = index + step;
         if (list[next]?.id) detail(list[next], list, next, folderScope);
@@ -95,6 +158,48 @@
           node('span', 'mw-spacer'), button('mw-square', '별표', star,
             { glyph: current?.starred ? 'star-on' : 'star', iconOnly: true }), more);
         return [bar, compact];
+      }
+
+      function renderMailFrame(rich, fallback) {
+        const frame = node('iframe', 'mw-detail-body');
+        frame.title = '메일 본문';
+        frame.hidden = true;
+        frame.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+        frame.src = '/mail-message-frame' + (showRemoteImages ? '?images=1' : '');
+        const messageId = current.id;
+        const cidParts = new Map();
+        (current.attachments || []).forEach((attachment, index) => {
+          if (!attachment.inline || !attachment.contentId) return;
+          const key = contentId(attachment.contentId);
+          cidParts.set(key, cidParts.has(key) ? null : index);
+        });
+        frame.addEventListener('load', () => {
+          if (!frame.isConnected || !frame.contentDocument?.body) return;
+          const doc = frame.contentDocument;
+          const win = frame.contentWindow;
+          doc.body.append(rich.fragment);
+          frame.hidden = false;
+          fallback.remove();
+          const size = () => { frame.style.height = Math.max(1, doc.body.scrollHeight, doc.body.offsetHeight) + 'px'; };
+          new win.ResizeObserver(size).observe(doc.body);
+          size();
+          const inline = new Map();
+          for (const { image, cid, remote } of rich.images) {
+            if (remote && showRemoteImages) {
+              image.referrerPolicy = 'no-referrer';
+              image.src = remote;
+            }
+            const part = cidParts.get(cid);
+            if (!Number.isInteger(part)) continue;
+            if (!inline.has(part)) {
+              inline.set(part, request('/messages/' + messageId + '/inline-images/' + part, {}, { binary: true })
+                .then(blob => frame.isConnected && frame.contentDocument === doc ? win.URL.createObjectURL(blob) : null)
+                .catch(() => null));
+            }
+            void inline.get(part).then(url => { if (url && frame.isConnected) image.src = url; });
+          }
+        }, { once: true });
+        return frame;
       }
 
       function render() {
@@ -169,17 +274,22 @@
           node('time', 'mw-muted mw-compact-only', timeOf(received)));
         person.append(button('mw-square', '메일 더보기', null, { glyph: 'more', iconOnly: true }));
         mail.append(person);
-        if (current.body?.blockedRemoteImages) {
+        let rich;
+        try { rich = prepareMailHtml(current.body?.html); } catch { /* Keep the plain-text rendering available. */ }
+        const blockedImages = rich ? rich.images.filter(image => image.remote).length : current.body?.blockedRemoteImages;
+        if (blockedImages && !showRemoteImages) {
           const images = node('div', 'mw-remote-images');
           images.append(icon('external-image', 18), node('span', '',
-            '외부 이미지 ' + current.body.blockedRemoteImages + '개를 차단했어.'), node('span', 'mw-spacer'),
-          control('이미지 표시', null));
+            '외부 이미지 ' + blockedImages + '개를 차단했어.'), node('span', 'mw-spacer'),
+          control('이미지 표시', rich ? () => { showRemoteImages = true; render(); } : null));
           mail.append(images);
         }
         const bodyText = current.body?.text || '';
         const quoteStart = bodyText.search(/^(?:> |-----Original Message-----|----- 원본 메일 -----)/m);
-        mail.append(node('div', 'mw-detail-body', quoteStart > 0 ? bodyText.slice(0, quoteStart) : bodyText));
-        if (quoteStart > 0) {
+        const fallback = node('div', 'mw-detail-body', !rich && quoteStart > 0 ? bodyText.slice(0, quoteStart) : bodyText);
+        mail.append(fallback);
+        if (rich) mail.append(renderMailFrame(rich, fallback));
+        else if (quoteStart > 0) {
           const quoted = node('details', 'mw-detail-quote');
           quoted.open = true;
           const summary = node('summary', '', '인용문 접기');
@@ -237,6 +347,13 @@
         if (!panel.isConnected) return;
         current = result.message;
         render();
+        if (current.read === false && current.body?.format === 'text') {
+          global.requestAnimationFrame(() => {
+            if (panel.isConnected && panel.getClientRects().length && current.read === false) {
+              void mutate([current], 'set_read', true, folderScope, 'auto');
+            }
+          });
+        }
       }).catch(problem => { if (panel.isConnected) { error = problem; render(); } });
     }
 

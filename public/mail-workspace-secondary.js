@@ -59,10 +59,17 @@
       let source = '';
       let query = '';
       let token = 0;
+      let nextOffset;
+      let loading = false;
+      const seen = new Set();
       const head = node('header', 'mw-aux-head');
       const total = node('span', 'mw-muted');
       const filters = node('div');
       const table = node('div', 'mw-view-card mw-contact-list');
+      const observer = new IntersectionObserver(([entry]) => {
+        if (!panel.isConnected) observer.disconnect();
+        else if (entry.isIntersecting && entry.target === table.lastElementChild && nextOffset !== undefined) void load(nextOffset, token);
+      });
       const { form, input } = searchForm('이름·이메일·소속 검색', value => { query = value; void refresh(); });
       input.addEventListener('search', () => { if (!input.value) { query = ''; void refresh(); } });
       const menu = button('mw-menu mw-compact-only', '메일함 메뉴 열기', () => toggleMailboxes(true),
@@ -78,25 +85,42 @@
       panel.append(head, filters, table);
       void refresh();
 
-      async function refresh() {
+      function refresh() {
         const sequence = ++token;
+        observer.disconnect();
+        seen.clear();
+        nextOffset = undefined;
+        loading = false;
         filters.replaceChildren(chips(sources, source, value => { source = value; void refresh(); }));
-        const params = { limit: 200 };
-        if (query) params.q = query;
-        if (source) params.source = source;
-        const result = await get('/contacts', params).catch(() => null);
-        if (sequence !== token || !panel.isConnected) return;
-        total.textContent = result ? result.total.toLocaleString('ko') + '명' : '';
+        total.textContent = '';
         const heading = node('div', 'mw-contact-row mw-contact-columns');
         heading.append(node('span'), ...['이름','이메일','소속','출처'].map(label => node('span', '', label)));
         table.replaceChildren(heading);
-        for (const entry of result?.contacts || []) {
+        void load(0, sequence);
+      }
+
+      async function load(offset, sequence) {
+        if (loading) return;
+        loading = true;
+        const params = { limit: 200, ...(offset ? { offset } : {}), ...(query ? { q: query } : {}), ...(source ? { source } : {}) };
+        const result = await get('/contacts', params).catch(() => null);
+        if (sequence !== token || !panel.isConnected) return;
+        loading = false;
+        if (!result) return;
+        total.textContent = result.total.toLocaleString('ko') + '명';
+        nextOffset = result.nextOffset > offset ? result.nextOffset : undefined;
+        for (const entry of result.contacts) {
+          const email = entry.email.toLowerCase();
+          if (seen.has(email)) continue;
+          seen.add(email);
           const row = button('mw-contact-row', '', () => void contactDetail(entry));
           row.replaceChildren(node('span', 'mw-avatar', (entry.name || entry.email).slice(0, 1)),
             node('strong', '', entry.name || entry.email), node('span', 'mw-contact-email', entry.email),
             node('span', 'mw-contact-company', entry.organization || '—'), badge(entry.source));
           table.append(row);
         }
+        observer.disconnect();
+        if (nextOffset !== undefined) observer.observe(table.lastElementChild);
       }
     }
 
@@ -119,7 +143,7 @@
       const history = node('section', 'mw-contact-history');
       card.append(info, attributes, history);
       panel.append(top, card);
-      const data = await get('/search', { q: entry.email, limit: 13 }).catch(() => null);
+      const data = await get('/search', { contactEmail: entry.email, limit: 13 }).catch(() => null);
       if (!panel.isConnected) return;
       const title = node('header', 'mw-settings-head');
       title.append(node('h2', '', '주고받은 메일'), node('span', 'mw-muted', data ? data.total + '통' : ''));

@@ -594,6 +594,19 @@ app.use((_req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   next();
 });
+
+// The empty reader document never receives a mail body or credentials from the server.
+app.get('/mail-message-frame', (req, res) => {
+  const imageSources = req.query.images === '1' ? 'blob: https: http:' : 'blob:';
+  res.set({
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; img-src ${imageSources}; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`,
+    'X-Frame-Options': 'SAMEORIGIN',
+    'X-DNS-Prefetch-Control': 'off',
+  });
+  res.type('html').send('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<style>body{margin:0;display:flow-root;overflow-wrap:anywhere}img,table{max-width:100%}</style><body></body>');
+});
 // 강의 필기는 Document당 JSON 한 벌이고 포스트잇 Q&A는 이미지를 담아 1MB를 넘는다. 그 경로만 인증 뒤
 // 라우트에서 따로 파싱한다.
 const globalJsonParser = express.json({ limit: '1mb' });

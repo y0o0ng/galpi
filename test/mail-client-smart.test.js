@@ -26,7 +26,7 @@ const CALENDAR = { overflow: false, needsAttachment: false, events: [
     confidence: 0.9, needsAttachment: false },
 ] };
 const CLASSIFICATION = {
-  category: 'urgent', importance: 0.9, summary: '안내', action: '참가 신청',
+  category: 'urgent', importance: 0.9, summary: '안내', action: '참가 신청', actionType: 'confirm',
   deadline: { kind: 'date', date: '2026-12-03', at: null }, notificationMode: 'immediate',
   attentionRequired: true, confidence: 0.9, needsAttachmentAnalysis: false, reason: '마감 있음',
 };
@@ -106,6 +106,34 @@ test('a GET has no analysis side effect and an Agent done result wins without ch
   assert.deepEqual(f.calls.map(call => call.schemaName), ['mail_workspace_calendar']);
   assert.equal((await f.smart.results([id])).results[0].classification.category, 'info');
   assert.equal(f.db.prepare('SELECT category FROM mail_messages WHERE id = ?').get(agentId).category, 'info');
+});
+
+test('Workspace action variants use only new typed classification results and keep legacy and Agent mail in All', async t => {
+  const f = fixture(t);
+  const types = ['reply', 'confirm', 'submit', null];
+  const messages = types.map((type, index) => f.add({ providerId: 'action-' + index, body: String(type) }));
+  const { id: legacy, agentId } = f.add({ providerId: 'legacy-agent-action', link: true });
+  f.db.prepare("UPDATE mail_messages SET category = 'action_required' WHERE id = ?").run(agentId);
+  const originalAgent = f.db.prepare('SELECT * FROM mail_messages WHERE id = ?').get(agentId);
+  await f.smart.analyze(messages.map(row => row.id), 'classification');
+  for (const actionType of types) {
+    f.setReply(({ schema }) => {
+      assert.deepEqual(schema.properties.actionType.enum, types);
+      return { ...CLASSIFICATION, category: 'action_required', actionType };
+    });
+    await f.smart.tick();
+  }
+  const untyped = f.db.prepare("UPDATE mail_workspace_analysis_jobs SET result_json = json_remove(result_json, '$.actionType') WHERE client_message_id = ?");
+  untyped.run(messages[3].id);
+  assert.deepEqual(new Set(f.smart.messages('action_required', {}).messages.map(row => row.id)), new Set([legacy, ...messages.map(row => row.id)]));
+  for (const [index, variant] of types.slice(0, 3).entries()) {
+    const { messages: rows } = f.smart.messages('action_required', { variant });
+    assert.deepEqual(rows.map(row => [row.id, row.classification.actionType]), [[messages[index].id, variant]]);
+  }
+  assert.deepEqual(f.db.prepare('SELECT * FROM mail_messages WHERE id = ?').get(agentId), originalAgent);
+  assert.equal(f.count('mail_attention'), 0);
+  assert.equal(f.count('mail_push_deliveries'), 0);
+  assert.equal(f.calls.length, 4);
 });
 
 test('explicit exploration populates both results once, keeps mail and task side effects out, and pages projections', async t => {

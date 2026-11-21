@@ -6,8 +6,8 @@
 
 | 프레임 | 구현과 연결 |
 | --- | --- |
-| Desktop 01~04·15·16, T1·T2, P1·P2 | 목록·선택·검색·필터·계정 폴더·임시보관함, 제공처별 서랍. 검색과 필터는 관측 메타데이터 API에 연결한다. |
-| Desktop 05~07·17·18, T3·T4, P3~P5 | 상세, 첨부, 답장·전체 답장·전달, 초안 버전 충돌, 발송 확인. 원문은 평문으로 그리고 화면에서 명시한 전송만 실행한다. |
+| Desktop 01~04·15·16, T1·T2, P1·P2 | 목록·선택·검색·필터·계정 폴더·임시보관함, 제공처별 서랍. 검색과 필터는 제공자 메일함 검색 API에 연결한다. |
+| Desktop 05~07·17·18, T3·T4, P3~P5 | 상세, 첨부, 답장·전체 답장·전달, 초안 버전 충돌, 발송 확인. HTML은 격리된 프레임에 표시하고 답장·전달의 원문 인용에는 평문을 사용한다. 화면에서 명시한 전송만 실행한다. |
 | Desktop 08·10~14 | Phase 4 스마트 분류 목록과 일정 달력. 명시적으로 배치된 분류 필터를 적용하고 원본을 검증해 연다. |
 | Desktop 09, C1~C5, P6·P7 | 메일 설정과 연락처 목록·상세, CSV 매핑·미리보기·확정, 수신자 자동완성. 알림 설정·규칙 해제·분석 재처리는 기존 인증 API를 사용한다. |
 | S1~S11 | 휴지통/검색 빈 상태, 목록·상세 로딩, 재인증, 동기화, 읽음/이동 실패, 원본 없음, 다운로드 실패, 발송 불명. 확인된 실패만 명시적으로 재시도할 수 있다. |
@@ -16,17 +16,26 @@
 
 ### 추가한 인증 API
 
-- `GET /api/mail-client/search`는 기존에 관측한 메타데이터를 제목·송수신자·계정·메일함·기간·첨부·별표·읽음 조건으로 검색한다. 커서는 검색 조건과 결과 순서에 결합되고 재시도 결과를 보존한다. 검색 결과는 관측 범위이며, 제공자 원본을 재검증하는 상세에서 열 수 있다. 검색 목록에서는 오래된 관측값으로 일괄 변경하지 않는다.
-- `GET /api/mail-client/messages/:id/attachments/:index`는 원본과 계정을 재검증한 뒤 비인라인 첨부만 다운로드로 제공한다. 외부 이미지는 건수만 알려주고 자동으로 호출하지 않는다.
+- `GET /api/mail-client/search`는 Gmail·Naver·NAVER WORKS에서 아직 열지 않은 과거 메일까지 검색한다. 검색어는 제목·발신자·받는 사람(To)에서 찾고, 발신자 전용 조건과 계정·메일함·기간·첨부·별표·읽음 필터를 함께 적용할 수 있다. 검색어 없이 필터만 적용해도 제공자 범위는 같다. 스팸·휴지통·초안은 기본 검색에서 제외하며 해당 라벨이나 폴더를 직접 선택하면 포함한다.
+- Gmail은 `messages.list`의 제목·주소·상태 검색과 라벨을 쓰고, Naver·NAVER WORKS는 실제 서버 폴더를 read-only로 열어 `UID SEARCH`를 실행한다. KST 기간과 헤더 조건은 반환 메타데이터에서 확인한다. IMAP 첨부 조건은 `BODYSTRUCTURE`로 확인하고, UIDVALIDITY가 없는 결과를 열 수 있는 ID로 바꿀 때만 기존 `BODY.PEEK` 원문 증명을 적용한다. 검색 본문과 별도 검색 색인은 두지 않는다. [Gmail 검색](https://developers.google.com/workspace/gmail/api/guides/filtering) · [IMAP SEARCH](https://imapflow.com/docs/guides/searching/)
+- 검색 커서는 계정·검색 조건·제공자별 위치에 묶이며 같은 커서의 응답을 재사용한다. Gmail 후보는 제공자 페이지 순서로, IMAP 후보는 폴더별 UID 범위로 가져오고 확보한 후보는 수신 시각으로 병합한다. IMAP에서 UID와 수신 시각 순서가 다른 경우 페이지 경계를 넘어 시각 순서가 바뀔 수 있다. `coverage=provider_mailboxes`이며 `total`은 해당 탐색에서 지금까지 확인한 수다. 필터를 적용한 뒤 후보가 남아 있으면 빈 페이지도 다음 커서를 가질 수 있다. 계정이나 폴더 조회가 실패하면 성공한 조회 결과와 `sources`·`incomplete`를 함께 돌려준다.
+- Gmail 상세는 현재 원본에서 확인한 thread ID로 `threads.get`을 호출해 같은 계정의 전체 스레드를 조회한다. 스레드에는 헤더와 MIME 메타데이터만 요청하며, 각 메일에 기존 메시지 ID를 발급해 `thread.messages`의 `id`·`from`·`subject`·`receivedAt` 형식으로 표시한다. 각 원문은 열 때 기존 상세 검증 경로에서 가져온다. 스레드 조회에 실패해도 열린 메일 본문은 표시한다. [Gmail 스레드 조회](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/get)
+- `GET /api/mail-client/messages/:id/attachments/:index`는 원본과 계정을 재검증한 뒤 비인라인 첨부만 다운로드로 제공한다. HTML의 CID 이미지는 `GET /api/mail-client/messages/:id/inline-images/:index`로 해당 원본을 다시 검증한 뒤 요청한다. 지원하는 래스터 형식은 PNG·JPEG·GIF·WebP이며 MIME 형식과 파일 시그니처를 모두 확인한다.
 - `GET /api/mail-client/accounts/:accountId/messages/:id/draft`는 목록 메시지에서 제공자 초안의 실제 ID와 버전을 확인한다. Gmail은 제공자 메시지 ID, IMAP은 폴더·UID와 원문을 대조한다.
 - v49 `mail_client_contacts`와 `GET /api/mail-client/contacts`, `POST /api/mail-client/contacts/import`는 로컬 CSV를 저장한다. 가져오기 전에 열 매핑과 중복을 확인하고 기존 연락처는 보존한다. `PUT /api/mail-client/contacts/settings`로 켠 경우에만 이미 관측한 송수신자를 목록에 합친다. 수집 결과를 별도 연락처 행으로 저장하지 않는다.
+- 연락처의 `주고받은 메일`과 `모두 보기`는 `/api/mail-client/search?contactEmail=…`를 사용한다. 제공자 전체 검색 후보 중 From 또는 To 주소가 대소문자를 무시하고 정확히 일치하는 것만 포함한다. 제목·표시 이름·Cc는 이 조건에 포함되지 않는다. 연락처 목록은 기존 정렬에서 `nextOffset`을 받아 스크롤로 이어 읽고, 검색어나 출처가 바뀌면 첫 페이지부터 조회한다. CSV·수집 연락처 모두에 적용한다.
+
+### HTML과 이미지 표시
+
+- 상세 응답은 기존 `body.text`와 선택적인 `body.html`을 제공한다. HTML이 있으면 화면에서 DOMPurify로 정제하고 스크립트를 허용하지 않는 sandbox iframe에 넣는다. 표·문단·글꼴·색상과 인라인 CSS·미디어 쿼리는 허용한 표시 속성 범위에서 유지한다. 일반 HTTP·HTTPS 링크는 새 탭에서 열고 리퍼러와 opener를 전달하지 않는다.
+- iframe 전용 CSP는 기본적으로 인라인 이미지용 blob만 허용한다. `이미지 표시`를 누르면 그 상세 화면에서만 HTML의 HTTP·HTTPS `img src`를 직접 읽는다. 외부 CSS·폰트·스크립트·CSS 이미지 요청은 차단하고 화면을 다시 열면 외부 이미지는 차단 상태로 시작한다. 본문과 이미지 바이트는 DB에 저장하지 않는다.
 
 ### 연결이 남은 제어와 데이터
 
-- 제공자 전체 우편함 검색, 본문 미리보기와 제공자 전체 스레드 탐색에는 관측 범위 밖의 계약이 필요하다. 현재 Gmail 상세는 같은 계정에서 이미 관측한 스레드만 표시한다.
+- Naver·NAVER WORKS 스레드 확장과 목록 본문 미리보기는 후속 범위다.
 - 계정 추가·관리·재로그인과 Gmail 연락처·Works 조직도 직접 동기화에는 서버의 새 인증·권한 계약이 필요하다. Naver는 현재 CSV 경로를 사용한다. 해당 제공자 제어는 비활성으로 표시한다.
-- 스마트 조치의 답장·확인·제출 칩은 현행 분석 API에 구분 필드가 없어 비활성이다. 규칙 추가의 입력 화면은 현재 피그마에 없어 기존 규칙의 조회와 해제를 연결한다. 받은편지함에 분석 요청 버튼을 두지 않는다.
-- 외부 이미지 표시는 추적 요청과 원문 표시 정책이 필요하다. 초안 충돌에서 기존 버전에 묶인 첨부가 있으면 그 첨부를 제외한 채 복사하지 않는다.
+- 규칙 추가의 입력 화면은 현재 피그마에 없어 기존 규칙의 조회와 해제를 연결한다. 받은편지함에 분석 요청 버튼을 두지 않는다.
+- 초안 충돌에서 기존 버전에 묶인 첨부가 있으면 그 첨부를 제외한 채 복사하지 않는다.
 
 ## Backend Phase 1
 
@@ -57,7 +66,7 @@ Agent 메시지·Attention 링크는 계정과 Agent identity, 해당 제공자 
 
 ## 상세와 첨부
 
-Gmail 상세는 Workspace 전용 `format=raw`, IMAP 상세는 검증을 함께 수행하는 원문 PEEK를 사용한다. 텍스트 본문은 16,000자 분석 정규화를 거치지 않고 전체를 반환한다. HTML 전용 메일은 HTML을 평문으로 변환한다. 응답의 본문 형식은 `text`이고 후속 화면에서는 `textContent`로 표시한다. 외부 이미지·링크의 자동 호출, HTML 실행, 첨부파일 다운로드는 이 API에서 지원하지 않는다. MIME에서 파싱한 첨부 이름·타입·크기·인라인 여부와 `Message-ID`, `In-Reply-To`, `References` 및 제공자 thread ID를 제공한다. 32 MiB를 초과하는 원문은 상세에서 `413`으로 표시한다. 이 제한은 잘린 응답을 전체 본문으로 표시하지 않도록 둔다. 원문과 첨부 바이트는 영구 저장 대상에서 제외한다.
+Gmail 상세는 Workspace 전용 `format=raw`, IMAP 상세는 검증을 함께 수행하는 원문 PEEK를 사용한다. 텍스트 본문은 16,000자 분석 정규화를 거치지 않고 전체를 반환한다. HTML 전용 메일도 인용에 사용할 평문을 변환해 제공하며, 화면 표시용 HTML은 위 HTML 표시 계약을 따른다. MIME에서 파싱한 첨부 이름·타입·크기·인라인 여부와 `Message-ID`, `In-Reply-To`, `References` 및 제공자 thread ID를 제공한다. 32 MiB를 초과하는 원문은 상세에서 `413`으로 표시한다. 이 제한은 잘린 응답을 전체 본문으로 표시하지 않도록 둔다. 원문과 첨부 바이트는 영구 저장 대상에서 제외한다.
 
 ## API
 
@@ -69,8 +78,9 @@ Gmail 상세는 Workspace 전용 `format=raw`, IMAP 상세는 검증을 함께 �
 | `/api/mail-client/accounts/:accountId/mailboxes` | 실제 메일함·라벨과 관측 상태 |
 | `/api/mail-client/accounts/:accountId/messages?mailbox=…&cursor=…` | 선택 목록, 원본 관측 상태, 후속 커서 |
 | `/api/mail-client/inbox?cursor=…` | 통합 목록, 계정별 관측 상태, 불완전 여부와 후속 커서 |
-| `/api/mail-client/messages/:messageId` | 메일 상세, 평문 본문, 송수신 정보, 스레드 관계와 첨부 메타데이터 |
+| `/api/mail-client/messages/:messageId` | 메일 상세, 평문과 선택적 HTML, 송수신 정보, 스레드 관계와 첨부 메타데이터 |
 | `/api/mail-client/messages/:messageId/attachments` | 첨부 메타데이터 |
+| `/api/mail-client/messages/:messageId/inline-images/:index` | 원본 메시지에서 검증한 래스터 인라인 이미지 바이트 |
 | `/api/mail-client/agent-messages/:messageId` | 기존 Agent 메시지를 검증한 Workspace 상세 ID |
 | `/api/mail-client/attention/:attentionId` | 현재 Attention 메시지를 검증한 Workspace 상세 ID |
 
@@ -158,6 +168,7 @@ v47 영수증은 요청 ID·계정·요청 해시·초안 버전/원본 참조·
 ### 스마트 목록과 일정 후보
 
 - 중요는 AI `urgent`·`important`, 조치 필요는 `action_required` 또는 행동 문구가 확인된 `urgent`다. 일정은 후보가 있는 메일이며 마감은 유효한 기존 Agent 기한이나 날짜가 해석된 마감 후보다. Workspace 분류 응답의 기한 값은 근거 인용이 있는 일정 작업으로 확인한 뒤 표시한다. 무시는 `ignore`, 미분류는 판단이 아직 없는 메일이다. `info`는 분류 완료로 본다. 이 필터는 겹칠 수 있다. Gmail IMPORTANT·수동 별표는 제공자 상태 그대로다.
+- 신규 Workspace 분류는 기존 `result_json`에 답장 `reply`, 확인 `confirm`, 제출 `submit`, 미확정 `null` 중 하나를 `actionType`으로 남긴다. 조치 필요의 세 칩은 `variant`로 이 필드를 조회한다. Agent 판단 또는 유형이 없는 기존 결과는 조치 필요의 전체 목록에 남으며, 유형 추가 때문에 기존 분석을 다시 실행하지 않는다.
 - 목록과 달력은 탐색·분석된 관측 범위를 조회하며 `coverage.complete=false`를 반환한다. 저장된 관측에는 `sourceVerification.state=observed`와 검증 시각을 표시한다. 개별 분석 결과와 일정 상세는 제공자에서 원문을 다시 검증하고 현재 검증 실패를 반환한다. 목록은 수신 시각, 계정과 제공자 위치로 정렬한다. 기간은 시작 포함, 끝 제외다. 미확정 후보는 수신 기준 날짜가 속한 기간의 별도 목록에 두며 달력 날짜가 없다.
 - 한 원문에서 최대 10개를 추출한다. 개인·공식·마감·미정 중 한 종류를 갖는다. 정확히 인용된 제목·날짜 표현과 실제 입력에 존재하는 짧은 근거가 필요하다. 외부 메일 지시는 데이터로 전달하고 모델에는 실행 도구를 주지 않는다. 원문 전체나 첨부 바이트는 보존하지 않는다. `mail_workspace_calendar_events`에는 근거 발췌·해시·날짜 출처·수신 기준일·추론 이유와 가능한 종료 시각을 보관한다. 작업에는 모델·프롬프트 버전·시각과 분류용 제한된 구조화 값만 남긴다. 입력 절단, 후보 초과, 근거 불일치, 첨부 의존성은 불완전 사유로 표시한다.
 - 날짜와 시각은 메일 수신 시각의 KST 달력으로 계산한다. 명시 연도를 보존한다. 월·일만 있으면 수신 연도 전후의 유효한 날짜에서 검증된 미래·과거 방향의 가장 가까운 날짜 또는 절대 차이가 가장 작은 날짜를 선택한다. 동률, 방향 충돌, 모호한 상대 표현이나 지원되지 않는 시간대는 미확정이다. 시간이 있는 경우에만 datetime을 쓰며 KST와 명시적인 UTC·숫자 오프셋을 지원한다. 날짜만 알려진 후보는 date다.
@@ -169,7 +180,7 @@ v47 영수증은 요청 ID·계정·요청 해시·초안 버전/원본 참조·
 | --- | --- |
 | `POST /api/mail-client/smart/analyze` | `{messageIds, kind}`에서 kind는 classification·calendar·both. HTTP 202와 메시지별 기존 또는 새 작업 상태, 검증 오류 반환 |
 | `GET /api/mail-client/smart/results?messageIds=1,2` | 현재 원문 검증, Agent·Workspace 출처와 모델·프롬프트·분석 시각, 작업 상태·실패 원인 |
-| `GET /api/mail-client/smart/messages?filter=unclassified` | 여섯 필터 중 하나. 선택적 accountId, limit, cursor |
+| `GET /api/mail-client/smart/messages?filter=unclassified` | 여섯 필터 중 하나. 선택적 accountId, limit, cursor. 조치 필요의 세부 variant는 `reply`·`confirm`·`submit` |
 | `GET /api/mail-client/smart/calendar?month=2026-12` | month 또는 from·until. 선택적 accountId, limit, cursor. 첫 요청은 날짜가 있는 후보와 별도 unresolved 목록 반환. section=unresolved로 해당 목록의 커서를 이어 읽음 |
 | `GET /api/mail-client/smart/calendar/:eventId` | 근거·원문 연결·현재 검증 상태와 미저장 task 제안값 |
 
