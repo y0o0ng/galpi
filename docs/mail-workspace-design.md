@@ -46,4 +46,34 @@ Gmail 상세는 Workspace 전용 `format=raw`, IMAP 상세는 검증을 함께 �
 | `/api/mail-client/agent-messages/:messageId` | 기존 Agent 메시지를 검증한 Workspace 상세 ID |
 | `/api/mail-client/attention/:attentionId` | 현재 Attention 메시지를 검증한 Workspace 상세 ID |
 
-제공자 쓰기·초안·전송·읽음 플래그 변경과 자동 분석은 별도 단계의 권한이다. 모의 HTTP 및 IMAP과 기존 Agent 회귀 검증은 로컬에서 실행하고, 실계정 스모크는 별도 검증으로 다룬다.
+Phase 1의 GET 계약은 제공자 조회 전용이다. 상태 변경은 아래 Phase 2의 명시적 POST에서 수행한다.
+
+## Backend Phase 2
+
+기존 인증을 적용한다. `MAIL_CLIENT_ENABLED=true`와 `MAIL_CLIENT_WRITE_ENABLED=true`가 모두 필요하며, 쓰기 플래그 기본값은 `false`다. Gmail은 `MAIL_GMAIL_MODIFY_REFRESH_TOKEN`에 부여한 `gmail.modify`로 프로필 주소와 원본 메시지 ID를 확인한다. 기존 Agent·Workspace 읽기 토큰과 답장 토큰은 각자의 기존 경로를 사용한다. IMAP은 요청 대상 계정의 기존 자격증명으로 쓰기 전용 연결을 연다.
+
+| 액션 | Gmail | IMAP |
+| --- | --- | --- |
+| `set_read` | `value=true`면 `UNREAD` 제거, `false`면 추가 | `\Seen`의 명시적 추가·제거 |
+| `set_starred` | `STARRED`의 명시적 추가·제거 | `\Flagged`의 명시적 추가·제거 |
+| `archive` | `INBOX` 제거 | 서버가 `\Archive`로 표시한 선택 가능한 실제 폴더로 이동 |
+| `move` | 명시한 출발 라벨과 실제 사용자 대상 라벨만 변경 | 동일 계정에서 LIST로 확인한 선택 가능한 대상 폴더로 이동 |
+| `trash` | `messages.trash` | 서버가 `\Trash`로 표시한 선택 가능한 실제 폴더로 이동 |
+
+Gmail 이동의 `sourceMailbox`는 현재 메시지에 있는 `label:INBOX` 또는 사용자 라벨, 또는 `all`을 명시한다. `all`에서는 선택한 사용자 라벨을 추가한다. 대상은 사용자 라벨로 한정한다. `IMPORTANT`는 Gmail 제공자 상태로 유지하고 Agent의 AI 분류는 기존 분석 경로에서 관리한다. [Gmail modify](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/modify) · [Gmail trash](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/trash)
+
+IMAP은 같은 쓰기 잠금으로 메일함·UID·UIDVALIDITY와 Phase 1의 검증값을 확인한 뒤 `UID STORE` 또는 네이티브 `UID MOVE`를 보낸다. 유효한 UIDVALIDITY가 없는 경우 확보해 둔 원문 해시까지 대조한다. 원문 검증에는 Phase 1의 32 MiB 한도를 적용한다. 보관·휴지통은 실제 LIST 플래그에서 역할이 하나로 확인될 때만 허용한다. 폴더명 기반 추론은 읽기용 안내에만 사용한다. `MOVE`가 없으면 실패를 반환하고, 이 API의 제공자 명령은 `UID STORE`의 두 플래그와 `UID MOVE`로 제한된다.
+
+### 요청과 결과
+
+- `POST /api/mail-client/messages/:messageId/actions`의 본문은 `requestId`, `action`과 해당 액션의 인자를 받는다. `messageId`는 Phase 1의 상세 ID다.
+- `POST /api/mail-client/messages/actions`의 본문은 `requestId`와 `operations`다. `operations`는 각 원소에 `messageId`와 액션 인자를 갖는 배열이며, 한 요청에 서로 다른 메시지 최대 25개를 받는다.
+- `set_read`와 `set_starred`에는 boolean `value`가 필요하다. `set_read`의 `origin` 기본값은 `user`이며 `auto`는 `value=true`일 때만 허용한다. `move`에는 `targetMailbox: { accountId, id }`가 필요하다. `id`는 해당 계정 Mail Workspace 목록에서 반환한 메일함 ID다. Gmail 이동에는 `sourceMailbox`도 전달한다.
+- 단일 결과는 `{ success, requestId, result }`, 일괄 결과는 `{ success, requestId, results }`를 반환한다. 각 결과는 `messageId`, `accountId`, `state`, `code`, `statusCode`를 담는다. 확인은 `confirmed`, 명시적으로 수행되지 않은 경우는 `failed`, 결과를 확인할 수 없는 경우는 `unknown`이다. 단일 요청의 `unknown`은 HTTP 202다. 유효한 일괄 요청은 HTTP 200으로 각 메시지의 상태를 반환하며 전부 `confirmed`일 때만 `success=true`다.
+- v46의 `mail_client_action_receipts`에는 요청 ID, Workspace 메시지 ID, 정규화한 요청의 SHA-256, 결과 상태·코드·시각만 보존한다. 같은 ID와 같은 요청은 기록을 반환하며, 다른 요청은 409다. 제공자 호출 전에 기록을 확보하고, 처리 중이거나 응답이 끊긴 요청은 `unknown`으로 반환한다. 재시작 후에도 같은 요청으로 다시 실행하지 않는다.
+
+### 자동 읽음과 목록 갱신
+
+상세 GET과 Overview 미리보기는 계속 조회 전용이다. 향후 UI가 본문 표시를 마친 뒤 `origin=auto`로 읽음을 요청할 수 있다. 사용자가 명시적으로 설정한 안 읽음은 `mail_client_read_overrides`에 남고 재시작 후에도 적용된다. 예외에 따라 자동 읽음을 건너뛰면 `confirmed`와 `MAIL_CLIENT_MANUAL_UNREAD_PRESERVED`를 반환한다. 직접 읽음으로 확인되면 해당 메시지의 보호를 해제한다. IMAP MOVE에서 COPYUID가 있으면 도착 UID에 보호를 이어간다. MOVE 결과나 매핑이 불명확하면 도착 폴더에서 원문 해시가 일치하는 메시지의 자동 읽음을 보수적으로 막는다. 이 보호는 대상을 쓰기로 선택하는 근거로 사용하지 않는다.
+
+확인된 변경은 해당 계정의 목록 관측 캐시를 무효화한다. 이미 발급한 Workspace 페이지 커서는 새 첫 페이지부터 시작하도록 만료시키고, 동시에 진행 중이던 이전 조회가 오래된 관측을 복구하지 못하게 한다. Agent의 동기화·분석·Attention·Push 및 기존 답장 발송은 기존 API 계약을 유지한다.

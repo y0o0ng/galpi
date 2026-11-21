@@ -57,7 +57,10 @@ const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailClient } = require('./lib/mail/client');
 const { createGmailMailClient } = require('./lib/mail/client-gmail');
 const { createImapMailClient } = require('./lib/mail/client-imap');
-const { registerMailClientRoutes } = require('./lib/mail/client-routes');
+const { registerMailClientRoutes, registerMailClientActionRoutes } = require('./lib/mail/client-routes');
+const { createMailClientActions } = require('./lib/mail/client-actions');
+const { createGmailMailWriter } = require('./lib/mail/client-gmail-write');
+const { createImapMailWriter } = require('./lib/mail/client-imap-write');
 const { createMailBodyReader } = require('./lib/mail/body');
 const { createMailSearchSession } = require('./lib/mail/search-tool');
 const { createMailPreferenceSession } = require('./lib/mail/preference-tool');
@@ -252,6 +255,7 @@ const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
 const MAIL_REPLY_ENABLED = MAIL_AGENT_ENABLED && process.env.MAIL_REPLY_ENABLED === 'true';
 const MAIL_CLIENT_ENABLED = process.env.MAIL_CLIENT_ENABLED === 'true';
+const MAIL_CLIENT_WRITE_ENABLED = MAIL_CLIENT_ENABLED && process.env.MAIL_CLIENT_WRITE_ENABLED === 'true';
 // News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
 const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
@@ -938,6 +942,20 @@ const mailClient = MAIL_CLIENT_ENABLED ? (() => {
     db,
     agentStore: mailStore,
     providers: { gmail: createGmailMailClient({ tokenSource: gmailReadTokens }), naver: imap, works: imap },
+  });
+})() : null;
+const mailClientActions = MAIL_CLIENT_WRITE_ENABLED ? (() => {
+  const refreshToken = process.env.MAIL_GMAIL_MODIFY_REFRESH_TOKEN;
+  const writer = createImapMailWriter({ credentialsFor: mailCredentialsFor });
+  const gmail = createGmailMailWriter({
+    tokenSource: refreshToken ? createGoogleTokenSource({
+      credentials: { ...MAIL_GMAIL_CREDENTIALS, refreshToken },
+      fetch: (url, init) => fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(12_000) }),
+    }) : null,
+  });
+  return createMailClientActions({
+    db, agentStore: mailStore, providers: { gmail, naver: writer, works: writer },
+    onConfirmed: () => mailClient.invalidateCursors(),
   });
 })() : null;
 const mailBodyReader = MAIL_AGENT_ENABLED
@@ -4936,6 +4954,7 @@ registerMailRoutes({
   onRequeued: () => { void mailAgent?.tick(); },
 });
 registerMailClientRoutes({ app, service: mailClient });
+registerMailClientActionRoutes({ app, service: mailClientActions });
 const shortcutRoutes = createVoiceShortcutRoutes({
   app,
   service: voiceShortcut,

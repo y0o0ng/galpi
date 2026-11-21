@@ -47,7 +47,7 @@ async function stopServer(child) {
   });
 }
 
-async function startServer(t, mailEnabled, clientEnabled = false) {
+async function startServer(t, mailEnabled, clientEnabled = false, writesEnabled = false) {
   const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'mail-server-'));
   const vaultPath = path.join(appRoot, 'vault');
   await fs.mkdir(vaultPath);
@@ -72,10 +72,12 @@ async function startServer(t, mailEnabled, clientEnabled = false) {
       CODEX_RUNNER_MODE: 'heuristic',
       MAIL_AGENT_ENABLED: mailEnabled ? 'true' : 'false',
       MAIL_CLIENT_ENABLED: clientEnabled ? 'true' : 'false',
+      MAIL_CLIENT_WRITE_ENABLED: writesEnabled ? 'true' : 'false',
       // 자격증명은 넣지 않는다. 계정이 하나도 없으므로 provider는 호출되지 않는다.
       MAIL_GMAIL_CLIENT_ID: '',
       MAIL_GMAIL_CLIENT_SECRET: '',
       MAIL_GMAIL_REFRESH_TOKEN: '',
+      MAIL_GMAIL_MODIFY_REFRESH_TOKEN: '',
       NAVER_MAIL_USER: '',
       NAVER_MAIL_APP_PASSWORD: '',
     },
@@ -113,7 +115,8 @@ test('the schema lands even while the mail agent stays off', async t => {
     ORDER BY name
   `).all().map(row => row.name);
   assert.deepEqual(tables, [
-    'mail_accounts', 'mail_attention', 'mail_client_cache', 'mail_client_messages', 'mail_messages',
+    'mail_accounts', 'mail_attention', 'mail_client_action_receipts', 'mail_client_cache',
+    'mail_client_messages', 'mail_client_read_overrides', 'mail_messages',
     'mail_notification_batches', 'mail_preferences',
     'mail_push_deliveries', 'mail_reply_attempts', 'mail_sync_state',
   ]);
@@ -136,6 +139,39 @@ test('Mail Client uses the existing HTTP authentication and runs independently f
     method: 'POST', headers: { 'X-API-Token': API_TOKEN },
   });
   assert.equal(rejectedWrite.status, 404);
+});
+
+test('Mail Client actions require both flags and the existing token, and return per-message outcomes', async t => {
+  async function post(url, path, body, authenticated = true) {
+    const response = await fetch(url + '/api/mail-client/messages' + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(authenticated ? { 'X-API-Token': API_TOKEN } : {}) },
+      body: JSON.stringify(body),
+    });
+    return { response, body: await response.json() };
+  }
+  const readOnly = await startServer(t, false, true, false);
+  const writeOnly = await startServer(t, false, false, true);
+  const enabled = await startServer(t, false, true, true);
+  for (const server of [readOnly, writeOnly]) {
+    assert.equal((await post(server.url, '/1/actions', { requestId: 'disabled', action: 'trash' })).body.code,
+      'MAIL_CLIENT_WRITE_DISABLED');
+  }
+  const input = { requestId: 'missing', action: 'trash' };
+  assert.equal((await post(enabled.url, '/1/actions', input, false)).response.status, 401);
+  const missing = await post(enabled.url, '/1/actions', input);
+  assert.equal(missing.response.status, 404);
+  assert.equal(missing.response.headers.get('cache-control'), 'no-store');
+  assert.equal(missing.body.result.state, 'failed');
+  assert.equal(missing.body.result.code, 'MAIL_CLIENT_MESSAGE_NOT_FOUND');
+  assert.equal((await post(enabled.url, '/1/actions', { ...input, action: 'archive' })).response.status, 409);
+  const batch = await post(enabled.url, '/actions', {
+    requestId: 'missing-batch',
+    operations: [{ messageId: 1, action: 'trash' }, { messageId: 2, action: 'archive' }],
+  });
+  assert.equal(batch.response.status, 200);
+  assert.equal(batch.body.success, false);
+  assert.deepEqual(batch.body.results.map(row => row.state), ['failed', 'failed']);
 });
 
 test('turning the flag on starts the worker and opens the status route', async t => {

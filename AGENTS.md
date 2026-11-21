@@ -145,6 +145,7 @@
 - **관측 대상 둘**: 실제 알림에서 판단 흔들림이 얼마나 드러나는지(흡수 장치인 batch 묶기와 발신자 억제는 이미 배포됐다), 그리고 본문 열기의 IMAP 연결이 동기화 tick과 부딪히는지.
 - **사용자 지시형 단일 답장은 로컬 구현 범위다.** 정본은 `docs/xion-mail-agent-design-final.md` §16이고 Pi 배포·실계정 발송은 보류한다.
 - **Mail Workspace Backend Phase 1은 읽기 전용 내부 API다.** 정본은 `docs/mail-workspace-design.md`이며 UI 노출과 Pi 배포는 후속 범위다.
+- **Mail Workspace Backend Phase 2는 별도 플래그 뒤에 구현했다.** 정본은 `docs/mail-workspace-design.md`이고 실계정 인수와 UI 연결이 남아 있다.
 - **`status='error'`는 사실상 영구 정지다.** `listDueAccounts`가 `active`만 집으므로 `next_sync_at`을 세워도 다시 선택되지 않고, 알림은 `auth_required`에만 있어서 조용히 멈춘다. **그래서 provider는 전송 계층 실패를 반드시 자기 경계에서 retryable로 정규화한다** — 2026-09-14에 랜선이 잠깐 빠졌을 때 경계가 없던 지메일만 40시간 멈췄다. 복구는 `store.setAccountStatus(id, 'active')`이고 경위·계약은 `docs/xion-mail-agent-design-final.md` 34절이다.
 
 ### 뉴스 — v1 인수했다, 홈 노출과 재확인만 남았다
