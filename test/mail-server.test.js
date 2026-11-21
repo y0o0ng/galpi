@@ -161,7 +161,13 @@ test('Mail Client uses the existing HTTP authentication and runs independently f
   assert.equal((await api(url, '/api/mail-client/unified/sent?limit=100')).response.status, 400);
   assert.equal((await api(url, '/api/mail-client/unified/sent?cursor=bad')).response.status, 400);
   assert.equal((await fetch(url + '/api/mail-client/unified/sent')).status, 401);
-  for (const role of ['inbox', 'sent', 'drafts', 'junk', 'trash']) {
+  for (const bad of ['0', 'x', '1.5']) {
+    assert.equal((await api(url, '/api/mail-client/unified/all?accountId=' + bad)).response.status, 400);
+  }
+  const missing = await api(url, '/api/mail-client/unified/all?accountId=99');
+  assert.equal(missing.response.status, 404);
+  assert.equal(missing.body.code, 'MAIL_CLIENT_ACCOUNT_NOT_FOUND');
+  for (const role of ['all', 'inbox', 'sent', 'drafts', 'junk', 'trash']) {
     assert.deepEqual((await api(url, '/api/mail-client/unified/' + role)).body, { success: true, messages: [], sources: [], incomplete: false, nextCursor: null });
   }
   const contactsPath = '/api/mail-client/contacts';

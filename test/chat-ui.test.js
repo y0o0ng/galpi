@@ -710,9 +710,15 @@ test('Reels episode card keeps model strings as text, revokes blobs, and hides w
 
 test('Mail Workspace unified folders load from the unified endpoint when no account is selected', () => {
   const source = fs.readFileSync(path.join(ROOT, 'public/mail-workspace.js'), 'utf8');
-  assert.match(source, /const unifiedRoles = \['inbox', 'sent', 'drafts', 'junk', 'trash'\];/);
+  assert.match(source, /const unifiedRoles = \['all', 'inbox', 'sent', 'drafts', 'junk', 'trash'\];/);
   assert.match(source, /!scope\.account && unifiedRoles\.includes\(role\) \? \(\) => changeScope\(\{ role, title \}\)/);
   assert.match(source, /endpoint = '\/unified\/' \+ scope\.role;/);
+  // 전체 메일 opens the unified reader without an account, and an IMAP account without a Gmail All Mail box is enabled too.
+  assert.match(source, /\(!scope\.account \|\| scope\.role === 'all'\) && !scope\.box/);
+  assert.match(source, /if \(scope\.account\) params\.accountId = scope\.account\.id;/);
+  assert.match(source, /role === 'all' && scope\.account && !target \? \(\) => changeScope\(\{ role, title, account: scope\.account \}\)/);
+  assert.match(source, /const accountAll = scope\.role === 'all' && account != null && !target;/);
+  assert.match(source, /else if \(accountAll\) changeScope\(\{ role: 'all', title: scope\.title, account \}\);/);
   assert.match(source, /else if \(unified\) params\.role = scope\.role;/);
   assert.match(source, /MAIL_CLIENT_MAILBOX_UNAVAILABLE/);
   assert.match(source, /'\/accounts\/' \+ message\.accountId \+ '\/messages\/' \+ message\.id \+ '\/draft'/);

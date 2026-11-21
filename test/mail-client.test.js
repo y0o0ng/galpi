@@ -224,7 +224,7 @@ function fakeImap() {
           calls.push({ path, operation: 'EXAMINE' });
           this.mailbox = {
             uidNext: Math.max(0, ...rows().map(row => row.uid)) + 1,
-            uidValidity: state.validity, exists: rows().length,
+            uidValidity: state.validities?.[mailbox] ?? state.validity, exists: rows().length,
           };
           return { release() { path = null; } };
         },
@@ -659,6 +659,105 @@ test('an account missing the folder for a role is unavailable without failing th
   assert.equal(page.nextCursor, null);
   assert.deepEqual(page.sources.map(source => [source.accountId, source.status, source.failure.code]),
     [[naver, 'unavailable', 'MAIL_CLIENT_MAILBOX_UNAVAILABLE']]);
+});
+
+function allMailFixture(t) {
+  const f = fixture(t);
+  const ids = {
+    gmail: f.addAccount('gmail', 'test@gmail.com'),
+    naver: f.addAccount('naver', 'test@naver.com'),
+    works: f.addAccount('works', 'test@school.example.com'),
+  };
+  f.gmail.setMessages([
+    gmailMessage('g-inbox', NOW - 1, ['INBOX']), gmailMessage('g-archived', NOW - 9, ['Label_2']),
+    gmailMessage('g-sent', NOW - 11, ['SENT']), gmailMessage('g-spam', NOW - 3, ['SPAM']), gmailMessage('g-trash', NOW - 4, ['TRASH']),
+  ]);
+  const { naver } = f.imap;
+  for (const [path, role] of [['Sent', '\\Sent'], ['SNS', null], ['Drafts', '\\Drafts'], ['Junk', '\\Junk'], ['Bin', '\\Trash']]) {
+    naver.folders.push({ path, name: path, ...(role ? { specialUse: role } : {}), flags: new Set() });
+  }
+  Object.assign(naver.rows, {
+    INBOX: [imapMessage(80, NOW - 2), imapMessage(81, NOW - 10)],
+    Sent: [imapMessage(7, NOW - 6)],
+    SNS: [imapMessage(30, NOW - 8), imapMessage(31, NOW - 12)],
+    Drafts: [imapMessage(8, NOW - 5)],
+    Junk: [imapMessage(9, NOW - 7)],
+    Bin: [imapMessage(10, NOW - 13)],
+  });
+  naver.validities = { SNS: 9n };
+  f.imap.works.rows.Received = [imapMessage(3, NOW - 14)];
+  f.imap.works.rows['Sent Messages'] = [imapMessage(5, NOW - 15)];
+  return { f, ids };
+}
+
+const allMailOrder = ['g-inbox', 'INBOX:80', 'Sent:7', 'SNS:30', 'g-archived', 'INBOX:81', 'g-sent', 'SNS:31', 'Received:3', 'Sent Messages:5', 'Projects/2026:19', 'Projects/2026:20'];
+const label = row => row.providerMessageId ?? row.folderPath + ':' + (row.receivedAt === NOW - 2 ? 80 : { 10: 81, 6: 7, 8: 30, 12: 31, 14: 3, 15: 5, 20: 19, 30: 20 }[NOW - row.receivedAt]);
+
+test('unified all merges Gmail All Mail with every IMAP folder except Drafts, Junk and Trash by receive time', async t => {
+  const { f, ids } = allMailFixture(t);
+  const page = await f.service.unified('all', null, 20);
+  assert.deepEqual(page.messages.map(label), allMailOrder);
+  assert.equal(page.incomplete, false);
+  assert.equal(page.nextCursor, null);
+  assert.deepEqual(page.sources.map(source => [source.accountId, source.status]), [[ids.gmail, 'fresh'], [ids.naver, 'fresh'], [ids.works, 'fresh']]);
+  const stored = row => JSON.parse(f.db.prepare('SELECT locator_json AS json FROM mail_client_messages WHERE id = ?').get(row.id).json);
+  for (const row of page.messages.filter(row => row.provider !== 'gmail')) {
+    assert.equal(stored(row).path, row.folderPath);
+    assert.equal(stored(row).inbox, row.folderPath === 'INBOX' || row.folderPath === 'Received');
+  }
+  assert.equal((await f.service.search({ role: 'all' }, null, null, 20)).messages.length, allMailOrder.length);
+});
+
+test('unified all holds one IMAP connection per account and fetches metadata only for emitted rows', async t => {
+  const { f, ids } = allMailFixture(t);
+  await Promise.all([f.service.mailboxes(ids.naver), f.service.mailboxes(ids.works)]);
+  f.imap.connections.length = 0;
+  f.imap.calls.length = 0;
+  const page = await f.service.unified('all', null, 6);
+  assert.deepEqual(page.messages.map(label), allMailOrder.slice(0, 6));
+  assert.deepEqual(f.imap.connections.sort(), ['test', 'test@school.example.com']);
+  const fetched = f.imap.calls.filter(call => call.operation === 'FETCH' && call.metadata);
+  // INBOX 80 and 81, Sent 7 and SNS 30 are emitted; SNS 31 is not.
+  assert.deepEqual(fetched.map(call => call.path + ':' + call.ids.join()).sort(), ['INBOX:80,81', 'SNS:30', 'Sent:7']);
+  assert.equal(fetched.some(call => call.path === 'Projects/2026'), false);
+  // UIDVALIDITY 0 folders are proven in the same session; the valid SNS folder only reads metadata.
+  assert.deepEqual(fetched.filter(call => call.source).map(call => call.path).sort(), ['INBOX', 'Sent']);
+  assert.equal(fetched.find(call => call.path === 'SNS').source, false);
+  const stored = row => JSON.parse(f.db.prepare('SELECT locator_json AS json FROM mail_client_messages WHERE id = ?').get(row.id).json);
+  assert.ok(stored(page.messages.find(row => row.folderPath === 'Sent')).rawProof);
+  assert.equal(stored(page.messages.find(row => row.folderPath === 'SNS')).rawProof, null);
+  assert.equal(stored(page.messages.find(row => row.folderPath === 'INBOX')).inbox, true);
+  assert.equal(stored(page.messages.find(row => row.folderPath === 'SNS')).inbox, false);
+});
+
+test('unified all pages continue across folders without duplicates and replay the same cursor', async t => {
+  const { f } = allMailFixture(t);
+  const seen = [];
+  let cursor = null;
+  let first;
+  for (let pages = 0; pages < 10; pages += 1) {
+    const page = await f.service.unified('all', cursor, 3);
+    first ??= { cursor, ids: page.messages.map(row => row.id), next: page.nextCursor };
+    seen.push(...page.messages.map(label));
+    cursor = page.nextCursor;
+    if (!cursor) break;
+  }
+  assert.deepEqual(seen, allMailOrder);
+  assert.equal(cursor, null);
+  const replay = await f.service.unified('all', first.next, 3);
+  const replayAgain = await f.service.unified('all', first.next, 3);
+  assert.deepEqual(replay.messages.map(row => row.id), replayAgain.messages.map(row => row.id));
+  assert.deepEqual(replay.messages.map(label), allMailOrder.slice(3, 6));
+});
+
+test('unified all can be limited to one account and rejects an unknown one', async t => {
+  const { f, ids } = allMailFixture(t);
+  const naver = await f.service.unified('all', null, 20, ids.naver);
+  assert.deepEqual(naver.messages.map(label), ['INBOX:80', 'Sent:7', 'SNS:30', 'INBOX:81', 'SNS:31', 'Projects/2026:19', 'Projects/2026:20']);
+  assert.deepEqual(naver.sources.map(source => source.accountId), [ids.naver]);
+  const gmail = await f.service.unified('all', null, 20, ids.gmail);
+  assert.deepEqual(gmail.messages.map(label), ['g-inbox', 'g-archived', 'g-sent']);
+  await assert.rejects(f.service.unified('all', null, 20, 999), { code: 'MAIL_CLIENT_ACCOUNT_NOT_FOUND', statusCode: 404 });
 });
 
 test('Gmail rate limits are not reported as an expired login', async t => {

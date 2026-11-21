@@ -6,7 +6,7 @@
     ['all', '전체 메일', 'mail'], ['inbox', '받은편지함', 'inbox'], ['sent', '보낸편지함', 'send'],
     ['drafts', '임시보관함', 'draft'], ['archive', '보관함', 'archive'], ['junk', '스팸함', 'spam'], ['trash', '휴지통', 'trash'],
   ];
-  const unifiedRoles = ['inbox', 'sent', 'drafts', 'junk', 'trash'];
+  const unifiedRoles = ['all', 'inbox', 'sent', 'drafts', 'junk', 'trash'];
   const smart = [
     ['중요', 'star', 'important'], ['조치 필요', 'action', 'action_required'], ['일정', 'calendar', 'schedule'],
     ['마감', 'deadline', 'deadline'], ['무시', 'muted', 'ignore'], ['미분류', 'unsorted', 'unclassified'],
@@ -510,7 +510,8 @@
         const target = role === 'inbox' ? null : mailboxFor(role, scope.account);
         const handler = role === 'inbox' ? () => inbox()
           : !scope.account && unifiedRoles.includes(role) ? () => changeScope({ role, title })
-            : target && (() => changeScope({ ...target, role, title }));
+            : role === 'all' && scope.account && !target ? () => changeScope({ role, title, account: scope.account })
+              : target && (() => changeScope({ ...target, role, title }));
         const count = role === 'inbox' ? inboxUnread : role === 'drafts' && scope.role === role && unread != null ? messages().length : null;
         const control = navRow(title, glyph, handler, (!screen || screen === 'detail' || screen === 'compose') && scope.role === role, count);
         control.dataset.mailboxRole = role;
@@ -579,12 +580,14 @@
           const account = accounts.find(item => item.provider === provider);
           const target = account ? mailboxFor(scope.role, account) : null;
           const unifiedOpen = !provider && unifiedRoles.includes(scope.role);
-          const canOpen = unifiedOpen || target;
+          const accountAll = scope.role === 'all' && account != null && !target;
+          const canOpen = unifiedOpen || target || accountAll;
           const active = !provider ? !scope.account : account != null && scope.account?.id === account.id;
           const chip = button('mw-chip', name, (scope.search ? (!provider || account) : canOpen) && !writing && !loading ? () => {
             if (scope.search) searchFor(searchTerm, account, scope.contactEmail);
             else if (scope.role === 'inbox') inbox(account);
             else if (unifiedOpen) changeScope({ role: scope.role, title: scope.title });
+            else if (accountAll) changeScope({ role: 'all', title: scope.title, account });
             else changeScope({ ...target, role: scope.role, title: scope.title });
           } : null);
           chip.setAttribute('aria-pressed', String(active));
@@ -965,8 +968,11 @@
         const params = { limit };
         if (cursor) params.cursor = cursor;
         let endpoint = '/inbox';
-        const unified = !scope.account && !scope.box && !scope.search && unifiedRoles.includes(scope.role);
-        if (unified) endpoint = '/unified/' + scope.role;
+        const unified = (!scope.account || scope.role === 'all') && !scope.box && !scope.search && unifiedRoles.includes(scope.role);
+        if (unified) {
+          endpoint = '/unified/' + scope.role;
+          if (scope.account) params.accountId = scope.account.id;
+        }
         if (scope.account && scope.box) {
           endpoint = '/accounts/' + scope.account.id + '/messages';
           params.mailbox = scope.box.id;
