@@ -424,6 +424,20 @@
     global.TaskPanel?.render(host, { view });
   }
 
+  // 알림 패널의 `providerLabel`·`formatMailTime`과 같은 규칙이다. 패널 API를 좁게 두려고
+  // 여기서 따로 갖는다(Figma `Overview Mail 개편`의 메타 자리).
+  const MAIL_PROVIDER_LABELS = { gmail: 'Gmail', naver: 'Naver', works: 'Works' };
+
+  function formatMailTime(seconds) {
+    if (!Number.isFinite(Number(seconds)) || !seconds) return '';
+    const date = new Date(Number(seconds) * 1000);
+    const day = value => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(value);
+    if (day(date) === day(new Date())) {
+      return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+    }
+    return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' }).format(date);
+  }
+
   function mailNotifications() {
     return state.notifications.filter(item => item.source === 'mail');
   }
@@ -438,9 +452,11 @@
     const summary = node('div', 'home-count-summary');
     summary.append(node('strong', '', String(mailNotifications().length)), node('span', '', '새 메일'));
     const list = node('div', 'home-mail-list');
-    mailNotifications().slice(0, 4).forEach(item => {
+    mailNotifications().slice(0, 3).forEach(item => {
       const row = node('div', 'home-mail-row');
-      row.append(node('strong', '', item.sender || item.senderAddress || '메일'), node('span', '', item.subject || item.title || item.text || '확인할 메일'));
+      const meta = node('small', 'home-mail-meta');
+      meta.append(node('span', '', MAIL_PROVIDER_LABELS[item.provider] || item.provider || '메일'), node('span', '', formatMailTime(item.receivedAt)));
+      row.append(node('strong', '', item.sender || item.senderAddress || '메일'), node('span', '', item.subject || item.title || item.text || '확인할 메일'), meta);
       list.append(row);
     });
     if (!list.childElementCount) list.append(node('p', 'home-card-empty', `분석 대기 ${analysis.pending || 0} · 완료 ${analysis.done || 0}`));
@@ -795,14 +811,16 @@
     else renderOverview();
   }
 
-  async function openMailWorkspace(isCurrent) {
+  // Agents의 Mail 카드와 Overview 메일 카드의 `메일함에서 열기`가 같은 길로 연다.
+  // `message`가 있으면 받은편지함 대신 그 메일 상세로 바로 간다.
+  async function openMailWorkspace(isCurrent, { view = 'agents', message = null } = {}) {
     const workspace = state.mailWorkspace;
     if (!workspace) return false;
     if (state.openingMail) return true;
     state.openingMail = true;
     try {
-      const available = await workspace.open();
-      if (state.route !== 'home' || state.homeView !== 'agents' || !isCurrent()) return true;
+      const available = await workspace.open(message);
+      if (state.route !== 'home' || state.homeView !== view || !isCurrent()) return true;
       if (!available) return false;
       document.getElementById('home-page').classList.remove('active');
       document.getElementById('mail-workspace').classList.add('active');

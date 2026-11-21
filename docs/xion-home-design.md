@@ -161,6 +161,12 @@ Mail 확장은 현재 알림의 mail filter를 재사용해 목록과 실제 처
 분석 상태, Push, 방해 금지, 알림 규칙, 재시도는 기존 mail API만 호출한다. UI용 두 번째 Mail
 store를 만들지 않는다.
 
+Overview 메일 카드의 시각 정본은 `galpi-home-design`의 Mail Workspace 페이지 `Overview Mail 개편 · 4단계`
+(기본 `477:10375`, 확장 `477:10954`)다. 기본 카드는 최대 3통과 provider·수신 시각을 보이고, 확장 상세는
+`받은 메일`·제목·보낸 사람·메타·읽음/중요/메일함에서 열기·본문 순서다. 읽음·중요는 attention을
+`/api/mail-client/attention/:id`로 Workspace 메시지에 옮겨 `set_read`·`set_starred`를 부르고,
+`메일함에서 열기`는 Workspace를 그 메일 상세로 연다. 일정 등록·답장 요청은 알림 카드에만 남는다.
+
 Home의 Notes 카드 확장은 Note/Paper 패널 DOM과 controller를 그대로 옮겨 쓴다. Desktop은 넓은 카드 안의
 목록·상세 구성을 쓰고 Phone은 `list → detail`로 이동한다. 내부 back은 detail에서 list로만
 돌아간다. 저장된 paper를 여는 것만으로 활성 Chat context를 바꾸지 않는다.

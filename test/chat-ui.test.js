@@ -352,7 +352,10 @@ test('Home uses the Figma shell assets and the existing Notes and Mail controlle
   assert.match(note, /function splitDetail\(\)/);
   assert.match(paper, /function splitDetail\(\)/);
   assert.match(notifications, /function makeMailCard\(item\)/);
-  assert.match(notifications, /home-mail-workspace-list[\s\S]*?detail\.replaceChildren\(makeMailCard\(item\)\)/);
+  assert.match(notifications, /home-mail-workspace-list[\s\S]*?detail\.replaceChildren\(makeMailDetail\(item\)\)/);
+  assert.match(notifications, /function makeMailDetail\(item\)[\s\S]*?'받은 메일'[\s\S]*?'메일함에서 열기'[\s\S]*?'set_read'[\s\S]*?'set_starred'/);
+  assert.match(notifications, /openMailWorkspace\?\.\(\(\) => true, \{ view: 'overview', message \}\)/);
+  assert.match(home, /mailNotifications\(\)\.slice\(0, 3\)[\s\S]*?home-mail-meta/);
   assert.match(notifications, /home-mail-workspace-actions[\s\S]*?mailAction\(item, 'done'\)[\s\S]*?mailAction\(item, 'snooze'\)/);
   assert.match(css, /\.home-card-mail\.focused \.home-count-summary \{\s*display: block;/);
 });

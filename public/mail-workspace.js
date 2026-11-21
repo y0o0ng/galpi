@@ -1118,7 +1118,7 @@
       void loadPage();
     }
 
-    async function open() {
+    async function open(message = null) {
       if (loading || writing) return true;
       try { await refreshAccounts(true); }
       catch (error) {
@@ -1135,6 +1135,7 @@
       history = [];
       page = 0;
       void loadPage();
+      if (Number.isSafeInteger(message?.id)) messageViews.detail({ id: message.id, accountId: message.accountId }, [], 0, scope);
       return true;
     }
 

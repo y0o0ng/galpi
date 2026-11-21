@@ -161,6 +161,21 @@
   const PROVIDER_LABELS = { gmail: 'Gmail', naver: 'Naver', works: 'Works' };
   const providerLabel = provider => PROVIDER_LABELS[provider] || provider || '메일';
 
+  // 오늘 받은 메일은 시각만, 그 전은 날짜만 보인다(Figma `Overview Mail 개편`의 메타 자리).
+  function formatMailTime(seconds) {
+    if (!Number.isFinite(Number(seconds)) || !seconds) return '';
+    const date = new Date(Number(seconds) * 1000);
+    const day = value => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(value);
+    if (day(date) === day(new Date())) {
+      return new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false,
+      }).format(date);
+    }
+    return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' }).format(date);
+  }
+
+  const mailMeta = item => [providerLabel(item.provider), formatMailTime(item.receivedAt)].filter(Boolean).join(' · ');
+
   const REASON_LABELS = {
     action_required: '행동 필요',
     attachment_check: '첨부 확인 필요',
@@ -248,6 +263,99 @@
     return card;
   }
 
+  // 펼친 메일 카드의 오른쪽 상세(Figma `Mail Detail Pane`). 본문은 고를 때 바로 읽고,
+  // 읽음·중요·메일함 열기는 Mail Workspace의 메시지로 옮겨서 처리한다.
+  function makeMailDetail(item) {
+    const pane = document.createElement('article');
+    pane.className = 'home-mail-detail';
+    const kicker = document.createElement('p');
+    kicker.className = 'home-mail-detail-kicker';
+    kicker.textContent = '받은 메일';
+    const subject = document.createElement('h3');
+    subject.textContent = item.title || '(제목 없음)';
+    const sender = document.createElement('p');
+    sender.className = 'home-mail-detail-sender';
+    sender.textContent = item.sender || '보낸사람 없음';
+    const meta = document.createElement('p');
+    meta.className = 'home-mail-detail-meta';
+    meta.textContent = mailMeta(item);
+
+    const actions = document.createElement('div');
+    actions.className = 'home-mail-detail-actions';
+    const spacer = document.createElement('span');
+    spacer.className = 'home-mail-detail-spacer';
+    const open = makeDetailButton('메일함에서 열기', null, () => openInMailbox(item));
+    open.classList.add('outlined');
+    actions.append(
+      makeDetailButton('읽음', 'read', () => workspaceAction(item, 'set_read', '읽음으로 표시했어')),
+      makeDetailButton('중요', 'star', () => workspaceAction(item, 'set_starred', '중요 메일로 표시했어')),
+      spacer, open,
+    );
+
+    const body = document.createElement('div');
+    body.className = 'mail-body home-mail-detail-body';
+    pane.append(kicker, subject, sender, meta, actions, body);
+    if (Number.isSafeInteger(item.mailMessageId)) void loadBody(item, body);
+    return pane;
+  }
+
+  function makeDetailButton(label, icon, onClick) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'home-mail-detail-button';
+    if (icon) {
+      const image = document.createElement('img');
+      image.src = `/assets/figma/mail-workspace/${icon}.svg`;
+      image.alt = '';
+      image.width = 16;
+      image.height = 16;
+      button.appendChild(image);
+    }
+    button.append(label);
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
+  async function workspaceMessage(item) {
+    const response = await state.apiFetch(`/api/mail-client/attention/${item.attentionId}`, { cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 503 && data.code === 'MAIL_CLIENT_DISABLED') throw new Error('메일함이 꺼져 있어');
+    if (!response.ok || !Number.isSafeInteger(data.id)) throw new Error('메일함에서 이 메일을 찾지 못했어');
+    return data;
+  }
+
+  async function workspaceAction(item, action, done) {
+    try {
+      const message = await workspaceMessage(item);
+      const response = await state.apiFetch('/api/mail-client/messages/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: global.crypto.randomUUID?.()
+            || Array.from(global.crypto.getRandomValues(new Uint32Array(4)), value => value.toString(36)).join('-'),
+          operations: [{ messageId: message.id, action, value: true }],
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (data.code === 'MAIL_CLIENT_WRITE_DISABLED') throw new Error('이 환경에서는 메일 상태를 변경할 수 없어.');
+      if (data.results?.[0]?.state !== 'confirmed') throw new Error('메일 상태를 바꾸지 못했어');
+      state.showToast(done);
+    } catch (error) {
+      state.showToast(error.message);
+    }
+  }
+
+  async function openInMailbox(item) {
+    try {
+      const message = await workspaceMessage(item);
+      if (!await global.HomeDashboard?.openMailWorkspace?.(() => true, { view: 'overview', message })) {
+        state.showToast('메일함을 열지 못했어');
+      }
+    } catch (error) {
+      state.showToast(error.message);
+    }
+  }
+
   function makeMailAction(label, onClick) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -270,6 +378,10 @@
     }
     body.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
+    await loadBody(item, body);
+  }
+
+  async function loadBody(item, body) {
     if (body.dataset.loaded === 'true' || body.dataset.loading === 'true') return;
 
     body.dataset.loading = 'true';
@@ -533,13 +645,13 @@
         sender.textContent = item.sender || '보낸사람 없음';
         const subject = document.createElement('span');
         subject.textContent = item.title || '(제목 없음)';
-        const source = document.createElement('small');
-        source.textContent = providerLabel(item.provider);
-        select.append(sender, subject, source);
+        const meta = document.createElement('small');
+        meta.textContent = mailMeta(item);
+        select.append(sender, subject, meta);
         select.addEventListener('click', () => {
           list.querySelector('.active')?.classList.remove('active');
           row.classList.add('active');
-          detail.replaceChildren(makeMailCard(item));
+          detail.replaceChildren(makeMailDetail(item));
         });
         const actions = document.createElement('div');
         actions.className = 'home-mail-workspace-actions';
