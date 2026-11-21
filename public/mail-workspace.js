@@ -269,7 +269,7 @@
       if (scope.role) {
         for (const [provider, name] of [['', '전체'], ...Object.entries(providers)]) {
           const account = accounts.find(item => item.provider === provider);
-          const target = (!provider || account) ? mailboxFor(scope.role, account) : null;
+          const target = account ? mailboxFor(scope.role, account) : null;
           const canOpen = (scope.role === 'inbox' && !provider) || target;
           const active = !provider ? !scope.account : account != null && scope.account?.id === account.id;
           const chip = button('mw-chip', name, canOpen && !writing && !loading ? () => {

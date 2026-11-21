@@ -408,6 +408,7 @@ test('list variants keep the designed actions and surface only verified failures
   await ui.press('임시보관함', '.mw-sidebar button');
   await ui.waitFor(ui.text('초안 1개'));
   assert.equal(await ui.evaluate('document.querySelector(".mw-actions").textContent'), '휴지통');
+  assert.equal(await ui.evaluate('document.querySelector(".mw-chips button").disabled'), true);
   assert.equal(await ui.evaluate(ui.text('받는 사람 · 최유진 교수')), true);
   await ui.capture('desktop-drafts.png');
 
