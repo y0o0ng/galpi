@@ -98,7 +98,7 @@
       let fetchingFile = false;
       let threadOpen = false;
       let recipientsOpen = false;
-      let showRemoteImages = false;
+      let showRemoteImages = true;
       const go = step => {
         const next = index + step;
         if (list[next]?.id) detail(list[next], list, next, folderScope);
@@ -277,7 +277,8 @@
         let rich;
         try { rich = prepareMailHtml(current.body?.html); } catch { /* Keep the plain-text rendering available. */ }
         const blockedImages = rich ? rich.images.filter(image => image.remote).length : current.body?.blockedRemoteImages;
-        if (blockedImages && !showRemoteImages) {
+        // Text-only bodies cannot show remote images, so the notice stays even when images are shown by default.
+        if (blockedImages && (!showRemoteImages || !rich)) {
           const images = node('div', 'mw-remote-images');
           images.append(icon('external-image', 18), node('span', '',
             '외부 이미지 ' + blockedImages + '개를 차단했어.'), node('span', 'mw-spacer'),

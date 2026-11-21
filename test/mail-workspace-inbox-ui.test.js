@@ -789,9 +789,10 @@ test('HTML mail shows styled tables and CID images, and loads only approved remo
   await ui.waitFor(`${inside('#cid-image')}?.naturalWidth === 1`);
   assert.equal(await ui.evaluate(`${inside('#mail-cell')}.ownerDocument.defaultView.getComputedStyle(${inside('#mail-cell')}).color`), 'rgb(52, 117, 78)');
   assert.equal(await ui.evaluate(`${inside('#mail-cell')}.ownerDocument.defaultView.getComputedStyle(${inside('#mail-cell')}).backgroundColor`), 'rgb(236, 239, 241)');
-  assert.equal(await ui.evaluate(`${inside('#remote-image')}.hasAttribute('src')`), false);
-  assert.deepEqual(remoteRequests, []);
-  assert.ok(await ui.evaluate(ui.text('외부 이미지 1개를 차단했어.')));
+  // Remote images load by default, without a referrer and without the blocked-image notice.
+  await ui.waitFor(`${inside('#remote-image')}?.naturalWidth === 1`);
+  assert.deepEqual(remoteRequests, [{ path: '/pixel', referrer: undefined }]);
+  assert.equal(await ui.evaluate(ui.text('외부 이미지 1개를 차단했어.')), false);
   assert.equal(await ui.evaluate(`Boolean(${frame}.contentWindow.mailExecuted || window.mailExecuted)`), false);
   assert.equal(await ui.evaluate(`Boolean(${inside('script, iframe, link, [onload], [srcset]')})`), false);
   assert.equal(await ui.evaluate(`${inside('#bad-link')}.hasAttribute('href')`), false);
@@ -806,20 +807,14 @@ test('HTML mail shows styled tables and CID images, and loads only approved remo
   assert.equal(navigation.url, '/clicked');
   assert.equal(navigation.headers.referer, undefined);
   assert.equal(await ui.evaluate('location.origin'), app.url);
-  await ui.press('이미지 표시');
-  await ui.waitFor(`${inside('#remote-image')}?.naturalWidth === 1`);
-  assert.deepEqual(remoteRequests.filter(request => !['/clicked', '/favicon.ico'].includes(request.path)),
-    [{ path: '/pixel', referrer: undefined }]);
   await ui.metrics(390, 844);
   await ui.waitFor(`${inside('#mail-cell')}?.ownerDocument.defaultView.getComputedStyle(${inside('#mail-cell')}).fontSize === '18px'`);
   assert.equal(await ui.evaluate(`${frame}.getBoundingClientRect().width <= 390 && ${frame}.getBoundingClientRect().height > 30`), true);
   await ui.metrics(1440, 900);
   await ui.press('목록', '.mw-detail-toolbar button');
-  const before = remoteRequests.filter(request => request.path === '/pixel').length;
   await open();
   await ui.waitFor(`${inside('#cid-image')}?.naturalWidth === 1`);
-  assert.equal(await ui.evaluate(`${inside('#remote-image')}.hasAttribute('src')`), false);
-  assert.equal(remoteRequests.filter(request => request.path === '/pixel').length, before);
+  await ui.waitFor(`${inside('#remote-image')}?.naturalWidth === 1`);
   await ui.press('답장', '.mw-detail-toolbar button');
   await ui.waitFor(ui.shown('.mw-quote summary'));
   await ui.click('.mw-quote summary');
