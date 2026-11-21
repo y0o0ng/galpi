@@ -4812,6 +4812,12 @@ app.get('/api/config', (req, res) => {
     tasksEnabled: ASSISTANT_TASKS_ENABLED,
     taskSeriesEnabled: ASSISTANT_TASK_SERIES_ENABLED,
     mailReplyEnabled: Boolean(mailReplyService),
+    mailClient: {
+      enabled: MAIL_CLIENT_ENABLED,
+      writeEnabled: MAIL_CLIENT_WRITE_ENABLED,
+      sendEnabled: MAIL_CLIENT_SEND_ENABLED,
+      smartEnabled: MAIL_CLIENT_SMART_ENABLED,
+    },
     halfDuplexVoice: voiceTts.publicConfig(),
     shortcutVoice: voiceShortcut.publicConfig(),
     attachments: attachmentUploads.publicConfig(),

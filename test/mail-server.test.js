@@ -135,6 +135,9 @@ test('Mail Client uses the existing HTTP authentication and runs independently f
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.deepEqual(body, { success: true, accounts: [] });
+  assert.deepEqual((await api(url, '/api/config')).body.mailClient, {
+    enabled: true, writeEnabled: false, sendEnabled: false, smartEnabled: false,
+  });
   assert.equal((await api(url, '/api/mail-client/inbox?limit=100')).response.status, 400);
   assert.equal((await api(url, '/api/mail/status')).body.code, 'MAIL_AGENT_DISABLED');
   assert.equal(logs.join('').includes('Provider 동기화 worker'), false);
@@ -209,6 +212,9 @@ test('Workspace smart endpoints default off, require read enablement and authent
   const parentOff = await startServer(t, false, false, false, true);
   const enabled = await startServer(t, false, true, false, true);
   const smartPath = '/api/mail-client/smart';
+  assert.deepEqual((await api(enabled.url, '/api/config')).body.mailClient, {
+    enabled: true, writeEnabled: false, sendEnabled: false, smartEnabled: true,
+  });
   for (const server of [defaultOff, parentOff]) {
     const { body, response } = await api(server.url, smartPath + '/messages?filter=unclassified');
     assert.equal(response.status, 503);

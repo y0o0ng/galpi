@@ -445,8 +445,14 @@
     });
     if (!list.childElementCount) list.append(node('p', 'home-card-empty', `분석 대기 ${analysis.pending || 0} · 완료 ${analysis.done || 0}`));
     body.append(summary, list);
+    if (state.mailWorkspace) {
+      const open = node('button', 'home-mail-workspace-link', '메일함 열기');
+      open.type = 'button';
+      open.addEventListener('click', event => { event.stopPropagation(); openMail(); });
+      body.append(open);
+    }
     if (state.focusedCard === 'mail') body.append(node('div', 'home-focus-extra'));
-    return card('mail', '메일', '', body);
+    return card('mail', '메일', '', body, { focusable: !state.mailWorkspace });
   }
 
   function renderNotifications() {
@@ -775,8 +781,8 @@
     global.TaskPanel?.render(host, options);
   }
 
-  function setHomeView(view) {
-    state.homeView = view === 'agents' ? 'agents' : 'overview';
+  function setHomeView(view, { attentionId } = {}) {
+    state.homeView = view === 'mail' && state.mailWorkspace ? 'mail' : view === 'agents' ? 'agents' : 'overview';
     if (state.homeView !== 'overview') {
       document.getElementById('home-grid').style.paddingBottom = '';
     }
@@ -787,18 +793,27 @@
     });
     const overview = document.getElementById('home-overview');
     const agents = document.getElementById('home-agents');
+    const workspace = document.getElementById('mail-workspace');
+    const inMail = state.homeView === 'mail';
+    document.getElementById('home-page').dataset.homeSurface = state.homeView;
+    if (workspace) workspace.hidden = !inMail;
     overview.hidden = state.homeView !== 'overview';
     agents.hidden = state.homeView !== 'agents';
     overview.classList.toggle('active', state.homeView === 'overview');
     agents.classList.toggle('active', state.homeView === 'agents');
-    if (state.homeView === 'agents') global.AgentPanel?.show();
-    else renderOverview();
+    if (inMail) state.mailWorkspace.show(attentionId);
+    else {
+      state.mailWorkspace?.hide();
+      if (state.homeView === 'agents') global.AgentPanel?.show();
+      else renderOverview();
+    }
   }
 
-  function setRoute(route, homeView) {
+  function setRoute(route, homeView, homeOptions) {
     if (!['home', 'chat', 'notes', 'settings'].includes(route)) route = 'home';
     if (route !== 'home') {
       document.getElementById('home-grid').style.paddingBottom = '';
+      state.mailWorkspace?.hide();
     }
     state.route = route;
     document.body.dataset.productRoute = route;
@@ -808,7 +823,11 @@
     if (route !== 'home') parkSharedPanels();
     if (route === 'chat') global.PaperPanel?.setTab('notes');
     if (route === 'notes') global.LectureNotes?.show();
-    if (route === 'home') setHomeView(homeView || state.homeView);
+    if (route === 'home') setHomeView(homeView || state.homeView, homeOptions);
+  }
+
+  function openMail(attentionId) {
+    if (state.mailWorkspace) setRoute('home', 'mail', { attentionId });
   }
 
   function storedLocation() {
@@ -910,14 +929,24 @@
     }
   }
 
-  function init({ apiFetch, showToast, weatherEnabled = false }) {
+  function init({ apiFetch, showToast, weatherEnabled = false, mailClientConfig = null }) {
     if (state.initialized) return;
     state.apiFetch = apiFetch;
     state.showToast = showToast;
     state.weatherEnabled = weatherEnabled;
+    if (mailClientConfig?.enabled === true && global.MailWorkspace) {
+      state.mailWorkspace = global.MailWorkspace.create({
+        mount: document.getElementById('mail-workspace'), apiFetch, config: mailClientConfig,
+        onExit: () => {
+          setHomeView('overview');
+          document.querySelector('.home-mail-workspace-link')?.focus();
+        },
+      });
+    }
     document.querySelectorAll('[data-product-route]').forEach(button => button.addEventListener('click', () => {
       if (button.dataset.homeCardTarget === 'notifications') openNotifications();
-      else setRoute(button.dataset.productRoute, button.dataset.homeViewTarget);
+      else setRoute(button.dataset.productRoute, button.dataset.homeViewTarget
+        || (state.route === 'home' && state.homeView === 'mail' && button.dataset.productRoute === 'home' ? 'overview' : undefined));
     }));
     document.querySelectorAll('[data-home-view]').forEach(button => button.addEventListener('click', () => setHomeView(button.dataset.homeView)));
     document.querySelectorAll('.shell-theme-button').forEach(button => button.addEventListener('click', () => document.getElementById('theme-toggle')?.click()));
@@ -932,7 +961,8 @@
       if (!event.matches) document.getElementById('home-grid').style.paddingBottom = '';
     });
     homePage.addEventListener('click', event => {
-      if (state.focusedCard && !event.target.closest('.home-card.focused') && !event.target.closest('#home-focus-collapse')) collapseFocus();
+      if (state.homeView === 'overview' && state.focusedCard
+        && !event.target.closest('.home-card.focused') && !event.target.closest('#home-focus-collapse')) collapseFocus();
     });
     state.initialized = true;
     updateClock();
@@ -941,5 +971,5 @@
     void refresh();
   }
 
-  global.HomeDashboard = { init, refresh, setRoute, setHomeView, setFocusedCard, openNotifications, openTasks, handleInitialUrl, notificationResolved };
+  global.HomeDashboard = { init, refresh, setRoute, setHomeView, setFocusedCard, openMail, openNotifications, openTasks, handleInitialUrl, notificationResolved };
 })(window);
