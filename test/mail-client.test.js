@@ -11,6 +11,8 @@ const { createImapMailClient } = require('../lib/mail/client-imap');
 const { createMailClient } = require('../lib/mail/client');
 
 const NOW = Date.parse('2026-11-21T12:00:00Z') / 1000;
+const DAY = 86400;
+const PRIOR_WINDOW_END = (Math.floor(NOW / DAY) + 1) * DAY - 7 * DAY;
 const SENT = new Date('2026-11-20T23:00:00Z');
 const SOURCE_BODY = 'abcdefg'.repeat(2700) + 'end-of-full-body';
 const FILE_CONTENT = 'never-store-attachment';
@@ -64,6 +66,7 @@ function fakeGmail() {
     gmailMessage('g-older', NOW - 86400 * 8, ['INBOX']),
   ];
   let unavailable = false;
+  let unavailableWindowEnd = null;
   let emailAddress = 'test@gmail.com';
   let tokenFetches = 0;
   async function fetch(url, init) {
@@ -87,6 +90,7 @@ function fakeGmail() {
       const query = parsed.searchParams.get('q') || '';
       const after = Number(query.match(/after:(\d+)/)?.[1] ?? -1);
       const before = Number(query.match(/before:(\d+)/)?.[1] ?? Infinity);
+      if (after >= 0 && before === unavailableWindowEnd) return Response.json({}, { status: 503 });
       const label = parsed.searchParams.get('labelIds');
       const found = mail.filter(row => (!label || row.labelIds.includes(label))
         && Number(row.internalDate) / 1000 > after && Number(row.internalDate) / 1000 < before);
@@ -108,7 +112,9 @@ function fakeGmail() {
     legacy: createGmailProvider({ tokenSource: tokens, fetch }),
     calls,
     tokenFetches: () => tokenFetches,
+    setMessages(messages) { mail.splice(0, mail.length, ...messages); },
     setUnavailable(value) { unavailable = value; },
+    setUnavailableWindow(end) { unavailableWindowEnd = end; },
     setEmailAddress(value) { emailAddress = value; },
   };
 }
@@ -272,6 +278,45 @@ test('Gmail labels and All Mail cover archived messages with a shared read token
   assert.equal(f.db.prepare('SELECT count(*) n FROM mail_attention').get().n, 0);
 });
 
+test('Gmail STARRED and IMPORTANT are independent in list and detail metadata', async t => {
+  const f = fixture(t);
+  const account = f.addAccount('gmail', 'test@gmail.com');
+  const labels = [['STARRED'], ['IMPORTANT'], ['STARRED', 'IMPORTANT'], []];
+  const originals = labels.map((entry, i) => gmailMessage('marks-' + i, NOW - i, entry));
+  f.gmail.setMessages(originals);
+  const page = await f.service.mailbox(account, 'all', null, 20);
+  const marks = ({ starred, important }) => [starred, important];
+  const expected = [[true, false], [false, true], [true, true], [false, false]];
+  assert.deepEqual(page.messages.map(marks), expected);
+  const details = await Promise.all(page.messages.map(message => f.service.detail(message.id)));
+  assert.deepEqual(details.map(marks), expected);
+  originals[0].labelIds = ['IMPORTANT'];
+  assert.deepEqual(marks(await f.service.detail(page.messages[0].id)), [false, true]);
+});
+
+test('stale pages from the previous metadata contract still separate manual stars from importance', async t => {
+  const f = fixture(t);
+  const gmail = f.addAccount('gmail', 'test@gmail.com');
+  const works = f.addAccount('works', 'test@school.example.com');
+  f.gmail.setMessages([gmailMessage('legacy-star', NOW, ['STARRED'])]);
+  await f.service.mailbox(gmail, 'all', null, 20);
+  await f.service.mailbox(works, 'folder:Received', null, 20);
+  f.db.prepare("UPDATE mail_client_cache SET observation_json = json_remove(observation_json, '$.rows[0].metadata.starred')").run();
+  f.db.prepare(`
+    UPDATE mail_client_cache
+    SET observation_json = json_set(observation_json, '$.rows[0].metadata.important', json('true'))
+    WHERE account_id = ? AND cache_key LIKE 'page:%'
+  `).run(works);
+  f.gmail.setUnavailable(true);
+  f.imap.works.unavailable = true;
+  const gmailPage = await f.service.mailbox(gmail, 'all', null, 20);
+  const worksPage = await f.service.mailbox(works, 'folder:Received', null, 20);
+  assert.equal(gmailPage.source.status, 'stale');
+  assert.equal(worksPage.source.status, 'stale');
+  assert.deepEqual(gmailPage.messages.map(({ starred, important }) => [starred, important]), [[true, false]]);
+  assert.deepEqual(worksPage.messages.map(({ starred, important }) => [starred, important]), [[true, null]]);
+});
+
 test('Naver and Works list real folders and paginate by UID in read-only mailboxes', async t => {
   const f = fixture(t);
   const naver = f.addAccount('naver', 'test@naver.com');
@@ -293,11 +338,19 @@ test('Naver and Works list real folders and paginate by UID in read-only mailbox
   f.imap.naver.rows.INBOX.push(imapMessage(20, NOW - 30));
   const inboxCopy = (await f.service.mailbox(naver, 'folder:INBOX', null, 5)).messages.find(row => row.receivedAt === NOW - 30);
   assert.notEqual(inboxCopy.id, p1.messages[0].id);
-  assert.equal((await f.service.detail(p1.messages[0].id)).read, false);
+  assert.equal(p1.messages[0].starred, false);
+  assert.equal(p1.messages[0].important, null);
+  const naverDetail = await f.service.detail(p1.messages[0].id);
+  assert.equal(naverDetail.read, false);
+  assert.equal(naverDetail.starred, false);
   assert.equal(f.imap.naver.rows['Projects/2026'][1].flags.has('\\Seen'), false);
   const worksPage = await f.service.mailbox(works, 'folder:Received', null, 1);
-  assert.equal(worksPage.messages[0].important, true);
-  assert.equal((await f.service.detail(worksPage.messages[0].id)).body.text.trim(), SOURCE_BODY);
+  assert.equal(worksPage.messages[0].starred, true);
+  assert.equal(worksPage.messages[0].important, null);
+  const worksDetail = await f.service.detail(worksPage.messages[0].id);
+  assert.equal(worksDetail.starred, true);
+  assert.equal(worksDetail.important, null);
+  assert.equal(worksDetail.body.text.trim(), SOURCE_BODY);
   await assert.rejects(f.service.mailbox(naver, 'folder:Sent', null, 1), { code: 'MAIL_CLIENT_MAILBOX_NOT_FOUND' });
 });
 
@@ -336,6 +389,98 @@ test('unified inbox sorts by receive time across providers and replays stable cu
   assert.deepEqual(found.map(row => row.accountId), [naver, gmail, works, naver, gmail]);
   assert.equal(new Set(found.map(row => row.id)).size, found.length);
   assert.deepEqual(found.map(row => row.receivedAt), [NOW - 2, NOW - 5, NOW - 5, NOW - 10, NOW - 8 * 86400]);
+});
+
+test('unified inbox fills a page across a UTC window boundary and returns only the remaining messages', async t => {
+  const f = fixture(t);
+  const gmail = f.addAccount('gmail', 'test@gmail.com');
+  const works = f.addAccount('works', 'test@school.example.com');
+  const gmailRows = [
+    gmailMessage('recent', NOW - 1, ['INBOX']),
+    ...Array.from({ length: 28 }, (_, i) => gmailMessage('older-' + i, PRIOR_WINDOW_END - 3 - i, ['INBOX'])),
+  ];
+  f.gmail.setMessages([...gmailRows, gmailRows[1]]);
+  f.imap.works.rows.Received = [
+    imapMessage(4, PRIOR_WINDOW_END),
+    imapMessage(3, PRIOR_WINDOW_END - 1),
+    imapMessage(2, PRIOR_WINDOW_END - 2),
+  ];
+  const first = await f.service.inbox(null, 20);
+  assert.equal(first.messages.length, 20);
+  assert.deepEqual(first.messages.slice(0, 5).map(row => row.accountId), [gmail, works, works, works, gmail]);
+  assert.ok(first.nextCursor);
+  const next = await f.service.inbox(first.nextCursor, 20);
+  assert.deepEqual(await f.service.inbox(first.nextCursor, 20), next);
+  assert.equal(next.messages.length, 12);
+  assert.equal(next.nextCursor, null);
+  const all = [...first.messages, ...next.messages];
+  assert.equal(new Set(all.map(row => row.id)).size, 32);
+  assert.deepEqual(all.map(row => row.receivedAt), [
+    NOW - 1, PRIOR_WINDOW_END, PRIOR_WINDOW_END - 1, PRIOR_WINDOW_END - 2,
+    ...Array.from({ length: 28 }, (_, i) => PRIOR_WINDOW_END - 3 - i),
+  ]);
+});
+
+test('unified inbox stops after three windows and resumes across empty windows on the same cursor contract', async t => {
+  const f = fixture(t);
+  f.addAccount('gmail', 'test@gmail.com');
+  f.gmail.setMessages([
+    gmailMessage('recent-a', NOW, ['INBOX']),
+    gmailMessage('recent-b', NOW - 1, ['INBOX']),
+    gmailMessage('far-past', NOW - 35 * DAY, ['INBOX']),
+  ]);
+  const countWindows = () => f.gmail.calls.filter(({ endpoint, query }) => endpoint === '/messages'
+    && query.get('q')?.startsWith('after:')).length;
+  const page = await f.service.inbox(null, 20);
+  assert.deepEqual(page.messages.map(row => row.providerMessageId), ['recent-a', 'recent-b']);
+  assert.equal(countWindows(), 3);
+  assert.ok(page.nextCursor);
+  const next = await f.service.inbox(page.nextCursor, 20);
+  assert.deepEqual(next.messages.map(row => row.providerMessageId), ['far-past']);
+  assert.equal(next.nextCursor, null);
+  assert.equal(countWindows(), 6);
+  assert.deepEqual(await f.service.inbox(page.nextCursor, 20), next);
+  assert.equal(countWindows(), 6);
+  f.advance(600);
+  await assert.rejects(f.service.inbox(page.nextCursor, 20), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
+});
+
+test('unified inbox retains each range observation when one account contributes fresh and stale rows', async t => {
+  const f = fixture(t);
+  f.addAccount('gmail', 'test@gmail.com');
+  f.gmail.setMessages([
+    gmailMessage('newer', NOW, ['INBOX']),
+    gmailMessage('older', PRIOR_WINDOW_END - 1, ['INBOX']),
+  ]);
+  const live = await f.service.inbox(null, 20);
+  assert.equal(live.messages.length, 2);
+  assert.equal(live.nextCursor, null);
+  f.advance(45);
+  f.gmail.setUnavailableWindow(PRIOR_WINDOW_END);
+  const mixed = await f.service.inbox(null, 20);
+  assert.equal(mixed.incomplete, true);
+  assert.equal(mixed.sources[0].status, 'stale');
+  assert.deepEqual(mixed.messages.map(row => [row.providerMessageId, row.stale, row.fetchedAt]), [
+    ['newer', false, NOW + 45],
+    ['older', true, NOW],
+  ]);
+});
+
+test('a later window failure preserves earlier rows from that account and older rows from healthy accounts', async t => {
+  const f = fixture(t);
+  const gmail = f.addAccount('gmail', 'test@gmail.com');
+  const works = f.addAccount('works', 'test@school.example.com');
+  f.gmail.setMessages([
+    gmailMessage('visible', NOW, ['INBOX']),
+    gmailMessage('unavailable', PRIOR_WINDOW_END - 1, ['INBOX']),
+  ]);
+  f.imap.works.rows.Received = [imapMessage(3, PRIOR_WINDOW_END - 2)];
+  f.gmail.setUnavailableWindow(PRIOR_WINDOW_END);
+  const page = await f.service.inbox(null, 20);
+  assert.deepEqual(page.messages.map(row => row.accountId), [gmail, works]);
+  assert.deepEqual(page.sources.map(source => source.status), ['unavailable', 'fresh']);
+  assert.equal(page.incomplete, true);
+  assert.equal(page.nextCursor, null);
 });
 
 test('an unavailable account leaves healthy inbox rows and reports old cached metadata with an observation time', async t => {

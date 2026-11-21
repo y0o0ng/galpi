@@ -9,7 +9,8 @@ Mail Workspace의 화면 정본은 [galpi-home-design의 Mail Workspace](https:/
 ## 제공자
 
 - Gmail은 Agent 읽기 경로와 동일한 OAuth 토큰 인스턴스와 MAIL-1 자격증명을 사용한다. Workspace는 Gmail REST의 `labels.list`와 `messages.list/get`를 GET으로 호출한다. `kind=label`과 `kind=all`을 구분한다. 전체 메일은 Gmail의 All Mail 범위로 조회하고 스팸·휴지통은 해당 라벨에서 조회한다. 메시지 ID와 thread ID를 보존한다. 목록에는 선택된 MIME 트리 메타데이터만 요청하고 깊이 제한 아래에서 첨부 유무를 확정할 수 없으면 `null`을 반환한다. [Gmail 목록](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list) · [Gmail 메시지 조회](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/get)
-- Naver·NAVER WORKS는 기존 TLS·앱 비밀번호 설정을 공유한다. LIST에서 반환된 경로·구분자·Special-Use·선택 가능 여부를 사용한다. 실제 INBOX는 서버가 반환한 inbox 경로로 찾는다. 폴더 페이지는 첫 요청의 UID 상한과 마지막 UID 경계를 기준으로 진행한다. 폴더 선택은 항상 read-only이고 원문에는 `BODY.PEEK`를 사용한다. `\Seen`과 `\Flagged`의 관측값을 각각 `read`와 `important`로 돌려준다. [ImapFlow API](https://imapflow.com/docs/api/imapflow-client/)
+- Naver·NAVER WORKS는 기존 TLS·앱 비밀번호 설정을 공유한다. LIST에서 반환된 경로·구분자·Special-Use·선택 가능 여부를 사용한다. 실제 INBOX는 서버가 반환한 inbox 경로로 찾는다. 폴더 페이지는 첫 요청의 UID 상한과 마지막 UID 경계를 기준으로 진행한다. 폴더 선택은 항상 read-only이고 원문에는 `BODY.PEEK`를 사용한다. [ImapFlow API](https://imapflow.com/docs/api/imapflow-client/)
+- 목록과 상세에서 `starred`는 Gmail `STARRED` 또는 IMAP `\Flagged`다. `important`는 Gmail `IMPORTANT`를 별도로 보존하며 IMAP에서는 `null`이다. Agent의 AI 분류는 별도 데이터다. 이전 v45 캐시의 별표는 저장된 Gmail 라벨이나 IMAP의 이전 `important` 필드에서 복원한다.
 - 제공자별 자격증명 하나를 유지한다. Gmail 프로필 또는 IMAP 로그인 계정이 저장된 계정 주소와 일치할 때만 새 관측을 읽는다.
 
 ## 위치 검증과 저장
@@ -24,7 +25,7 @@ Agent 메시지·Attention 링크는 계정과 Agent identity, 해당 제공자 
 
 통합 목록은 동일한 UTC 수신 시각 창에 대해 계정별 받은편지함을 병렬 조회한다. 완료한 창의 메시지는 수신 시각 내림차순으로 정렬하고, 동률은 계정 ID와 제공자 위치로 고정한다. UID 할당 순서와 수신 날짜가 다른 IMAP 메일도 같은 시각 정렬을 적용한다. 기본 7일 창에 계정별 후보가 200건을 넘으면 채우기 전에 창을 양분한다. 같은 1초에 모인 메일은 동률 정렬을 위해 그 범위 전체를 조회한다. 과거 창으로 이동할 때 제공자의 날짜 검색은 ID와 날짜만 조사하며 메타데이터는 요청 범위 안에서 읽는다.
 
-커서는 서버에서 발급하는 불투명 토큰으로 10분 동안 유지한다. 같은 커서 재시도에는 같은 페이지를 반환하며, 재시작·만료 후 첫 페이지에서 다시 시작한다. 3개 빈 창을 지난 요청은 후속 커서를 반환할 수 있다. 사용 가능한 계정의 결과를 계속 제공하고 계정별 `fresh`·`stale`·`unavailable`과 `incomplete`를 명시한다. 범위를 제공하지 못한 계정은 현재 탐색에서 제외하고 새 첫 페이지에서 다시 시도한다. 새 메일 유입이나 제공자 삭제에 따라 아직 읽지 않은 날짜 창의 관측은 달라질 수 있다.
+커서는 서버에서 발급하는 불투명 토큰으로 10분 동안 유지한다. 같은 커서 재시도에는 같은 페이지를 반환하며, 재시작·만료 후 첫 페이지에서 다시 시작한다. 요청한 개수에 도달하거나 과거 메일이 끝날 때까지 날짜 창을 이어 읽는다. 한 요청에서 새 창은 최대 3개 읽으며, 더 탐색해야 하면 후속 커서를 반환한다. 계정별 `fresh`·`stale`·`unavailable`과 `incomplete`를 명시한다. 한 페이지에 여러 창의 결과가 들어와도 행마다 해당 관측 시각과 캐시 상태를 유지한다. 범위를 제공하지 못한 계정은 후속 탐색에서 제외하되 이미 조회한 메시지는 보존한다. 새 첫 페이지에서 해당 계정을 다시 시도한다. 새 메일 유입이나 제공자 삭제에 따라 아직 읽지 않은 날짜 창의 관측은 달라질 수 있다.
 
 ## 상세와 첨부
 
