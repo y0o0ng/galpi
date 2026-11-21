@@ -77,3 +77,40 @@ IMAP은 같은 쓰기 잠금으로 메일함·UID·UIDVALIDITY와 Phase 1의 검
 상세 GET과 Overview 미리보기는 계속 조회 전용이다. 향후 UI가 본문 표시를 마친 뒤 `origin=auto`로 읽음을 요청할 수 있다. 사용자가 명시적으로 설정한 안 읽음은 `mail_client_read_overrides`에 남고 재시작 후에도 적용된다. 예외에 따라 자동 읽음을 건너뛰면 `confirmed`와 `MAIL_CLIENT_MANUAL_UNREAD_PRESERVED`를 반환한다. 직접 읽음으로 확인되면 해당 메시지의 보호를 해제한다. IMAP MOVE에서 COPYUID가 있으면 도착 UID에 보호를 이어간다. MOVE 결과나 매핑이 불명확하면 도착 폴더에서 원문 해시가 일치하는 메시지의 자동 읽음을 보수적으로 막는다. 이 보호는 대상을 쓰기로 선택하는 근거로 사용하지 않는다.
 
 확인된 변경은 해당 계정의 목록 관측 캐시를 무효화한다. 이미 발급한 Workspace 페이지 커서는 새 첫 페이지부터 시작하도록 만료시키고, 동시에 진행 중이던 이전 조회가 오래된 관측을 복구하지 못하게 한다. Agent의 동기화·분석·Attention·Push 및 기존 답장 발송은 기존 API 계약을 유지한다.
+
+## Backend Phase 3
+
+Workspace 작성은 인증된 내부 API에서만 사용한다. `MAIL_CLIENT_ENABLED=true`가 필요하며 초안 저장과 임시 업로드는 `MAIL_CLIENT_WRITE_ENABLED=true`를 요구한다. 발송은 거기에 `MAIL_CLIENT_SEND_ENABLED=true`와 명시적 POST 요청이 필요하다. 발송 플래그 기본값은 `false`다. 모든 응답은 `Cache-Control: no-store`다. 화면, 시온의 지시형 답장, Mail Agent 분석 큐와 알림은 각자의 기존 경로를 사용한다.
+
+### 작성과 첨부
+
+- 발신 주소는 연결 계정에서 정한다. Gmail은 Phase 2와 같은 `MAIL_GMAIL_MODIFY_REFRESH_TOKEN` 발급기를 사용하며 실제 Gmail 프로필을 확인한다. Naver와 NAVER WORKS는 등록 계정과 기존 앱 비밀번호의 인증 주소를 대조하고 TLS SMTP 465로 보낸다. [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes) · [Naver SMTP](https://help.naver.com/service/30029/contents/21341) · [NAVER WORKS IMAP/SMTP](https://help.worksmobile.com/en/use-guides/mail/settings/pop3-imap-smtp/)
+- `compose`는 `kind`(`new`, `reply`, `reply_all`, `forward`), 문자열 `text`, 선택적 `html`·`subject`·`to`·`cc`·`bcc`·`attachments`를 받는다. 수신자는 이메일 주소 배열이다. 답장·전체 답장·전달에는 같은 계정의 Phase 1 상세 ID인 `originalId`가 필요하다. 답장은 검증한 원본의 Reply-To 또는 From으로, 전체 답장은 여기에 원본 To·CC를 합쳐 계산한다. 답장 요청의 To·CC는 생략하고 발신 계정 자신과 중복 주소는 서버에서 제거한다. 명시한 BCC만 발송에 사용한다. SMTP에서는 BCC를 수신 봉투에만 넣는다. Gmail은 BCC가 포함된 MIME을 받아 수신자에게 사본을 배분한다.
+- 답장은 원본 Message-ID를 `In-Reply-To`와 `References`에 연결하고 `Re:`를 붙인다. 전달은 `Fwd:`와 원본 발신·날짜·제목·수신 정보 및 평문을 인용한다. 원본의 첨부는 각각 검증된 참조가 필요하다. 보관된 초안을 다시 열어 본문 전체를 편집할 때는 `kind: "new"`와 관측한 초안 버전을 써서 기존 답장 스레드와 인용된 본문을 보존할 수 있다.
+- 임시 업로드는 계정별 일회용 핸들이다. 15분 동안 프로세스 메모리에 두고 사용·만료·재시작 시 정리한다. `{ kind: "upload", id }`로 전송한다. 조회한 원본·초안 첨부는 각각 `{ kind: "original" | "draft", index, proof }`로 참조한다. 원문 해시와 첨부 순서·바이트의 증명을 대조하므로 원본이나 파일이 달라지면 저장·발송을 중단한다. 첨부 원본은 제공자에서 필요할 때 읽는다.
+- 첨부는 최대 30개, 합계 18 MiB, 인코딩한 최종 MIME은 최대 25 MiB다. 더 낮은 제공자 제한이 확인되면 413을 반환한다. 작성 데이터와 첨부 바이트는 서버에 영구 보관하지 않는다. 초안의 `htmlSource`는 편집용 원문이다. 소비자는 HTML을 화면에 삽입하거나 첨부 내용을 실행하지 않고, 미리보기가 필요하면 별도의 안전한 표시 경계를 적용해야 한다.
+
+### 제공자 초안과 결과
+
+- Gmail은 `drafts.list/get/create/update/send`를 사용한다. `id`는 초안의 안정적인 ID, `messageId`는 현재 내부 메시지 ID다. 초안 버전은 내부 ID와 원문 및 스레드 관측값을 묶는다. 같은 계정과 초안의 Galpi 갱신·발송을 직렬화하고, 쓰기 직전 버전을 다시 대조한다. Gmail에는 원자적 버전 비교와 쓰기가 없어 마지막 확인과 요청 사이의 외부 변경을 완전히 차단할 수 없다. `drafts.send`에는 확인한 내용으로 생성한 MIME을 전달한다. Gmail이 발송과 동시에 초안을 제거하고 SENT를 생성한다. [Gmail draft guide](https://developers.google.com/workspace/gmail/api/guides/drafts)
+- Naver와 NAVER WORKS는 LIST 플래그에서 유일하게 확인된 실제 `\Drafts`에 MIME을 `\Draft`로 APPEND한다. 초안 ID는 계정·폴더·UID·UIDVALIDITY·원문 해시·Galpi 식별자를 묶은 불투명 값이다. APPENDUID의 유효성을 확인한 뒤에도 원문과 식별자를 대조한다. UIDVALIDITY=0이거나 UID 응답이 빠지면 최근 범위에서 원문이 고유하게 일치할 때만 확인으로 기록한다.
+- IMAP 수정은 기존 버전과 네이티브 MOVE 및 실제 `\Trash`를 먼저 검증한다. 새 버전이 확인돼야 기존 버전을 다시 확인하고 UID MOVE로 옮긴다. 새 초안 확인 후 정리 결과가 불명확하면 `unknown`과 새 `draftId`, 별도 `cleanup` 상태를 반환한다. 두 초안이 남아 있을 수 있다. `MOVE`를 제공하지 않으면 수정은 APPEND 전 중단한다.
+- SMTP는 전원 수락과 부분 수락을 `delivery`와 수락·거절 개수로 구분한다. 부분 수락은 `state=sent`, `success=false`다. 전원 수락한 IMAP 초안은 발송을 기록한 뒤 다시 검증해 휴지통으로 이동한다. 정리에 실패해도 영수증은 `sent`다. 부분 수락과 결과 불명인 초안은 남겨 둔다. SMTP 영수증의 `sentCopyStatus=verification_required`는 제공자 설정에 따른 보낸메일함 저장 확인이 필요하다는 뜻이다. Workspace에서 SENT APPEND나 영구 삭제를 수행하지 않는다.
+
+### API와 재시도
+
+| 메서드와 경로 (`/api/mail-client/accounts/:accountId`가 앞에 붙음) | 요청과 결과 |
+| --- | --- |
+| `GET /drafts?limit=…&cursor=…` | 제공자 초안 목록과 다음 커서 |
+| `GET /drafts/:draftId` | 원문 편집값·버전·첨부 참조 |
+| `POST /drafts` | `requestId`, `compose`로 초안 저장 |
+| `PUT /drafts/:draftId` | `requestId`, 관측 `version`, `compose`로 갱신, 버전 충돌은 409 |
+| `POST /uploads?filename=…&contentType=…` | `application/octet-stream` 바이트를 보내 임시 핸들 발급 |
+| `GET /messages/:messageId/attachment-references` | 발송 시 검증에 쓸 원본 첨부 참조 |
+| `POST /send` | `requestId`, `compose`로 즉시 발송 |
+| `POST /drafts/:draftId/send` | `requestId`, 관측 `version`의 제공자 초안을 발송 |
+| `GET /send/:requestId` | 저장된 발송 영수증 |
+
+v47 영수증은 요청 ID·계정·요청 해시·초안 버전/원본 참조·상태·오류 코드·제공자 메시지 ID·시각과 정리/수락 결과만 남긴다. 제공자 쓰기 전 `pending`을 확보한다. 같은 요청은 기존 결과를 반환하고 다른 내용에 같은 ID를 쓰면 409를 반환한다. 같은 초안 버전에 대해 이미 `pending`·`sent`·`unknown` 영수증이 있으면 새 ID로도 발송을 막는다. 재시작 후 남은 `pending`과 응답 유실에 따른 `unknown`은 자동 실행하지 않는다. 초안 저장 결과는 `saved`·`conflict`·`failed`·`unknown`과 처리 중 `pending`을 구분한다. 확인된 저장·발송과 외부 변경 가능성이 있는 결과는 계정 목록 캐시와 Phase 2 페이지 커서를 무효화한다.
+
+실계정 확인은 Gmail OAuth 프로필·초안 교체·스레드·SENT, Naver와 NAVER WORKS의 실제 Drafts/Trash 플래그·UIDVALIDITY·MOVE·APPEND 원문 보존·SMTP BCC·SENT 저장을 각각 포함한다. Phase 3 자동 검증은 모의 제공자만 사용한다.

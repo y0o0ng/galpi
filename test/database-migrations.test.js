@@ -365,6 +365,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 44, name: 'mail_reply_attempts' },
     { version: 45, name: 'mail_client_cache' },
     { version: 46, name: 'mail_client_action_receipts' },
+    { version: 47, name: 'mail_client_compose_receipts' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -384,6 +385,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN (
       'ddays', 'mail_reply_attempts', 'mail_client_cache', 'mail_client_messages',
       'mail_client_action_receipts', 'mail_client_read_overrides',
+      'mail_client_compose_receipts',
       'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
       'memory_general_fact_transitions', 'memory_general_fact_transition_evidence', 'memory_general_fact_reviews'
     ) AND name NOT LIKE 'lecture_%' AND name NOT LIKE 'reels_%' AND name NOT LIKE 'cards_%' ORDER BY name`).all(),
@@ -1104,6 +1106,7 @@ test('schema v42 adds the reels candidate everyday_door column and keeps existin
     { version: 44, name: 'mail_reply_attempts' },
     { version: 45, name: 'mail_client_cache' },
     { version: 46, name: 'mail_client_action_receipts' },
+    { version: 47, name: 'mail_client_compose_receipts' },
   ]);
   assert.deepEqual(runDatabaseMigrations(db).applied, []);
   assert.deepEqual(
@@ -1112,5 +1115,28 @@ test('schema v42 adds the reels candidate everyday_door column and keeps existin
   );
   db.prepare("UPDATE reels_candidates SET everyday_door = '오래 안 쓴 앱이 버벅여요'").run();
   assert.equal(db.prepare('SELECT everyday_door AS q FROM reels_candidates').get().q, '오래 안 쓴 앱이 버벅여요');
+  db.close();
+});
+
+test('schema v47 preserves existing mail receipts and reserves a draft version once', () => {
+  const db = createLegacyDatabase();
+  migrateThrough(db, 46);
+  db.exec(`
+    INSERT INTO mail_reply_attempts (request_id, request_sha256, mail_message_id, account_id, state)
+      VALUES ('reply', 'legacy-reply-hash', 1, 1, 'sent');
+    INSERT INTO mail_client_action_receipts (request_id, message_id, request_sha256, state, provider_code)
+      VALUES ('action', 1, 'legacy-action-hash', 'confirmed', 'MAIL_CLIENT_WRITE_CONFIRMED');
+  `);
+  assert.deepEqual(runDatabaseMigrations(db).applied, [{ version: 47, name: 'mail_client_compose_receipts' }]);
+  assert.equal(db.prepare('SELECT state FROM mail_reply_attempts').get().state, 'sent');
+  assert.equal(db.prepare('SELECT state FROM mail_client_action_receipts').get().state, 'confirmed');
+  const reserve = db.prepare(`
+    INSERT INTO mail_client_compose_receipts
+      (request_id, account_id, operation, request_sha256, draft_id, draft_version, state)
+    VALUES (?, 1, 'send', 'hash', 'draft', 'version', ?)
+  `);
+  reserve.run('attempt-1', 'unknown');
+  assert.throws(() => reserve.run('attempt-2', 'pending'), /UNIQUE/);
+  assert.deepEqual(runDatabaseMigrations(db).applied, []);
   db.close();
 });

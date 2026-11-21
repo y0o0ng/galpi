@@ -73,6 +73,7 @@ async function startServer(t, mailEnabled, clientEnabled = false, writesEnabled 
       MAIL_AGENT_ENABLED: mailEnabled ? 'true' : 'false',
       MAIL_CLIENT_ENABLED: clientEnabled ? 'true' : 'false',
       MAIL_CLIENT_WRITE_ENABLED: writesEnabled ? 'true' : 'false',
+      MAIL_CLIENT_SEND_ENABLED: 'false',
       // 자격증명은 넣지 않는다. 계정이 하나도 없으므로 provider는 호출되지 않는다.
       MAIL_GMAIL_CLIENT_ID: '',
       MAIL_GMAIL_CLIENT_SECRET: '',
@@ -116,7 +117,7 @@ test('the schema lands even while the mail agent stays off', async t => {
   `).all().map(row => row.name);
   assert.deepEqual(tables, [
     'mail_accounts', 'mail_attention', 'mail_client_action_receipts', 'mail_client_cache',
-    'mail_client_messages', 'mail_client_read_overrides', 'mail_messages',
+    'mail_client_compose_receipts', 'mail_client_messages', 'mail_client_read_overrides', 'mail_messages',
     'mail_notification_batches', 'mail_preferences',
     'mail_push_deliveries', 'mail_reply_attempts', 'mail_sync_state',
   ]);
@@ -153,6 +154,15 @@ test('Mail Client actions require both flags and the existing token, and return 
   const readOnly = await startServer(t, false, true, false);
   const writeOnly = await startServer(t, false, false, true);
   const enabled = await startServer(t, false, true, true);
+  const noAuth = await fetch(enabled.url + '/api/mail-client/accounts/1/send', { method: 'POST' });
+  assert.equal(noAuth.status, 401);
+  assert.equal(noAuth.headers.get('cache-control'), 'no-store');
+  const noSend = await fetch(enabled.url + '/api/mail-client/accounts/1/send', {
+    method: 'POST', headers: { 'X-API-Token': API_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestId: 'disabled-send', compose: { kind: 'new', text: 'test' } }),
+  });
+  assert.equal(noSend.status, 503);
+  assert.equal((await noSend.json()).code, 'MAIL_CLIENT_SEND_DISABLED');
   for (const server of [readOnly, writeOnly]) {
     assert.equal((await post(server.url, '/1/actions', { requestId: 'disabled', action: 'trash' })).body.code,
       'MAIL_CLIENT_WRITE_DISABLED');

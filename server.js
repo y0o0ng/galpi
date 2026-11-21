@@ -57,10 +57,13 @@ const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailClient } = require('./lib/mail/client');
 const { createGmailMailClient } = require('./lib/mail/client-gmail');
 const { createImapMailClient } = require('./lib/mail/client-imap');
-const { registerMailClientRoutes, registerMailClientActionRoutes } = require('./lib/mail/client-routes');
+const { registerMailClientRoutes, registerMailClientActionRoutes, registerMailClientComposeRoutes } = require('./lib/mail/client-routes');
 const { createMailClientActions } = require('./lib/mail/client-actions');
 const { createGmailMailWriter } = require('./lib/mail/client-gmail-write');
 const { createImapMailWriter } = require('./lib/mail/client-imap-write');
+const { createMailClientCompose } = require('./lib/mail/client-compose');
+const { createGmailCompose } = require('./lib/mail/client-compose-gmail');
+const { createImapDrafts } = require('./lib/mail/client-compose-imap');
 const { createMailBodyReader } = require('./lib/mail/body');
 const { createMailSearchSession } = require('./lib/mail/search-tool');
 const { createMailPreferenceSession } = require('./lib/mail/preference-tool');
@@ -256,6 +259,7 @@ const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
 const MAIL_REPLY_ENABLED = MAIL_AGENT_ENABLED && process.env.MAIL_REPLY_ENABLED === 'true';
 const MAIL_CLIENT_ENABLED = process.env.MAIL_CLIENT_ENABLED === 'true';
 const MAIL_CLIENT_WRITE_ENABLED = MAIL_CLIENT_ENABLED && process.env.MAIL_CLIENT_WRITE_ENABLED === 'true';
+const MAIL_CLIENT_SEND_ENABLED = MAIL_CLIENT_WRITE_ENABLED && process.env.MAIL_CLIENT_SEND_ENABLED === 'true';
 // News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
 const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
@@ -588,6 +592,10 @@ app.use((_req, res, next) => {
 // 강의 필기는 Document당 JSON 한 벌이고 포스트잇 Q&A는 이미지를 담아 1MB를 넘는다. 그 경로만 인증 뒤
 // 라우트에서 따로 파싱한다.
 const globalJsonParser = express.json({ limit: '1mb' });
+app.use('/api/mail-client', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 app.use((req, res, next) => (isLectureLargeJson(req) ? next() : globalJsonParser(req, res, next)));
 app.use(express.static(path.join(__dirname, 'public')));
 // 강의 노트 뷰어의 PDF 렌더러. 저장소에 사본을 두지 않고 고정 버전 패키지에서 필요한 폴더만 내보낸다.
@@ -944,20 +952,25 @@ const mailClient = MAIL_CLIENT_ENABLED ? (() => {
     providers: { gmail: createGmailMailClient({ tokenSource: gmailReadTokens }), naver: imap, works: imap },
   });
 })() : null;
+const gmailModifyRefreshToken = process.env.MAIL_GMAIL_MODIFY_REFRESH_TOKEN;
+const gmailModifyTokens = MAIL_CLIENT_ENABLED && gmailModifyRefreshToken ? createGoogleTokenSource({
+  credentials: { ...MAIL_GMAIL_CREDENTIALS, refreshToken: gmailModifyRefreshToken },
+  fetch: (url, init) => fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(12_000) }),
+}) : null;
 const mailClientActions = MAIL_CLIENT_WRITE_ENABLED ? (() => {
-  const refreshToken = process.env.MAIL_GMAIL_MODIFY_REFRESH_TOKEN;
   const writer = createImapMailWriter({ credentialsFor: mailCredentialsFor });
-  const gmail = createGmailMailWriter({
-    tokenSource: refreshToken ? createGoogleTokenSource({
-      credentials: { ...MAIL_GMAIL_CREDENTIALS, refreshToken },
-      fetch: (url, init) => fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(12_000) }),
-    }) : null,
-  });
+  const gmail = createGmailMailWriter({ tokenSource: gmailModifyTokens });
   return createMailClientActions({
     db, agentStore: mailStore, providers: { gmail, naver: writer, works: writer },
     onConfirmed: () => mailClient.invalidateCursors(),
   });
 })() : null;
+const mailClientCompose = MAIL_CLIENT_ENABLED ? createMailClientCompose({
+  db, agentStore: mailStore, mailClient,
+  gmail: createGmailCompose({ tokenSource: gmailModifyTokens }),
+  imap: createImapDrafts({ credentialsFor: mailCredentialsFor }),
+  credentialsFor: mailCredentialsFor, writeEnabled: MAIL_CLIENT_WRITE_ENABLED, sendEnabled: MAIL_CLIENT_SEND_ENABLED,
+}) : null;
 const mailBodyReader = MAIL_AGENT_ENABLED
   ? createMailBodyReader({ store: mailStore, providers: mailProviders, credentials: mailCredentialsFor })
   : null;
@@ -4955,6 +4968,7 @@ registerMailRoutes({
 });
 registerMailClientRoutes({ app, service: mailClient });
 registerMailClientActionRoutes({ app, service: mailClientActions });
+registerMailClientComposeRoutes({ app, service: mailClientCompose });
 const shortcutRoutes = createVoiceShortcutRoutes({
   app,
   service: voiceShortcut,
