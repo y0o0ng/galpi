@@ -366,6 +366,18 @@ test('calendar year direction comes from the source tense, independently of a de
       expected: ['2026-11-18', 'inferred', 'nearest_date'],
     },
     {
+      name: 'last day does not make a cutoff past',
+      evidence: 'Last day for application: 11/25', dateText: '11/25', title: 'application',
+      direction: 'past', directionEvidence: 'Last day',
+      expected: ['2026-11-25', 'inferred', 'nearest_date'],
+    },
+    {
+      name: 'a past weekday is still directional evidence',
+      evidence: 'Orientation last Friday, 11/20', dateText: '11/20', title: 'Orientation',
+      direction: 'past', directionEvidence: 'last Friday',
+      expected: ['2026-11-20', 'inferred', 'nearest_past'],
+    },
+    {
       name: 'a request to submit establishes a future direction',
       evidence: '11월 25일까지 제출해 주세요', dateText: '11월 25일', title: '제출',
       direction: 'future', directionEvidence: '제출해 주세요',
