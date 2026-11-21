@@ -73,7 +73,7 @@
     }).format(new Date());
   }
 
-  function card(id, title, meta, content, { focusable = true } = {}) {
+  function card(id, title, meta, content, { focusable = true, activate } = {}) {
     const article = node('article', `home-card home-card-${id}`);
     article.dataset.cardId = id;
     article.style.viewTransitionName = `home-card-${id}`;
@@ -85,7 +85,7 @@
       article.tabIndex = 0;
       article.setAttribute('role', 'button');
       article.setAttribute('aria-label', `${title} 자세히 보기`);
-      const focus = () => setFocusedCard(id);
+      const focus = activate || (() => setFocusedCard(id));
       article.addEventListener('click', event => {
         if (!event.target.closest('button, a, input, select, textarea')) {
           event.stopPropagation();
@@ -446,7 +446,7 @@
     if (!list.childElementCount) list.append(node('p', 'home-card-empty', `분석 대기 ${analysis.pending || 0} · 완료 ${analysis.done || 0}`));
     body.append(summary, list);
     if (state.focusedCard === 'mail') body.append(node('div', 'home-focus-extra'));
-    return card('mail', '메일', '', body);
+    return card('mail', '메일', '', body, { activate: state.mailWorkspace ? openMail : null });
   }
 
   function renderNotifications() {
@@ -795,11 +795,32 @@
     else renderOverview();
   }
 
+  async function openMail() {
+    const workspace = state.mailWorkspace;
+    if (!workspace || state.openingMail) return;
+    const focusedCard = state.focusedCard;
+    state.openingMail = true;
+    try {
+      const available = await workspace.open();
+      if (state.route !== 'home' || state.homeView !== 'overview' || state.focusedCard !== focusedCard) return;
+      if (!available) return setFocusedCard('mail');
+      setRoute('home', 'overview');
+      document.getElementById('home-page').classList.remove('active');
+      document.getElementById('mail-workspace').classList.add('active');
+      document.body.dataset.mailWorkspace = '';
+      document.querySelector('#mail-workspace h1').focus();
+    } finally {
+      state.openingMail = false;
+    }
+  }
+
   function setRoute(route, homeView) {
     if (!['home', 'chat', 'notes', 'settings'].includes(route)) route = 'home';
     if (route !== 'home') {
       document.getElementById('home-grid').style.paddingBottom = '';
     }
+    delete document.body.dataset.mailWorkspace;
+    document.getElementById('mail-workspace')?.classList.remove('active');
     state.route = route;
     document.body.dataset.productRoute = route;
     document.querySelectorAll('[data-product-page]').forEach(page => page.classList.toggle('active', page.dataset.productPage === route));
@@ -915,6 +936,8 @@
     state.apiFetch = apiFetch;
     state.showToast = showToast;
     state.weatherEnabled = weatherEnabled;
+    const mount = document.getElementById('mail-workspace');
+    if (mount && global.MailWorkspace) state.mailWorkspace = global.MailWorkspace.create({ mount, apiFetch, showToast });
     document.querySelectorAll('[data-product-route]').forEach(button => button.addEventListener('click', () => {
       if (button.dataset.homeCardTarget === 'notifications') openNotifications();
       else setRoute(button.dataset.productRoute, button.dataset.homeViewTarget);
