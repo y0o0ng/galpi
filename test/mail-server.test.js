@@ -80,6 +80,8 @@ async function startServer(t, mailEnabled, clientEnabled = false, writesEnabled 
       MAIL_GMAIL_CLIENT_SECRET: '',
       MAIL_GMAIL_REFRESH_TOKEN: '',
       MAIL_GMAIL_MODIFY_REFRESH_TOKEN: '',
+      MAIL_GMAIL_REDIRECT_URI: '',
+      MAIL_ACCOUNT_SECRET_FILE: '',
       NAVER_MAIL_USER: '',
       NAVER_MAIL_APP_PASSWORD: '',
     },
@@ -135,6 +137,14 @@ test('Mail Client uses the existing HTTP authentication and runs independently f
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.deepEqual(body, { success: true, accounts: [] });
+  const management = '/api/mail-client/account-management';
+  assert.equal((await fetch(url + management)).status, 401);
+  assert.deepEqual((await api(url, management)).body, { success: true, accounts: [], gmailOAuthEnabled: false });
+  const callback = await fetch(url + '/api/mail/oauth/callback?state=missing&code=opaque');
+  assert.equal(callback.status, 400);
+  assert.equal(callback.headers.get('cache-control'), 'no-store');
+  assert.doesNotMatch(await callback.text(), /opaque/);
+  assert.equal((await fetch(url + '/api/mail/oauth/callback', { method: 'POST' })).status, 401);
   const reader = await fetch(url + '/mail-message-frame');
   assert.match(reader.headers.get('content-security-policy'), /img-src blob:;/);
   assert.equal(reader.headers.get('x-frame-options'), 'SAMEORIGIN');

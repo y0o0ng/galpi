@@ -97,12 +97,12 @@ async function browser(t) {
 }
 
 async function mockApp(t) {
-  const accounts = [
-    { id: 1, provider: 'gmail', address: 'sample@gmail.com', status: 'active' },
-    { id: 2, provider: 'naver', address: 'sample@naver.com', status: 'active' },
-    { id: 3, provider: 'works', address: 'student@school.ac.kr', status: 'active' },
-  ];
   const now = Math.floor(Date.now() / 1000);
+  const accounts = [
+    { id: 1, provider: 'gmail', address: 'sample@gmail.com', status: 'active', lastSyncAt: now },
+    { id: 2, provider: 'naver', address: 'sample@naver.com', status: 'active', lastSyncAt: now - 60 },
+    { id: 3, provider: 'works', address: 'student@school.ac.kr', status: 'active', lastSyncAt: now - 120 },
+  ];
   const fixture = process.env.MAIL_INBOX_FIXTURE;
   const messages = fixture ? JSON.parse(await fs.readFile(fixture, 'utf8')) : [
     { id: 1, accountId: 1, provider: 'gmail', labelIds: ['INBOX'], subject: '논문 피드백 전달', from: [{ name: '최유진 교수', address: 'sender@example.com' }],
@@ -179,6 +179,36 @@ async function mockApp(t) {
     if (!endpoint.startsWith('/api/mail-client/')) return json({ messages: [], notes: [], models: [], notifications: [], ddays: [], chat: [] });
     if (endpoint.endsWith('/accounts')) return state.enabled ? json({ success: true, accounts })
       : json({ success: false, code: 'MAIL_CLIENT_DISABLED' }, 503);
+    const management = '/api/mail-client/account-management';
+    if (endpoint === management) return json({ success: true, accounts, gmailOAuthEnabled: true });
+    if (endpoint === management + '/imap') {
+      if (payload.password !== 'mock-app-password') return json({ success: false, code: 'MAIL_CLIENT_AUTH_REQUIRED' }, 503);
+      let account = accounts.find(item => item.provider === payload.provider);
+      if (account && account.address !== payload.email) return json({ success: false, code: 'MAIL_PROVIDER_ACCOUNT_LIMIT' }, 409);
+      if (!account) {
+        account = { id: 3, provider: payload.provider, address: payload.email };
+        accounts.push(account);
+      }
+      account.status = 'active';
+      if (account.provider === 'works') state.authExpired = false;
+      return json({ success: true, account });
+    }
+    if (endpoint === management + '/disconnect') {
+      const account = accounts.find(item => item.id === payload.accountId);
+      account.status = 'disabled';
+      return json({ success: true, account });
+    }
+    if (endpoint === management + '/gmail/start') {
+      return json({ success: true, state: payload.role, url: 'https://accounts.google.com/o/oauth2/v2/auth' });
+    }
+    if (endpoint === management + '/gmail/finish') {
+      if (!state.oauthReady) return json({ success: true, status: 'pending' });
+      const account = accounts.find(item => item.provider === 'gmail');
+      account.status = 'active';
+      account.managed = true;
+      if (payload.state !== 'read') account.permissions = { ...account.permissions, [payload.state]: true };
+      return json({ success: true, status: 'done', account });
+    }
     if (endpoint.endsWith('/mailboxes')) {
       const id = Number(endpoint.split('/').at(-2));
       const mailboxes = [{ id: 'inbox', inbox: true, selectable: true, name: '받은편지함' }];
@@ -200,7 +230,7 @@ async function mockApp(t) {
       ], nextCursor: null });
       return json({ success: true, messages: messages.filter(message => !message.removed),
         incomplete: state.incomplete || state.authExpired, sources: accounts.map(account => ({
-          ...account, status: (state.incomplete || state.authExpired) && account.id === 3 ? 'unavailable' : 'fresh',
+          accountId: account.id, provider: account.provider, status: (state.incomplete || state.authExpired) && account.id === 3 ? 'unavailable' : 'fresh',
           failure: state.authExpired && account.id === 3 ? { code: 'MAIL_CLIENT_AUTH_REQUIRED' } : undefined,
         })), nextCursor: '00000000-0000-4000-8000-000000000001' });
     }
@@ -322,7 +352,7 @@ async function mockApp(t) {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => { server.closeAllConnections(); server.close(); });
-  return { url: 'http://127.0.0.1:' + server.address().port, calls, contacts, messages, state, routes };
+  return { url: 'http://127.0.0.1:' + server.address().port, calls, contacts, messages, state, routes, accounts };
 }
 
 const mailAgent = '#home-agents [aria-label="Mail 에이전트 열기"]';
@@ -544,8 +574,12 @@ test('list variants keep the designed actions and surface only verified failures
   app.state.authExpired = true;
   await ui.press('새로고침');
   await ui.waitFor(ui.text('Works 로그인이 만료됐어.'));
-  assert.equal(await ui.evaluate('document.querySelector(".mw-reconnect").disabled'), true);
+  assert.equal(await ui.evaluate('document.querySelector(".mw-reconnect").disabled'), false);
   await ui.capture('desktop-account-expired.png');
+  await ui.press('다시 로그인');
+  await ui.waitFor(ui.shown('.mw-account-dialog[open]'));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-account-dialog[open] input[type=email]").value'), 'student@school.ac.kr');
+  await ui.press('취소', '.mw-account-dialog[open] button');
   app.state.authExpired = false;
   app.state.incomplete = true;
   await ui.press('새로고침');
@@ -1202,4 +1236,72 @@ test('contact lookup and move failure retain the designed controls', { skip: !ch
   await ui.click('.mw-recipient-choice');
   assert.match(await ui.evaluate('document.querySelector("[aria-label=\\"받는 사람\\"]").value'), /sender@example\.com/);
   assert.equal(app.calls.filter(call => call.endpoint.endsWith('/send')).length, 0);
+});
+
+test('account settings link and reauthenticate mock providers, preserve provider slots, and confirm disconnect', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  app.accounts.pop();
+  app.accounts[0].status = 'auth_required';
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  await ui.press('메일 설정', '.mw-sidebar button');
+  await ui.waitFor(ui.shown('.mw-settings-card .mw-outlined:not(:disabled)'));
+  await ui.waitFor(ui.text('재인증 필요'));
+  await ui.capture('desktop-mail-account-settings.png');
+  const dialog = '.mw-account-dialog[open]';
+  const buttons = dialog + ' button';
+
+  await ui.press('계정 추가');
+  await ui.waitFor(ui.shown(dialog));
+  assert.equal(await ui.evaluate(`[...document.querySelectorAll('${buttons}')].filter(button => button.disabled).length`), 2);
+  await ui.press('NAVER WORKS', buttons);
+  await ui.evaluate(`document.querySelector('${dialog} input[type=email]').value = 'student@school.ac.kr';
+    document.querySelector('${dialog} input[type=password]').value = 'wrong-password'`);
+  await ui.press('연결', buttons);
+  await ui.waitFor(ui.text('앱 비밀번호를 확인해 줘.'));
+  assert.equal(app.accounts.some(account => account.provider === 'works'), false);
+  assert.equal(await ui.evaluate(`document.querySelector('${dialog} input[type=password]').value`), '');
+  await ui.evaluate(`document.querySelector('${dialog} input[type=password]').value = 'mock-app-password'`);
+  await ui.press('연결', buttons);
+  await ui.waitFor(ui.shown('[data-account-id="3"]'));
+  await ui.waitFor(ui.text('student@school.ac.kr'));
+
+  await ui.evaluate(`[...document.querySelectorAll('.mw-settings-line')]
+    .find(line => line.textContent.includes('student@school.ac.kr')).querySelector('button').click()`);
+  await ui.press('연결 해제', buttons);
+  await ui.waitFor(ui.text('기존 메일과 분석 기록은 보존돼.'));
+  assert.equal(app.accounts[2].status, 'active');
+  await ui.press('연결 해제', buttons);
+  await ui.waitFor('!' + ui.shown('[data-account-id="3"]'));
+  await ui.waitFor(ui.text('연결 해제'));
+  assert.equal(app.accounts[2].id, 3);
+  await ui.evaluate(`[...document.querySelectorAll('.mw-settings-line')]
+    .find(line => line.textContent.includes('student@school.ac.kr')).querySelector('button').click()`);
+  await ui.press('재연결', buttons);
+  assert.equal(await ui.evaluate(`document.querySelector('${dialog} input[type=email]').readOnly`), true);
+  await ui.evaluate(`document.querySelector('${dialog} input[type=password]').value = 'mock-app-password'`);
+  await ui.press('연결', buttons);
+  await ui.waitFor(ui.shown('[data-account-id="3"]'));
+  assert.equal(app.accounts[2].id, 3);
+
+  await ui.evaluate(`window.open = () => ({ close() {}, location: { replace(url) { window.mockOAuthUrl = url; } } })`);
+  await ui.evaluate(`[...document.querySelectorAll('.mw-settings-line')]
+    .find(line => line.textContent.includes('sample@gmail.com')).querySelector('button').click()`);
+  await ui.press('재인증', buttons);
+  await ui.waitFor('Boolean(window.mockOAuthUrl)');
+  assert.equal(app.accounts[0].status, 'auth_required');
+  app.state.oauthReady = true;
+  await ui.waitFor('!' + ui.shown(dialog));
+  await ui.waitFor('!' + ui.text('재인증 필요'));
+  assert.equal(app.accounts[0].status, 'active');
+  assert.equal(app.calls.filter(call => call.endpoint.endsWith('/gmail/start')).at(-1).payload.role, 'read');
+  await ui.evaluate(`[...document.querySelectorAll('.mw-settings-line')]
+    .find(line => line.textContent.includes('sample@gmail.com')).querySelector('button').click()`);
+  await ui.press('발송 권한 연결', buttons);
+  await ui.waitFor('!' + ui.shown(dialog));
+  assert.deepEqual(app.accounts[0].permissions, { reply: true });
 });

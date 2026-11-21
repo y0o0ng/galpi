@@ -2,7 +2,7 @@
 
 (function register(global) {
   function create(ui) {
-    const { node, button, icon, providers, timeOf, get, request, show, accounts, openMessage, compose, makeRow, notify, searchHistory, toggleMailboxes } = ui;
+    const { node, button, icon, providers, timeOf, get, request, show, accounts, openMessage, compose, makeRow, notify, searchHistory, toggleMailboxes, refreshAccounts } = ui;
     const sources = [['', '전체'], ['gmail', 'Gmail'], ['naver', 'Naver'], ['works', 'Works'], ['csv', 'CSV'], ['observed', '메일에서 수집']];
     const sourceLabels = Object.fromEntries(sources);
     const contactPicker = node('input');
@@ -273,6 +273,212 @@
       await preview();
     }
 
+    const accountPath = '/account-management';
+    const accountProviders = { gmail: 'Gmail', naver: 'Naver', works: 'NAVER WORKS' };
+
+    function accountDialog(title) {
+      const dialog = node('dialog', 'mw-analysis-dialog mw-account-dialog');
+      dialog.setAttribute('aria-label', title);
+      dialog.append(node('h2', '', title));
+      dialog.addEventListener('close', () => dialog.remove(), { once: true });
+      document.getElementById('mail-workspace').append(dialog);
+      return dialog;
+    }
+
+    function accountFooter(dialog, label, submit, closeLabel = '취소') {
+      const footer = node('div', 'mw-popover-footer');
+      footer.append(control(closeLabel, () => dialog.close(), undefined, 'mw-popover-secondary'));
+      if (submit) footer.append(control(label, submit, undefined, 'mw-popover-primary'));
+      dialog.append(footer);
+      return footer.lastElementChild;
+    }
+
+    function accountIssue(dialog) {
+      const issue = node('p', 'mw-account-issue');
+      issue.setAttribute('role', 'status');
+      dialog.append(issue);
+      return issue;
+    }
+
+    function accountError(error) {
+      return ({
+        MAIL_PROVIDER_ACCOUNT_LIMIT: '이 제공자에 등록된 계정과 같은 주소로 연결해 줘.',
+        MAIL_CLIENT_AUTH_REQUIRED: '앱 비밀번호를 확인해 줘.',
+        MAIL_CLIENT_ACCOUNT_INPUT_INVALID: '이메일 주소와 입력 내용을 확인해 줘.',
+        MAIL_CLIENT_ACCOUNT_CHANGED: '계정 상태가 바뀌었어. 다시 시도해 줘.',
+        MAIL_CLIENT_ACCOUNT_STORAGE_UNAVAILABLE: '서버에 인증 정보를 저장하지 못했어.',
+        MAIL_CLIENT_OAUTH_UNAVAILABLE: '서버에 Gmail 연결 설정이 필요해.',
+        MAIL_CLIENT_OAUTH_CANCELLED: 'Google 인증을 취소했어.',
+        MAIL_CLIENT_OAUTH_SCOPE_REQUIRED: 'Google에서 요청한 권한을 허용해 줘.',
+        MAIL_CLIENT_OAUTH_STATE_INVALID: 'Gmail 연결 시간이 지났어. 다시 시작해 줘.',
+        MAIL_CLIENT_OAUTH_READ_REQUIRED: '먼저 Gmail 계정을 다시 연결해 줘.',
+      })[error?.code] || '계정 요청을 완료하지 못했어. 다시 시도해 줘.';
+    }
+
+    async function accountSaved(dialog, message, refresh) {
+      if (dialog.open) dialog.close();
+      notify(message);
+      await refreshAccounts();
+      await refresh?.();
+    }
+
+    async function gmailConnect(role, refresh) {
+      const popup = global.open('about:blank', '_blank');
+      const dialog = accountDialog(({ read: 'Gmail 연결', modify: 'Gmail 수정 권한', reply: 'Gmail 발송 권한' })[role]);
+      const status = accountIssue(dialog);
+      accountFooter(dialog, null, null, popup ? '취소' : '닫기');
+      dialog.showModal();
+      if (!popup) {
+        status.textContent = '브라우저에서 팝업을 허용한 뒤 다시 시도해 줘.';
+        return;
+      }
+      popup.opener = null;
+      let timer;
+      dialog.addEventListener('close', () => {
+        global.clearTimeout(timer);
+        popup.close();
+      }, { once: true });
+      status.textContent = 'Google 창에서 계정과 권한을 확인해 줘.';
+      const expires = Date.now() + 10 * 60 * 1000;
+      try {
+        const { state, url } = await request(accountPath + '/gmail/start', { method: 'POST', json: { role } });
+        if (!dialog.open) return;
+        popup.location.replace(url);
+        async function check() {
+          if (!dialog.open) return;
+          if (Date.now() >= expires) {
+            status.textContent = accountError({ code: 'MAIL_CLIENT_OAUTH_STATE_INVALID' });
+            popup.close();
+            return;
+          }
+          try {
+            const result = await request(accountPath + '/gmail/finish', { method: 'POST', json: { state } });
+            if (!dialog.open) return;
+            if (result.status === 'done') {
+              await accountSaved(dialog, role === 'read' ? 'Gmail 계정을 연결했어.' : 'Gmail 권한을 연결했어.', refresh);
+              return;
+            }
+            timer = global.setTimeout(check, 5000);
+          } catch (error) {
+            status.textContent = accountError(error);
+            popup.close();
+          }
+        }
+        void check();
+      } catch (error) {
+        status.textContent = accountError(error);
+        popup.close();
+      }
+    }
+
+    function connectAccount(provider, account, refresh) {
+      if (provider === 'gmail') return void gmailConnect('read', refresh);
+      const dialog = accountDialog(accountProviders[provider] + ' ' + (account ? '다시 연결' : '연결'));
+      const form = node('form', 'mw-account-form');
+      const email = node('input');
+      email.type = 'email';
+      email.required = true;
+      email.autocomplete = 'username';
+      email.value = account?.address || '';
+      email.readOnly = Boolean(account);
+      const password = node('input');
+      password.type = 'password';
+      password.required = true;
+      password.autocomplete = 'new-password';
+      const identity = node('label', '', '이메일 주소');
+      const credential = node('label', '', '앱 비밀번호');
+      identity.append(email);
+      credential.append(password);
+      form.append(identity, credential);
+      dialog.append(form);
+      const issue = accountIssue(dialog);
+      const connect = accountFooter(dialog, '연결', () => form.requestSubmit());
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (connect.disabled) return;
+        connect.disabled = true;
+        issue.textContent = '';
+        const json = { provider, email: email.value, password: password.value };
+        password.value = '';
+        try {
+          await request(accountPath + '/imap', { method: 'POST', json });
+          await accountSaved(dialog, '메일 계정을 연결했어.', refresh);
+        } catch (error) {
+          issue.textContent = accountError(error);
+          password.focus();
+        } finally {
+          connect.disabled = false;
+        }
+      });
+      dialog.showModal();
+    }
+
+    function chooseProvider(list, enabled, select, existing = false) {
+      const dialog = accountDialog(existing ? '다시 로그인' : '계정 추가');
+      const choices = node('div', 'mw-account-choices');
+      for (const provider of Object.keys(accountProviders)) {
+        const account = list.find(item => item.provider === provider);
+        if (existing && !account) continue;
+        const allowed = (provider !== 'gmail' || enabled) && (existing || !account || account.status === 'disabled');
+        choices.append(control(accountProviders[provider], allowed ? () => { dialog.close(); select(provider, account); } : null));
+      }
+      dialog.append(choices);
+      if (!enabled && (!existing || list.some(account => account.provider === 'gmail'))) {
+        dialog.append(node('p', '', 'Gmail은 서버에 연결 설정이 필요해.'));
+      }
+      accountFooter(dialog, null, null);
+      dialog.showModal();
+    }
+
+    async function reauthenticate(targets) {
+      try {
+        const data = await get(accountPath);
+        const list = data.accounts.filter(account => targets.some(target => account.id === target.id));
+        if (list.length === 1 && (list[0].provider !== 'gmail' || data.gmailOAuthEnabled)) {
+          connectAccount(list[0].provider, list[0]);
+        } else if (list.length) chooseProvider(list, data.gmailOAuthEnabled, connectAccount, true);
+      } catch (error) { notify(accountError(error)); }
+    }
+
+    function disconnectAccount(account, refresh) {
+      const dialog = accountDialog('계정 연결 해제');
+      dialog.append(node('p', '', account.address + '의 연결을 해제할까? 기존 메일과 분석 기록은 보존돼.'));
+      const issue = accountIssue(dialog);
+      const disconnect = accountFooter(dialog, '연결 해제', async () => {
+        disconnect.disabled = true;
+        try {
+          await request(accountPath + '/disconnect', { method: 'POST', json: { accountId: account.id } });
+          await accountSaved(dialog, '메일 계정 연결을 해제했어.', refresh);
+        } catch (error) {
+          issue.textContent = accountError(error);
+          disconnect.disabled = false;
+        }
+      });
+      dialog.showModal();
+    }
+
+    function manageAccount(account, gmailEnabled, refresh) {
+      const dialog = accountDialog(accountProviders[account.provider] + ' 계정 관리');
+      dialog.append(node('p', '', account.address));
+      const actions = node('div', 'mw-account-choices');
+      const choose = run => () => { dialog.close(); run(); };
+      const gmail = account.provider === 'gmail';
+      const disabled = account.status === 'disabled';
+      actions.append(control(disabled ? '재연결' : '재인증', !gmail || gmailEnabled
+        ? choose(() => connectAccount(account.provider, account, refresh)) : null));
+      if (!disabled) actions.append(control('연결 해제', choose(() => disconnectAccount(account, refresh))));
+      if (gmail && gmailEnabled && account.managed && account.status === 'active') {
+        for (const [role, label] of [['modify', '수정'], ['reply', '발송']]) {
+          actions.append(control(label + (account.permissions?.[role] ? ' 권한 갱신' : ' 권한 연결'),
+            choose(() => void gmailConnect(role, refresh))));
+        }
+      }
+      dialog.append(actions);
+      if (gmail && !gmailEnabled) dialog.append(node('p', '', 'Gmail은 서버에 연결 설정이 필요해.'));
+      accountFooter(dialog, null, null, '닫기');
+      dialog.showModal();
+    }
+
     function settings() {
       const panel = node('section', 'mw-aux mw-settings');
       show('settings', panel);
@@ -286,13 +492,15 @@
       let preferences = [];
       let settingsData = null;
       let directory = null;
+      let management = null;
       void refresh();
 
       async function refresh() {
-        [state, settingsData, directory] = await Promise.all([
+        [state, settingsData, directory, management] = await Promise.all([
           get('/api/mail/status').catch(() => null),
           get('/api/mail/settings').then(data => data.settings).catch(() => null),
           get('/contacts', { limit: 1 }).catch(() => null),
+          get(accountPath).catch(() => null),
         ]);
         preferences = await get('/api/mail/preferences').then(data => data.preferences || []).catch(() => []);
         if (panel.isConnected) render();
@@ -313,12 +521,25 @@
       }
 
       function render() {
-        const linked = section('연결 계정', control('계정 추가', null));
-        for (const account of state?.accounts || accounts()) {
-          const active = account.status === 'active';
-          linked.append(settingsLine((account.provider === 'works' ? 'NAVER WORKS' : providers[account.provider]) + '  ' + account.address,
-            account.lastSyncAt ? '마지막 동기화 ' + timeOf(account.lastSyncAt) : '',
-            health(active ? '• 연결됨' : '• 연결 확인 필요', active ? 'ok' : 'warn'), control('관리', null, undefined, 'mw-view-action')));
+        const linked = section('연결 계정', control('계정 추가', management ? () => chooseProvider(
+          management.accounts, management.gmailOAuthEnabled, (provider, account) => connectAccount(provider, account, refresh)
+        ) : null));
+        linked.classList.add('mw-linked-accounts');
+        for (const account of management?.accounts || state?.accounts || accounts()) {
+          const [text, tone] = ({
+            active: ['연결됨', 'ok'], disabled: ['연결 해제', 'off'], auth_required: ['재인증 필요', 'warn'],
+          })[account.status] || ['연결 확인 필요', 'warn'];
+          const row = node('div', 'mw-settings-line');
+          const description = node('div', 'mw-settings-description');
+          const identity = node('div', 'mw-account-identity');
+          const address = node('span', 'mw-account-email', account.address);
+          address.title = account.address;
+          identity.append(node('strong', '', accountProviders[account.provider]), address);
+          description.append(identity);
+          if (account.lastSyncAt) description.append(node('p', 'mw-account-last-sync', '마지막 동기화 ' + timeOf(account.lastSyncAt)));
+          row.append(description, health(text, tone), control('관리', management
+            ? () => manageAccount(account, management.gmailOAuthEnabled, refresh) : null, undefined, 'mw-view-action'));
+          linked.append(row);
         }
         const contactList = section('연락처' + (directory ? '  ' + directory.total + '명' : ''), control('CSV 가져오기', () => pickCsv(refresh), 'download'));
         contactList.append(settingsLine('Gmail 연락처', '', health('미연결', 'off')),
@@ -541,7 +762,7 @@
       }
     }
 
-    return { contacts, settings, calendar, refreshCalendar: () => refreshCalendar?.() };
+    return { contacts, settings, reauthenticate, calendar, refreshCalendar: () => refreshCalendar?.() };
   }
 
   global.MailWorkspaceSecondary = { create };

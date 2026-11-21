@@ -333,7 +333,7 @@
         searchTerm = value;
         changeScope({ role: 'inbox', title: '검색 결과', search: true, contactEmail: value });
       },
-      toggleMailboxes,
+      toggleMailboxes, refreshAccounts: accountsChanged,
       compose: options => messageViews.openCompose(options),
       makeRow: row,
     };
@@ -531,7 +531,7 @@
       accountNav.setAttribute('aria-label', '계정');
       accountNav.append(node('h3', 'mw-nav-title', '계정'));
       const problems = problemSources();
-      for (const account of accounts) {
+      for (const account of accounts.filter(account => account.status !== 'disabled')) {
         const custom = (boxes.get(account.id) || []).filter(box => box.selectable && (
           (box.kind === 'label' && box.type === 'user') || (box.kind === 'folder' && !roleOf(box))
         ));
@@ -851,7 +851,8 @@
       }
       if (auth.length) {
         const names = auth.map(source => providers[source.provider]).filter(Boolean).join(', ');
-        notice(names + ' 로그인이 만료됐어. 다시 로그인할 때까지 ' + names + ' 새 메일을 못 가져와.', '다시 로그인', null);
+        const targets = accounts.filter(account => auth.some(source => source.accountId === account.id));
+        notice(names + ' 로그인이 만료됐어. 다시 로그인할 때까지 ' + names + ' 새 메일을 못 가져와.', '다시 로그인', auxiliary && targets.length ? () => auxiliary.reauthenticate(targets) : null);
       }
       if ((listError && !auth.length) || other.length || (current?.incomplete && !auth.length)) {
         const names = other.map(source => providers[source.provider]).filter(Boolean).join(', ');
@@ -1086,26 +1087,44 @@
       } catch { showToast('이 초안을 열지 못했어.'); }
     }
 
-    async function open() {
-      if (loading || writing) return true;
-      try {
-        const data = await get('/accounts');
-        accounts = data.accounts;
-      } catch (error) {
-        if (error.code !== 'MAIL_CLIENT_DISABLED') showToast('메일 계정을 확인하지 못했어.');
-        return false;
-      }
+    async function refreshAccounts(reset = false) {
+      accounts = (await get('/accounts')).accounts;
       boxes.clear();
-      expanded.clear();
-      await Promise.all(accounts.filter(account => account.status !== 'disabled').map(async account => {
+      if (reset) expanded.clear();
+      await Promise.all(accounts.filter(account => !['disabled', 'auth_required'].includes(account.status)).map(async account => {
         try {
           const data = await get('/accounts/' + account.id + '/mailboxes');
           boxes.set(account.id, data.mailboxes);
-          if (account.provider === 'gmail') expanded.add(account.id);
+          if (account.provider === 'gmail' && reset) expanded.add(account.id);
         } catch {
           // A folder lookup can fail independently of the unified inbox.
         }
       }));
+    }
+
+    async function accountsChanged() {
+      try { await refreshAccounts(); }
+      catch { showToast('메일 계정 목록을 갱신하지 못했어.'); return; }
+      if (scope.account && accounts.find(account => account.id === scope.account.id)?.status === 'disabled') {
+        scope = { role: 'inbox', title: '받은편지함' };
+        searchTerm = '';
+        appliedFilters = {};
+      }
+      inboxUnread = null;
+      history = [];
+      page = 0;
+      selected.clear();
+      renderSidebar();
+      void loadPage();
+    }
+
+    async function open() {
+      if (loading || writing) return true;
+      try { await refreshAccounts(true); }
+      catch (error) {
+        if (error.code !== 'MAIL_CLIENT_DISABLED') showToast('메일 계정을 확인하지 못했어.');
+        return false;
+      }
       if (screen) close();
       scope = { role: 'inbox', title: '받은편지함' };
       searchTerm = '';

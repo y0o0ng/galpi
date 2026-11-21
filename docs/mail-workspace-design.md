@@ -10,7 +10,7 @@
 | Desktop 05~07·17·18, T3·T4, P3~P5 | 상세, 첨부, 답장·전체 답장·전달, 초안 버전 충돌, 발송 확인. HTML은 격리된 프레임에 표시하고 답장·전달의 원문 인용에는 평문을 사용한다. 화면에서 명시한 전송만 실행한다. |
 | Desktop 08·10~14 | Phase 4 스마트 분류 목록과 일정 달력. 명시적으로 배치된 분류 필터를 적용하고 원본을 검증해 연다. |
 | A1~A4 | 스마트 메일함 제목 옆에서 시작하는 수동 일괄 분석. 확인창·진행 버튼·결과 토스트·대상 없음 상태를 연결한다. |
-| Desktop 09, C1~C5, P6·P7 | 메일 설정과 연락처 목록·상세, CSV 매핑·미리보기·확정, 수신자 자동완성. 알림 설정·규칙 해제·분석 재처리는 기존 인증 API를 사용한다. |
+| Desktop 09, C1~C5, P6·P7 | 메일 설정과 연락처 목록·상세, CSV 매핑·미리보기·확정, 수신자 자동완성. 연결 계정의 추가·관리·재인증을 제공하며 알림 설정·규칙 해제·분석 재처리는 기존 인증 API를 사용한다. |
 | S1~S11 | 휴지통/검색 빈 상태, 목록·상세 로딩, 재인증, 동기화, 읽음/이동 실패, 원본 없음, 다운로드 실패, 발송 불명. 확인된 실패만 명시적으로 재시도할 수 있다. |
 
 이동은 필터 팝오버 패널과 계정 서랍의 계정별 펼침 목록을 재사용한다. 한 번에 같은 계정의 메시지만 이동한다. Gmail은 받은편지함 또는 실제 사용자 라벨의 출발 위치를 확인하고, 전체 메일에서는 대상 라벨을 추가한다. IMAP은 서버의 검증된 같은 계정 폴더로 이동한다. 발송·이동 결과가 불명확하면 자동으로 다시 요청하지 않는다.
@@ -34,9 +34,19 @@
 ### 연결이 남은 제어와 데이터
 
 - Naver·NAVER WORKS 스레드 확장과 목록 본문 미리보기는 후속 범위다.
-- 계정 추가·관리·재로그인과 Gmail 연락처·Works 조직도 직접 동기화에는 서버의 새 인증·권한 계약이 필요하다. Naver는 현재 CSV 경로를 사용한다. 해당 제공자 제어는 비활성으로 표시한다.
+- Gmail 연락처·Works 조직도 직접 동기화는 후속 범위다. Naver는 CSV 경로를 사용한다. 직접 동기화 제어는 비활성으로 표시한다.
 - 규칙 추가의 입력 화면은 현재 피그마에 없어 기존 규칙의 조회와 해제를 연결한다.
 - 초안 충돌에서 기존 버전에 묶인 첨부가 있으면 그 첨부를 제외한 채 복사하지 않는다.
+
+## 연결 계정 관리
+
+- 메일 설정의 `계정 추가`·`관리`와 목록의 `다시 로그인`에서 시작한다. Gmail·Naver·NAVER WORKS를 각각 한 계정까지 연결한다. 같은 제공자의 다른 주소는 거절한다. 동일한 주소를 재인증하면 기존 account ID·동기화 커서·메일 관측·분석·일정 후보·Attention을 보존한 채 동기화를 재개한다.
+- Naver·NAVER WORKS는 입력한 메일 주소와 앱 비밀번호로 기존 제공자 호스트에 IMAP/TLS 로그인하고 INBOX를 읽기 전용으로 열어 확인한다. 확인 후에만 자격증명을 교체한다. 동일 앱 비밀번호를 해당 계정의 읽기·쓰기·SMTP에 사용한다.
+- Gmail은 Google 웹 OAuth 클라이언트를 사용한다. `MAIL_GMAIL_REDIRECT_URI`에 앱과 같은 origin의 `/api/mail/oauth/callback` 전체 URL을 지정하고 Google 콘솔의 리디렉션 URI에도 같은 값을 등록한다. HTTPS를 사용하며 loopback 개발만 HTTP를 허용한다. OAuth 시작·완료는 기존 앱 인증을 요구한다. callback은 단일 사용 state·PKCE·HttpOnly SameSite=Lax 쿠키로 시작한 브라우저와 연결한다. Google 계정 프로필과 권한을 검증하고 원래 탭에서 연결 결과를 확인할 때만 자격증명을 적용한다. [Google 서버 OAuth](https://developers.google.com/identity/protocols/oauth2/web-server)
+- Gmail 읽기·수정·발송은 별도 동의를 받는다. 첫 연결은 `gmail.readonly`, 관리의 수정 권한은 `gmail.modify`, 발송 권한은 제공자 초안 발송과 원본 확인에 필요한 `gmail.compose`와 `gmail.metadata`를 요청한다. Agent와 Workspace는 같은 읽기 토큰 발급기를 공유한다. 읽기 refresh가 실패해 재인증이 필요한 경우 계정 상태를 표시하고, 새 자격증명을 확인하면 이전 캐시를 폐기한다. 수정·발송 권한은 관리에서 다시 연결할 수 있다. 기존 쓰기·발송 활성화 플래그를 그대로 적용한다. [Gmail 권한](https://developers.google.com/workspace/gmail/api/auth/scopes) · [Gmail 초안 발송](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.drafts/send)
+- 기존 `.env` 계정은 그대로 사용할 수 있다. UI에서 처음 관리한 제공자는 이후 파일에 검증된 자격증명만 사용한다. 기존 Gmail을 UI에서 읽기 재인증한 뒤 수정·발송이 필요하면 해당 권한을 각각 연결한다. UI 자격증명은 기본적으로 `~/.config/galpi/mail` 아래 DB별 파일에 저장한다. `MAIL_ACCOUNT_SECRET_FILE`로 정한 경우 repository·DB·Vault·일반 백업 밖에 파일을 둔다. 디렉터리는 소유자 전용 `0700`, 파일은 `0600`이다. 토큰·비밀번호를 DB나 브라우저에 저장하지 않는다.
+- 연결 해제는 서버의 해당 자격증명과 토큰 캐시를 폐기하고 계정을 `disabled`로 저장한다. 해당 계정 신규 조회·동기화·분석 예약·변경·발송은 중단되며 기존 기록은 유지한다. DB의 관리 여부와 파일의 해제 상태가 기존 `.env`로 자동 복구되는 것을 막는다. Google 계정에서 앱 권한을 별도로 철회할 수 있다.
+- `MAIL_CLIENT_ENABLED`와 기존 앱 인증을 적용하는 `/api/mail-client/account-management`는 GET으로 계정과 상태를 반환한다. POST `/imap`은 연결·재인증, `/disconnect`는 연결 해제, `/gmail/start`와 `/gmail/finish`는 OAuth 시작과 결과 확인을 처리한다. OAuth callback의 브라우저 검증 계약은 위와 같다.
 
 ## Backend Phase 1
 
@@ -89,7 +99,7 @@ Phase 1의 GET 계약은 제공자 조회 전용이다. 상태 변경은 아래 
 
 ## Backend Phase 2
 
-기존 인증을 적용한다. `MAIL_CLIENT_ENABLED=true`와 `MAIL_CLIENT_WRITE_ENABLED=true`가 모두 필요하며, 쓰기 플래그 기본값은 `false`다. Gmail은 `MAIL_GMAIL_MODIFY_REFRESH_TOKEN`에 부여한 `gmail.modify`로 프로필 주소와 원본 메시지 ID를 확인한다. 기존 Agent·Workspace 읽기 토큰과 답장 토큰은 각자의 기존 경로를 사용한다. IMAP은 요청 대상 계정의 기존 자격증명으로 쓰기 전용 연결을 연다.
+기존 인증을 적용한다. `MAIL_CLIENT_ENABLED=true`와 `MAIL_CLIENT_WRITE_ENABLED=true`가 모두 필요하며, 쓰기 플래그 기본값은 `false`다. Gmail은 연결 계정의 수정 권한(`.env` 계정은 `MAIL_GMAIL_MODIFY_REFRESH_TOKEN`)으로 프로필 주소와 원본 메시지 ID를 확인한다. 기존 Agent·Workspace 읽기 토큰과 답장 토큰은 각자의 기존 경로를 사용한다. IMAP은 요청 대상 계정의 기존 자격증명으로 쓰기 전용 연결을 연다.
 
 | 액션 | Gmail | IMAP |
 | --- | --- | --- |
@@ -123,7 +133,7 @@ Workspace 작성은 인증된 내부 API에서만 사용한다. `MAIL_CLIENT_ENA
 
 ### 작성과 첨부
 
-- 발신 주소는 연결 계정에서 정한다. Gmail은 Phase 2와 같은 `MAIL_GMAIL_MODIFY_REFRESH_TOKEN` 발급기를 사용하며 실제 Gmail 프로필을 확인한다. Naver와 NAVER WORKS는 등록 계정과 기존 앱 비밀번호의 인증 주소를 대조하고 TLS SMTP 465로 보낸다. [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes) · [Naver SMTP](https://help.naver.com/service/30029/contents/21341) · [NAVER WORKS IMAP/SMTP](https://help.worksmobile.com/en/use-guides/mail/settings/pop3-imap-smtp/)
+- 발신 주소는 연결 계정에서 정한다. Gmail은 UI 관리 계정의 발송 권한을 사용하고, 기존 `.env` 계정의 Workspace에서는 Phase 2의 `MAIL_GMAIL_MODIFY_REFRESH_TOKEN`을 사용한다. 두 경로 모두 실제 Gmail 프로필을 확인한다. Naver와 NAVER WORKS는 등록 계정과 기존 앱 비밀번호의 인증 주소를 대조하고 TLS SMTP 465로 보낸다. [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes) · [Naver SMTP](https://help.naver.com/service/30029/contents/21341) · [NAVER WORKS IMAP/SMTP](https://help.worksmobile.com/en/use-guides/mail/settings/pop3-imap-smtp/)
 - `compose`는 `kind`(`new`, `reply`, `reply_all`, `forward`), 문자열 `text`, 선택적 `html`·`subject`·`to`·`cc`·`bcc`·`attachments`를 받는다. 수신자는 이메일 주소 배열이다. 답장·전체 답장·전달에는 같은 계정의 Phase 1 상세 ID인 `originalId`가 필요하다. 답장은 검증한 원본의 Reply-To 또는 From으로, 전체 답장은 여기에 원본 To·CC를 합쳐 계산한다. 답장 요청의 To·CC는 생략하고 발신 계정 자신과 중복 주소는 서버에서 제거한다. 명시한 BCC만 발송에 사용한다. SMTP에서는 BCC를 수신 봉투에만 넣는다. Gmail은 BCC가 포함된 MIME을 받아 수신자에게 사본을 배분한다.
 - 답장은 원본 Message-ID를 `In-Reply-To`와 `References`에 연결하고 `Re:`를 붙인다. 전달은 `Fwd:`와 원본 발신·날짜·제목·수신 정보 및 평문을 인용한다. 원본의 첨부는 각각 검증된 참조가 필요하다. 보관된 초안을 다시 열어 본문 전체를 편집할 때는 `kind: "new"`와 관측한 초안 버전을 써서 기존 답장 스레드와 인용된 본문을 보존할 수 있다.
 - 임시 업로드는 계정별 일회용 핸들이다. 15분 동안 프로세스 메모리에 두고 사용·만료·재시작 시 정리한다. `{ kind: "upload", id }`로 전송한다. 조회한 원본·초안 첨부는 각각 `{ kind: "original" | "draft", index, proof }`로 참조한다. 원문 해시와 첨부 순서·바이트의 증명을 대조하므로 원본이나 파일이 달라지면 저장·발송을 중단한다. 첨부 원본은 제공자에서 필요할 때 읽는다.

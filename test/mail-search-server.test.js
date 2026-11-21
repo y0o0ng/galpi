@@ -93,7 +93,7 @@ async function startServer(t, { mailEnabled, replyEnabled = false }) {
       req.resume();
       return sendJson(res, 200, { access_token: 'mock-gmail', expires_in: 3600 });
     }
-    if (replyEnabled && req.url === '/gmail/v1/users/me/profile') {
+    if (replyEnabled && ['/gmail/v1/users/me/profile', '/gmail/v1/users/me/profile?fields=emailAddress'].includes(req.url)) {
       return sendJson(res, 200, { emailAddress: 'me@example.com' });
     }
     if (replyEnabled && req.url === '/gmail/v1/users/me/messages/inbox-1?format=raw') {

@@ -154,6 +154,13 @@ body[data-mail-workspace] #global-nav .shell-settings::before {
 #mail-workspace .mw-analysis-dialog p { margin: 0; font-size: 13px; color: var(--mw-secondary); }
 #mail-workspace .mw-analysis-dialog .mw-popover-footer { margin-top: 18px; padding: 0; border: 0; }
 #mail-workspace .mw-analysis-dialog .mw-popover-footer button { height: 36px; padding: 0 14px; }
+#mail-workspace :is(.mw-account-form, .mw-account-choices) { display: grid; gap: 10px; margin-block: 14px; }
+#mail-workspace .mw-account-form label { display: grid; gap: 5px; color: var(--mw-secondary); font-size: 13px; }
+#mail-workspace .mw-account-form input {
+  width: 100%; min-height: 36px; box-sizing: border-box; padding: 6px 10px; border: 1px solid var(--mw-border);
+  border-radius: 10px; font: inherit; color: var(--mw-primary); background: var(--mw-surface);
+}
+#mail-workspace .mw-account-dialog .mw-account-issue:not(:empty) { margin-top: 10px; }
 #mail-workspace .mw-analysis-notice:not([hidden]) {
   position: fixed; z-index: 4; inset: auto 16px 32px 488px; margin-inline: auto; width: max-content; max-width: calc(100vw - 32px);
   display: flex; align-items: center; gap: 10px; padding: 8px 14px; min-height: 48px; box-sizing: border-box;
@@ -975,6 +982,16 @@ body[data-mail-workspace] #global-nav .shell-settings::before {
 #mail-workspace .mw-settings-description { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 #mail-workspace .mw-settings-line .mw-pill[data-tone="ok"] { color: var(--mw-accent); background: var(--mw-soft); }
 #mail-workspace .mw-settings-line .mw-pill[data-tone="warn"] { color: #b55454; border: 1px solid #b55454; }
+#mail-workspace .mw-linked-accounts { padding-bottom: 8px; }
+#mail-workspace .mw-linked-accounts > header { min-height: 32px; padding-bottom: 12px; margin: 0; }
+#mail-workspace .mw-linked-accounts .mw-settings-line { min-height: 0; gap: 12px; padding-block: 12px; border: 0; }
+#mail-workspace .mw-linked-accounts :is(.mw-outlined, .mw-view-action) { min-height: 32px; padding-inline: 10px; font-weight: 510; }
+#mail-workspace .mw-account-identity { display: flex; align-items: baseline; gap: 8px; overflow: hidden; white-space: nowrap; }
+#mail-workspace .mw-account-identity strong { font-size: 14px; font-weight: 590; }
+#mail-workspace .mw-account-email { overflow: hidden; text-overflow: ellipsis; color: var(--mw-secondary); font-size: 13px; }
+#mail-workspace .mw-account-last-sync { margin: 2px 0 0; color: var(--mw-tertiary); font-size: 12px; }
+#mail-workspace .mw-linked-accounts .mw-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; }
+#mail-workspace .mw-linked-accounts .mw-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 #mail-workspace .mw-toggle {
   width: 40px;
   height: 24px;

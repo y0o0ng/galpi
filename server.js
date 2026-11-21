@@ -52,7 +52,9 @@ const {
   createMailPushService,
 } = require('./lib/mail/push');
 const { createNaverProvider } = require('./lib/mail/naver');
-const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
+const { createGmailProvider } = require('./lib/mail/gmail');
+const { CALLBACK: MAIL_OAUTH_CALLBACK, createMailAccountAuth } = require('./lib/mail/account-auth');
+const { registerMailAccountRoutes } = require('./lib/mail/account-routes');
 const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailClient } = require('./lib/mail/client');
 const { createMailClientContacts } = require('./lib/mail/client-contacts');
@@ -654,6 +656,8 @@ function socketRateLimitKey(req) {
 }
 
 function requireApiToken(req, res, next) {
+  // This exact callback authenticates the browser with the single-use OAuth session cookie.
+  if (MAIL_CLIENT_ENABLED && req.method === 'GET' && req.originalUrl.split('?')[0] === MAIL_OAUTH_CALLBACK) return next();
   if (!API_TOKEN) {
     // 토큰 없는 운용은 loopback 개발에서만 허용한다. `assertBindIsAuthenticated`가
     // 기동 때 이미 막지만, 리버스 프록시가 외부 요청을 loopback으로 넘기는 배치에서는
@@ -940,9 +944,17 @@ const voiceShortcut = createVoiceShortcutService(db, {
   enabled: VOICE_SHORTCUT_ENABLED,
 });
 const mailStore = createMailStore(db);
-const gmailReadTokens = MAIL_AGENT_ENABLED || MAIL_CLIENT_ENABLED
-  ? createGoogleTokenSource({ credentials: MAIL_GMAIL_CREDENTIALS })
-  : null;
+const mailAccountAuth = MAIL_AGENT_ENABLED || MAIL_CLIENT_ENABLED ? createMailAccountAuth({
+  store: mailStore, file: RUNTIME_PATHS.mailSecretsPath,
+  forbiddenPaths: [__dirname, DB_PATH, RUNTIME_PATHS.vaultPath, BACKUP_DIR, ATTACHMENTS_TMP_DIR],
+  gmail: { clientId: MAIL_GMAIL_CREDENTIALS.clientId, clientSecret: MAIL_GMAIL_CREDENTIALS.clientSecret,
+    read: MAIL_GMAIL_CREDENTIALS.refreshToken, modify: process.env.MAIL_GMAIL_MODIFY_REFRESH_TOKEN,
+    reply: process.env.MAIL_GMAIL_REPLY_REFRESH_TOKEN, redirectUri: process.env.MAIL_GMAIL_REDIRECT_URI },
+  imap: { naver: MAIL_NAVER_CREDENTIALS, works: MAIL_WORKS_CREDENTIALS },
+  onChange: () => mailClient?.invalidateCursors(),
+  onAuthRequired: account => console.warn(`Mail 재인증 필요: account=${account.id} provider=${account.provider}`),
+}) : null;
+const gmailReadTokens = mailAccountAuth?.gmailTokens('read');
 // 플래그가 꺼져 있으면 worker도 provider도 만들지 않는다. 표만 비어 있는 상태가 된다.
 // provider는 동기화와 분석이 같은 인스턴스를 쓴다 — Gmail token source를 따로 만들면
 // 토큰을 두 번 갈면서 서로의 만료를 모른다.
@@ -955,40 +967,37 @@ const mailProviders = MAIL_AGENT_ENABLED
     gmail: createGmailProvider({ tokenSource: gmailReadTokens }),
   }
   : null;
-const MAIL_CREDENTIALS_BY_PROVIDER = {
-  // Gmail은 OAuth token source가 자격증명을 들고 있어 호출부가 넘길 것이 없다.
-  gmail: {},
-  naver: MAIL_NAVER_CREDENTIALS,
-  works: MAIL_WORKS_CREDENTIALS,
+const mailCredentialsFor = account => mailAccountAuth.imapCredentials(account);
+const mailAgentCredentialsFor = account => mailAccountAuth.agentCredentials(account);
+const credentialVersion = account => mailAccountAuth?.generation(account);
+const mailImapOptions = {
+  credentialsFor: mailCredentialsFor, credentialVersion,
+  onAuthRequired: (account, version) => mailAccountAuth.noteAuthRequired(account, version),
 };
-const mailCredentialsFor = account => MAIL_CREDENTIALS_BY_PROVIDER[account.provider] || {};
 const mailClient = MAIL_CLIENT_ENABLED ? (() => {
-  const imap = createImapMailClient({ credentialsFor: mailCredentialsFor });
+  const imap = createImapMailClient(mailImapOptions);
   return createMailClient({
     db,
     agentStore: mailStore,
+    credentialVersion,
     smartEnabled: MAIL_CLIENT_SMART_ENABLED,
     providers: { gmail: createGmailMailClient({ tokenSource: gmailReadTokens }), naver: imap, works: imap },
   });
 })() : null;
-const gmailModifyRefreshToken = process.env.MAIL_GMAIL_MODIFY_REFRESH_TOKEN;
-const gmailModifyTokens = MAIL_CLIENT_ENABLED && gmailModifyRefreshToken ? createGoogleTokenSource({
-  credentials: { ...MAIL_GMAIL_CREDENTIALS, refreshToken: gmailModifyRefreshToken },
-  fetch: (url, init) => fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(12_000) }),
-}) : null;
+const gmailModifyTokens = mailAccountAuth?.gmailTokens('modify');
 const mailClientActions = MAIL_CLIENT_WRITE_ENABLED ? (() => {
-  const writer = createImapMailWriter({ credentialsFor: mailCredentialsFor });
+  const writer = createImapMailWriter(mailImapOptions);
   const gmail = createGmailMailWriter({ tokenSource: gmailModifyTokens });
   return createMailClientActions({
-    db, agentStore: mailStore, providers: { gmail, naver: writer, works: writer },
+    db, agentStore: mailStore, providers: { gmail, naver: writer, works: writer }, credentialVersion,
     onConfirmed: () => mailClient.invalidateCursors(),
   });
 })() : null;
 const mailClientCompose = MAIL_CLIENT_ENABLED ? createMailClientCompose({
   db, agentStore: mailStore, mailClient,
-  gmail: createGmailCompose({ tokenSource: gmailModifyTokens }),
-  imap: createImapDrafts({ credentialsFor: mailCredentialsFor }),
-  credentialsFor: mailCredentialsFor, writeEnabled: MAIL_CLIENT_WRITE_ENABLED, sendEnabled: MAIL_CLIENT_SEND_ENABLED,
+  gmail: createGmailCompose({ tokenSource: gmailModifyTokens, sendTokenSource: mailAccountAuth.gmailTokens('reply', 'modify') }),
+  imap: createImapDrafts(mailImapOptions),
+  credentialsFor: mailCredentialsFor, credentialVersion, writeEnabled: MAIL_CLIENT_WRITE_ENABLED, sendEnabled: MAIL_CLIENT_SEND_ENABLED,
 }) : null;
 const mailSmart = MAIL_CLIENT_SMART_ENABLED ? createMailSmart({
   db, mailClient, agentStore: mailStore, model: MAIL_ANALYZER_MODEL,
@@ -1010,19 +1019,16 @@ const mailSmart = MAIL_CLIENT_SMART_ENABLED ? createMailSmart({
   onError: error => console.error('Mail Workspace 분석 오류:', error?.code?.startsWith('SQLITE_') ? error.code : 'INTERNAL'),
 }) : null;
 const mailBodyReader = MAIL_AGENT_ENABLED
-  ? createMailBodyReader({ store: mailStore, providers: mailProviders, credentials: mailCredentialsFor })
+  ? createMailBodyReader({ store: mailStore, providers: mailProviders, credentials: mailAgentCredentialsFor })
   : null;
-const gmailReplyRefreshToken = process.env.MAIL_GMAIL_REPLY_REFRESH_TOKEN;
 const mailReplyService = MAIL_REPLY_ENABLED && HAS_GPT && GPT_RESPONSES_ENABLED ? createMailReplyService({
   db,
   store: mailStore,
   bodyReader: mailBodyReader,
   transmit: createMailReplyTransport({
     smtpCredentials: mailCredentialsFor,
-    gmailTokens: gmailReplyRefreshToken ? createGoogleTokenSource({
-      credentials: { ...MAIL_GMAIL_CREDENTIALS, refreshToken: gmailReplyRefreshToken },
-      fetch: (url, init) => fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(15_000) }),
-    }) : null,
+    gmailTokens: mailAccountAuth?.gmailTokens('reply'),
+    credentialVersion,
   }),
   async callModel({ model, system, input, schema, schemaName }) {
     const response = await openai.responses.create({
@@ -1042,7 +1048,7 @@ const mailAnalyzer = MAIL_AGENT_ENABLED && HAS_GPT
   ? createMailAnalyzer({
     store: mailStore,
     providers: mailProviders,
-    credentials: mailCredentialsFor,
+    credentials: mailAgentCredentialsFor,
     model: MAIL_ANALYZER_MODEL,
     // 메일 본문은 신뢰할 수 없는 외부 입력이다. tool을 주지 않고 구조화된 판단만 받는다.
     callModel: async ({ model, system, input, schema, schemaName }) => {
@@ -1274,7 +1280,8 @@ const mailAgent = MAIL_AGENT_ENABLED
     providers: mailProviders,
     analyzer: mailAnalyzer,
     pushService: mailPushService,
-    credentials: mailCredentialsFor,
+    credentials: mailAgentCredentialsFor,
+    credentialVersion,
     // 오류 코드만 남긴다. 제목·발신자·주소는 로그에 넣지 않는다(설계 19절).
     onError: (error, account) => {
       console.error(`Mail sync 오류: account=${account?.id ?? '-'} ${error?.code || error?.name || 'UNKNOWN'}`);
@@ -5005,6 +5012,7 @@ registerMailRoutes({
   onRequeued: () => { void mailAgent?.tick(); },
 });
 registerMailClientRoutes({ app, service: mailClient, contacts: createMailClientContacts(db) });
+registerMailAccountRoutes(app, MAIL_CLIENT_ENABLED ? mailAccountAuth : null);
 registerMailClientActionRoutes({ app, service: mailClientActions });
 registerMailClientComposeRoutes({ app, service: mailClientCompose });
 registerMailClientSmartRoutes({ app, service: mailSmart });
