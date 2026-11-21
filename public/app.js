@@ -31,6 +31,7 @@ let tasksEnabled = false;
 let weatherEnabled = false;
 let taskSeriesEnabled = false;
 let mailReplyEnabled = false;
+let mailClientConfig = null;
 let mailReplyTarget = null;
 const pendingMailReplyRequests = new Map();
 let taskRefreshTimer = null;
@@ -198,9 +199,10 @@ async function init() {
     weatherEnabled = config.weatherEnabled === true;
     taskSeriesEnabled = config.taskSeriesEnabled === true;
     mailReplyEnabled = config.mailReplyEnabled === true;
+    mailClientConfig = config.mailClient;
     document.getElementById('mail-reply-clear').onclick = () => setMailReplyTarget(null);
     initPaperPanel();
-    window.HomeDashboard?.init({ apiFetch, showToast, weatherEnabled });
+    window.HomeDashboard?.init({ apiFetch, showToast, weatherEnabled, mailClientConfig });
     // 옆의 XION 칩이 비서 이름을 말하므로 라벨은 모델만 남긴다.
     document.getElementById('model-indicator').textContent = config.gptChatBootstrapModel;
     renderWebUsagePill(config.webSearch);
@@ -1276,6 +1278,7 @@ function initPaperPanel() {
         window.NotePanel?.open(note);
       },
       onResolved: id => window.HomeDashboard?.notificationResolved?.(id),
+      onOpenMail: mailClientConfig?.enabled === true ? id => window.HomeDashboard?.openMail(id) : null,
       onReply: mailReplyEnabled ? item => {
         setMailReplyTarget(item);
         window.HomeDashboard?.setRoute('chat');

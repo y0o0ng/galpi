@@ -222,7 +222,10 @@
     body.className = 'mail-body';
     body.hidden = true;
     card.appendChild(body);
-    open.addEventListener('click', () => toggleBody(item, open, body));
+    if (state.onOpenMail && Number.isSafeInteger(item.attentionId)) {
+      open.removeAttribute('aria-expanded');
+      open.addEventListener('click', () => state.onOpenMail(item.attentionId));
+    } else open.addEventListener('click', () => toggleBody(item, open, body));
 
     const actions = document.createElement('div');
     actions.className = 'notification-actions';
@@ -597,7 +600,7 @@
     refresh();
   }
 
-  function init({ apiFetch, showToast, onSplit, openNote, onResolved, onReply }) {
+  function init({ apiFetch, showToast, onSplit, openNote, onResolved, onReply, onOpenMail }) {
     if (state.initialized) return;
     const el = elements();
     if (
@@ -616,6 +619,7 @@
     state.openNote = openNote;
     state.onResolved = onResolved;
     state.onReply = onReply;
+    state.onOpenMail = onOpenMail;
     el.refresh.addEventListener('click', refresh);
     el.tabs.forEach(tab => tab.addEventListener('click', () => selectFilter(tab.dataset.notificationFilter)));
     state.initialized = true;
