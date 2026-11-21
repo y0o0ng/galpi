@@ -550,8 +550,9 @@ V5는 **밖에 나가 일하는 전문 직원**이다 — 외부 데이터 수�
 ## Mail Workspace — 통합 메일 클라이언트
 
 - **Backend Phase 1**은 제공자별 메일함·라벨 조회, 점진 페이지, 통합 받은편지함, 원본 검증·상세, 메타데이터 캐시와 인증된 내부 API다. Mail Agent의 동기화·분석·Attention·Push는 기존 계약을 따른다. [Mail Workspace 설계](mail-workspace-design.md)
-- **Backend Phase 2**는 상태 변경·일괄 처리·수동 안 읽음 및 멱등 기록의 로컬 구현이다. 운영 활성화, 화면 연결, 실계정 인수는 후속이다. [Phase 2 계약](mail-workspace-design.md#backend-phase-2)
-- **Backend Phase 3**는 일반 작성·제공자 초안·첨부·명시적 발송·v47 영수증의 로컬 구현이다. 운영 플래그 활성화, 실계정 확인, 화면 연결은 후속이다. [Phase 3 계약](mail-workspace-design.md#backend-phase-3)
+- **Backend Phase 2**는 상태 변경·일괄 처리·수동 안 읽음 및 멱등 기록의 로컬 구현이다. Gmail·네이버·웍스의 승인된 실계정 경로를 확인했다. 화면과 운영 활성화는 후속이다. [Phase 2 계약](mail-workspace-design.md#backend-phase-2)
+- **Backend Phase 3**는 일반 작성·제공자 초안·첨부·명시적 발송·v47 영수증의 로컬 구현이다. Gmail↔네이버, Gmail↔웍스의 승인된 실계정 경로를 인수했다. 운영 플래그 활성화와 화면 연결은 후속이다. [Phase 3 계약](mail-workspace-design.md#backend-phase-3)
+- **Backend Phase 4**는 기존 Agent 판단 재사용, 별도 점진 분석, 스마트 필터와 근거를 갖춘 미저장 일정 후보다. 기본 꺼짐 플래그와 v48을 사용한다. 실계정·실모델 확인과 화면 연결은 후속이다. [Phase 4 계약](mail-workspace-design.md#backend-phase-4)
 
 ## 뉴스 — "내가 신경 쓰는 것만 바뀌면 알려준다" (메일 위에 얹기) 🔨 v1 Pi 인수(2026-08-21), 홈 노출까지 인수, 재확인만 남음
 

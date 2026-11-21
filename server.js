@@ -57,11 +57,14 @@ const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailClient } = require('./lib/mail/client');
 const { createGmailMailClient } = require('./lib/mail/client-gmail');
 const { createImapMailClient } = require('./lib/mail/client-imap');
-const { registerMailClientRoutes, registerMailClientActionRoutes, registerMailClientComposeRoutes } = require('./lib/mail/client-routes');
+const {
+  registerMailClientRoutes, registerMailClientActionRoutes, registerMailClientComposeRoutes, registerMailClientSmartRoutes,
+} = require('./lib/mail/client-routes');
 const { createMailClientActions } = require('./lib/mail/client-actions');
 const { createGmailMailWriter } = require('./lib/mail/client-gmail-write');
 const { createImapMailWriter } = require('./lib/mail/client-imap-write');
 const { createMailClientCompose } = require('./lib/mail/client-compose');
+const { createMailSmart } = require('./lib/mail/client-smart');
 const { createGmailCompose } = require('./lib/mail/client-compose-gmail');
 const { createImapDrafts } = require('./lib/mail/client-compose-imap');
 const { createMailBodyReader } = require('./lib/mail/body');
@@ -260,6 +263,7 @@ const MAIL_REPLY_ENABLED = MAIL_AGENT_ENABLED && process.env.MAIL_REPLY_ENABLED 
 const MAIL_CLIENT_ENABLED = process.env.MAIL_CLIENT_ENABLED === 'true';
 const MAIL_CLIENT_WRITE_ENABLED = MAIL_CLIENT_ENABLED && process.env.MAIL_CLIENT_WRITE_ENABLED === 'true';
 const MAIL_CLIENT_SEND_ENABLED = MAIL_CLIENT_WRITE_ENABLED && process.env.MAIL_CLIENT_SEND_ENABLED === 'true';
+const MAIL_CLIENT_SMART_ENABLED = MAIL_CLIENT_ENABLED && process.env.MAIL_CLIENT_SMART_ENABLED === 'true';
 // News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
 const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
@@ -949,6 +953,7 @@ const mailClient = MAIL_CLIENT_ENABLED ? (() => {
   return createMailClient({
     db,
     agentStore: mailStore,
+    smartEnabled: MAIL_CLIENT_SMART_ENABLED,
     providers: { gmail: createGmailMailClient({ tokenSource: gmailReadTokens }), naver: imap, works: imap },
   });
 })() : null;
@@ -970,6 +975,25 @@ const mailClientCompose = MAIL_CLIENT_ENABLED ? createMailClientCompose({
   gmail: createGmailCompose({ tokenSource: gmailModifyTokens }),
   imap: createImapDrafts({ credentialsFor: mailCredentialsFor }),
   credentialsFor: mailCredentialsFor, writeEnabled: MAIL_CLIENT_WRITE_ENABLED, sendEnabled: MAIL_CLIENT_SEND_ENABLED,
+}) : null;
+const mailSmart = MAIL_CLIENT_SMART_ENABLED ? createMailSmart({
+  db, mailClient, agentStore: mailStore, model: MAIL_ANALYZER_MODEL,
+  callModel: HAS_GPT ? async ({ model, system, input, schema, schemaName }) => {
+    const response = await openai.responses.create({
+      model,
+      instructions: system,
+      input,
+      store: false,
+      text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } },
+    }, { timeout: 30_000, maxRetries: 0 });
+    if (response.status !== 'completed') throw new Error('MAIL_CLIENT_SMART_MODEL_INCOMPLETE');
+    try { return JSON.parse(extractSmallResponseText(response)); } catch {
+      throw Object.assign(new Error('MAIL_CLIENT_SMART_MODEL_OUTPUT_INVALID'), {
+        code: 'MAIL_CLIENT_SMART_MODEL_OUTPUT_INVALID', statusCode: 502,
+      });
+    }
+  } : null,
+  onError: error => console.error('Mail Workspace 분석 오류:', error?.code?.startsWith('SQLITE_') ? error.code : 'INTERNAL'),
 }) : null;
 const mailBodyReader = MAIL_AGENT_ENABLED
   ? createMailBodyReader({ store: mailStore, providers: mailProviders, credentials: mailCredentialsFor })
@@ -4969,6 +4993,7 @@ registerMailRoutes({
 registerMailClientRoutes({ app, service: mailClient });
 registerMailClientActionRoutes({ app, service: mailClientActions });
 registerMailClientComposeRoutes({ app, service: mailClientCompose });
+registerMailClientSmartRoutes({ app, service: mailSmart });
 const shortcutRoutes = createVoiceShortcutRoutes({
   app,
   service: voiceShortcut,
@@ -8675,6 +8700,7 @@ const httpServer = app.listen(PORT, HOST, () => {
     mailAgent.start();
     console.log('   메일:     Provider 동기화 worker 실행 중 (30초 tick, 계정별 5분)');
   }
+  mailSmart?.start();
   if (newsCollector) {
     newsCollector.start();
     console.log(`   뉴스:     수집 worker 실행 중 (15분 tick, 관심별 6시간, 월 ${newsStore.monthlyCreditLimit} credits)`);
@@ -8759,6 +8785,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     assistantPushDispatcher?.stop();
     attachmentUploads.stop();
     mailAgent?.stop();
+    mailSmart?.stop();
     newsCollector?.stop();
     newsAnalyzer?.stop();
     newsPushDispatcher?.stop();
