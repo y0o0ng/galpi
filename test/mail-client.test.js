@@ -234,7 +234,7 @@ function fakeImap() {
   return { naver, works, calls, adapter };
 }
 
-function fixture(t) {
+function fixture(t, smartEnabled = false) {
   const db = new Database(':memory:');
   t.after(() => db.close());
   db.exec('CREATE TABLE messages (id INTEGER PRIMARY KEY, created_at INTEGER)');
@@ -245,7 +245,7 @@ function fixture(t) {
   let now = NOW;
   const addAccount = (provider, address) => store.registerAccount({ provider, address, now }).id;
   const service = createMailClient({
-    db, agentStore: store, providers: { gmail: gmail.adapter, naver: imap.adapter, works: imap.adapter }, now: () => now,
+    db, agentStore: store, smartEnabled, providers: { gmail: gmail.adapter, naver: imap.adapter, works: imap.adapter }, now: () => now,
   });
   return { db, store, service, gmail, imap, addAccount, advance(seconds) { now += seconds; } };
 }
@@ -587,4 +587,61 @@ test('HTML-only mail is returned as text without script content or attachment by
   const detail = await f.service.detail(page.messages[0].id);
   assert.deepEqual(detail.body, { format: 'text', text: 'Safe visible text.' });
   assert.equal(detail.hasAttachments, false);
+});
+
+test('smart source checks freshly read Gmail labels and rejects reused IDs before opening content', async t => {
+  const f = fixture(t, true);
+  const accountId = f.addAccount('gmail', 'test@gmail.com');
+  const original = gmailMessage('reused', NOW, ['IMPORTANT']);
+  f.gmail.setMessages([original]);
+  const { messages: [listed] } = await f.service.mailbox(accountId, 'all', null, 20);
+  assert.equal((await f.service.openAnalysisSource(listed.id)).row.metadata.important, true);
+
+  f.gmail.setMessages([{ ...original, labelIds: ['SENT'] }]);
+  const requests = f.gmail.calls.length;
+  await assert.rejects(f.service.openAnalysisSource(listed.id), { code: 'MAIL_CLIENT_SMART_INELIGIBLE' });
+  assert.equal(f.gmail.calls.slice(requests).some(call => call.query.get('format') === 'raw'), false);
+
+  f.gmail.setMessages([{ ...original, internalDate: String((NOW + 1) * 1000) }]);
+  await assert.rejects(f.service.openAnalysisSource(listed.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
+});
+
+test('smart IMAP eligibility uses server roles, retains distinct locations and rejects stale proofs', async t => {
+  const f = fixture(t, true);
+  const accountId = f.addAccount('naver', 'test@naver.com');
+  for (const [path, role] of [['A', 'Sent'], ['B', 'Drafts'], ['C', 'Trash'], ['D', 'Junk']]) {
+    f.imap.naver.folders.push({ path, flags: new Set(['\\' + role]) });
+    f.imap.naver.rows[path] = [imapMessage(17, NOW - 10)];
+  }
+  const { mailboxes } = await f.service.mailboxes(accountId);
+  assert.ok(mailboxes.every(mailbox => !Object.hasOwn(mailbox, 'analysisEligible')));
+  const { messages: [ordinary] } = await f.service.mailbox(accountId, 'folder:Projects/2026', null, 20);
+  const { messages: [inbox] } = await f.service.mailbox(accountId, 'folder:INBOX', null, 20);
+  assert.equal(ordinary.rfcMessageId, inbox.rfcMessageId);
+  assert.notEqual(ordinary.id, inbox.id);
+  assert.equal((await f.service.openAnalysisSource(ordinary.id)).cached.locator.analysisMailboxEligible, true);
+  assert.equal((await f.service.openAnalysisSource(ordinary.id)).agentMessageId, null);
+  for (const folder of ['A', 'B', 'C', 'D']) {
+    const { messages: [excluded] } = await f.service.mailbox(accountId, 'folder:' + folder, null, 20);
+    await assert.rejects(f.service.openAnalysisSource(excluded.id), { code: 'MAIL_CLIENT_SMART_INELIGIBLE' });
+  }
+  f.imap.naver.folders.find(folder => folder.path === 'D').flags.clear();
+  const ordinaryFolder = f.imap.naver.folders.find(folder => folder.path === 'Projects/2026');
+  ordinaryFolder.specialUse = '\\Archive';
+  ordinaryFolder.specialUseSource = 'name';
+  await assert.rejects(f.service.openAnalysisSource(ordinary.id), { code: 'MAIL_CLIENT_SMART_MAILBOX_UNVERIFIED' });
+  ordinaryFolder.specialUseSource = 'extension';
+  assert.ok((await f.service.openAnalysisSource(ordinary.id)).raw.equals(SOURCE));
+
+  f.imap.naver.rows.INBOX = f.imap.naver.rows.INBOX.map(row => ({
+    ...row, source: Buffer.from(SOURCE.toString().replace('end-of-full-body', 'new-of-full-body')),
+  }));
+  await assert.rejects(f.service.openAnalysisSource(inbox.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
+  const { messages: [replacement] } = await f.service.mailbox(accountId, 'folder:INBOX', null, 20);
+  assert.notEqual(inbox.id, replacement.id);
+  f.imap.naver.validity = 44n;
+  await assert.rejects(f.service.openAnalysisSource(replacement.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
+  f.imap.naver.rows['Projects/2026'] = [];
+  await assert.rejects(f.service.openAnalysisSource(ordinary.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
+  assert.ok(f.imap.calls.every(call => ['EXAMINE', 'PEEK'].includes(call.operation)));
 });

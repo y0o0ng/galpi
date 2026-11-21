@@ -130,3 +130,35 @@ Workspace 작성은 인증된 내부 API에서만 사용한다. `MAIL_CLIENT_ENA
 v47 영수증은 요청 ID·계정·요청 해시·초안 버전/원본 참조·상태·오류 코드·제공자 메시지 ID·시각과 정리/수락 결과만 남긴다. 제공자 쓰기 전 `pending`을 확보한다. 같은 요청은 기존 결과를 반환하고 다른 내용에 같은 ID를 쓰면 409를 반환한다. 같은 초안 버전에 대해 이미 `pending`·`sent`·`unknown` 영수증이 있으면 새 ID로도 발송을 막는다. 재시작 후 남은 `pending`과 응답 유실에 따른 `unknown`은 자동 실행하지 않는다. 초안 저장 결과는 `saved`·`conflict`·`failed`·`unknown`과 처리 중 `pending`을 구분한다. 확인된 저장·발송과 외부 변경 가능성이 있는 결과는 계정 목록 캐시와 Phase 2 페이지 커서를 무효화한다.
 
 실계정 확인은 Gmail OAuth 프로필·초안 교체·스레드·SENT, Naver와 NAVER WORKS의 실제 Drafts/Trash 플래그·UIDVALIDITY·MOVE·APPEND 원문 보존·SMTP BCC·SENT 저장을 각각 포함한다. Phase 3 자동 검증은 모의 제공자만 사용한다.
+
+## Backend Phase 4
+
+`MAIL_CLIENT_SMART_ENABLED=false`가 기본값이며 `MAIL_CLIENT_ENABLED=true`가 필요하다. 스마트 분석은 Agent 활성화, 메일 쓰기, 발송 플래그와 독립이다. 기존 Gmail 읽기 권한과 IMAP의 read-only 원문 조회를 사용한다. 스마트 API에는 기존 인증과 `Cache-Control: no-store`를 적용한다. 스마트 메일함은 Figma의 중요·조치 필요·일정·마감·무시·미분류 구분을 따른다. [Mail Workspace 화면 정본](https://www.figma.com/design/8EafrARqh4NwKmaRvwRkZM/galpi-home-design?node-id=449-931)
+
+### 분석 범위와 큐
+
+- 사용자가 이미 탐색한 Workspace 상세 ID만 명시적 POST로 예약한다. 한 요청은 서로 다른 ID 최대 10개를 받는다. POST는 제공자 확인과 예약까지만 처리하고 모델 응답은 별도 작업으로 받는다. 읽기 API에서 분석을 예약하거나 모델을 호출하는 횟수는 0회다.
+- Gmail은 현재 메시지 ID·수신 시각·봉투 정보를 확인한다. `SENT`, `DRAFT`, `SPAM`, `TRASH`가 붙은 메일은 제외한다. IMAP은 현재 LIST의 서버 역할과 read-only UID·UIDVALIDITY 및 원문 증명을 확인한다. INBOX나 서버의 Archive 역할을 사용할 수 있다. 일반 폴더는 서버가 Sent·Drafts·Trash·Junk를 각각 한 곳으로 식별할 수 있을 때 허용한다. ImapFlow가 이름으로 유추한 역할, 집계 폴더, Draft·Deleted 플래그는 분석 허용 근거로 쓰지 않는다.
+- 비활성 계정과 변경된 위치·원문을 거부한다. 조회한 원문 바이트의 SHA-256을 확보하고 모델 호출 직전과 결과 저장 전에 동일성을 확인한다. 같은 Workspace 위치에서 이전 원문과 달라지면 해당 상세 ID는 분석에 사용할 수 없다. IMAP 이동 뒤 새 상세 ID는 자신의 독립된 결과를 갖는다. RFC Message-ID만으로 결과를 옮기거나 병합하지 않는다.
+- v48의 `mail_workspace_sources`는 마지막으로 확인한 원문 해시와 관측 시각·오류를 갖는다. `mail_workspace_analysis_jobs`는 메시지·원문 해시·분류 또는 일정 작업의 조합을 유일하게 보존한다. 작업 상태는 pending·analyzing·done·failed·skipped다. 4분 lease를 회수하고 실패는 최대 세 번 시도한다. 일시 오류의 재시도 대기는 30초, 60초다. lease가 만료된 작업자의 결과는 폐기한다. 일정 후보 저장과 작업 완료는 한 트랜잭션으로 처리한다.
+- 같은 계정과 제공자 위치가 검증된 Agent의 완료 판단을 먼저 표시한다. Workspace 결과는 대체 판단으로만 쓴다. `skip_analysis`는 모델 호출 전에 적용하고 이유를 결과에 남긴다. Agent baseline·분석 큐·판단 프롬프트 버전과 Attention·Push는 기존 경로에 남는다. 사용자가 선택한 baseline 메일의 Workspace 분석은 Agent baseline이나 큐를 변경하지 않는다.
+
+### 스마트 목록과 일정 후보
+
+- 중요는 AI `urgent`·`important`, 조치 필요는 `action_required` 또는 행동 문구가 확인된 `urgent`다. 일정은 후보가 있는 메일이며 마감은 유효한 기존 Agent 기한이나 날짜가 해석된 마감 후보다. Workspace 분류 응답의 기한 값은 근거 인용이 있는 일정 작업으로 확인한 뒤 표시한다. 무시는 `ignore`, 미분류는 판단이 아직 없는 메일이다. `info`는 분류 완료로 본다. 이 필터는 겹칠 수 있다. Gmail IMPORTANT·수동 별표는 제공자 상태 그대로다.
+- 목록과 달력은 탐색·분석된 관측 범위를 조회하며 `coverage.complete=false`를 반환한다. 저장된 관측에는 `sourceVerification.state=observed`와 검증 시각을 표시한다. 개별 분석 결과와 일정 상세는 제공자에서 원문을 다시 검증하고 현재 검증 실패를 반환한다. 목록은 수신 시각, 계정과 제공자 위치로 정렬한다. 기간은 시작 포함, 끝 제외다. 미확정 후보는 수신 기준 날짜가 속한 기간의 별도 목록에 두며 달력 날짜가 없다.
+- 한 원문에서 최대 10개를 추출한다. 개인·공식·마감·미정 중 한 종류를 갖는다. 정확히 인용된 제목·날짜 표현과 실제 입력에 존재하는 짧은 근거가 필요하다. 외부 메일 지시는 데이터로 전달하고 모델에는 실행 도구를 주지 않는다. 원문 전체나 첨부 바이트는 보존하지 않는다. `mail_workspace_calendar_events`에는 근거 발췌·해시·날짜 출처·수신 기준일·추론 이유와 가능한 종료 시각을 보관한다. 작업에는 모델·프롬프트 버전·시각과 분류용 제한된 구조화 값만 남긴다. 입력 절단, 후보 초과, 근거 불일치, 첨부 의존성은 불완전 사유로 표시한다.
+- 날짜와 시각은 메일 수신 시각의 KST 달력으로 계산한다. 명시 연도를 보존한다. 월·일만 있으면 수신 연도 전후의 유효한 날짜에서 검증된 미래·과거 방향의 가장 가까운 날짜 또는 절대 차이가 가장 작은 날짜를 선택한다. 동률, 방향 충돌, 모호한 상대 표현이나 지원되지 않는 시간대는 미확정이다. 시간이 있는 경우에만 datetime을 쓰며 KST와 명시적인 UTC·숫자 오프셋을 지원한다. 날짜만 알려진 후보는 date다.
+- 일정 상세는 현재 원문을 검증한 뒤 기존 due 검증기를 통과하는 제목과 날짜를 `taskProposal.value`에 돌려준다. 미확정이거나 후보 날짜가 현재 기준 과거인 경우 `taskProposal.code`를 제공한다. 나중에 UI가 사용자 수정·확정 뒤 기존 일정 API와 `clientRequestId`로 저장한다. 이 단계에는 task·reminder 생성 경로가 없다.
+
+### 내부 API
+
+| 메서드와 경로 | 계약 |
+| --- | --- |
+| `POST /api/mail-client/smart/analyze` | `{messageIds, kind}`에서 kind는 classification·calendar·both. HTTP 202와 메시지별 기존 또는 새 작업 상태, 검증 오류 반환 |
+| `GET /api/mail-client/smart/results?messageIds=1,2` | 현재 원문 검증, Agent·Workspace 출처와 모델·프롬프트·분석 시각, 작업 상태·실패 원인 |
+| `GET /api/mail-client/smart/messages?filter=unclassified` | 여섯 필터 중 하나. 선택적 accountId, limit, cursor |
+| `GET /api/mail-client/smart/calendar?month=2026-12` | month 또는 from·until. 선택적 accountId, limit, cursor. 첫 요청은 날짜가 있는 후보와 별도 unresolved 목록 반환. section=unresolved로 해당 목록의 커서를 이어 읽음 |
+| `GET /api/mail-client/smart/calendar/:eventId` | 근거·원문 연결·현재 검증 상태와 미저장 task 제안값 |
+
+작업 결과의 실패 이유, 건너뜀, 원문 변경, 계정 비활성, 워크스페이스 기능 비활성을 응답 코드 또는 메시지별 상태로 구분한다. UI 연결, 실계정·실모델 인수 및 운영 활성화는 후속 범위다.
