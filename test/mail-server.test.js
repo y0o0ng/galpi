@@ -118,7 +118,7 @@ test('the schema lands even while the mail agent stays off', async t => {
   `).all().map(row => row.name);
   assert.deepEqual(tables, [
     'mail_accounts', 'mail_attention', 'mail_client_action_receipts', 'mail_client_cache',
-    'mail_client_compose_receipts', 'mail_client_messages', 'mail_client_read_overrides', 'mail_messages',
+    'mail_client_compose_receipts', 'mail_client_contacts', 'mail_client_messages', 'mail_client_read_overrides', 'mail_messages',
     'mail_notification_batches', 'mail_preferences',
     'mail_push_deliveries', 'mail_reply_attempts', 'mail_sync_state',
     'mail_workspace_analysis_jobs', 'mail_workspace_calendar_events', 'mail_workspace_sources',
@@ -136,6 +136,13 @@ test('Mail Client uses the existing HTTP authentication and runs independently f
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.deepEqual(body, { success: true, accounts: [] });
   assert.equal((await api(url, '/api/mail-client/inbox?limit=100')).response.status, 400);
+  const contactsPath = '/api/mail-client/contacts';
+  assert.equal((await fetch(url + contactsPath)).status, 401);
+  assert.deepEqual((await api(url, contactsPath)).body, { success: true, contacts: [], total: 0, collectionEnabled: false });
+  assert.equal((await fetch(url + contactsPath + '/import', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entries: [{ email: 'example@example.com' }] }),
+  })).status, 401);
   assert.equal((await api(url, '/api/mail/status')).body.code, 'MAIL_AGENT_DISABLED');
   assert.equal(logs.join('').includes('Provider 동기화 worker'), false);
   const rejectedWrite = await fetch(url + '/api/mail-client/inbox', {

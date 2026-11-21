@@ -585,7 +585,7 @@ test('HTML-only mail is returned as text without script content or attachment by
   f.imap.works.rows.Received = [imapMessage(3, NOW - 5, { source })];
   const page = await f.service.mailbox(account, 'folder:Received', null, 1);
   const detail = await f.service.detail(page.messages[0].id);
-  assert.deepEqual(detail.body, { format: 'text', text: 'Safe visible text.' });
+  assert.deepEqual(detail.body, { format: 'text', text: 'Safe visible text.', blockedRemoteImages: 1 });
   assert.equal(detail.hasAttachments, false);
 });
 
@@ -644,4 +644,36 @@ test('smart IMAP eligibility uses server roles, retains distinct locations and r
   f.imap.naver.rows['Projects/2026'] = [];
   await assert.rejects(f.service.openAnalysisSource(ordinary.id), { code: 'MAIL_CLIENT_LOCATION_STALE' });
   assert.ok(f.imap.calls.every(call => ['EXAMINE', 'PEEK'].includes(call.operation)));
+});
+
+test('Workspace search combines observed folder, sender and flags and keeps its cursor scoped', async t => {
+  const f = fixture(t);
+  const gmail = f.addAccount('gmail', 'test@gmail.com');
+  const naver = f.addAccount('naver', 'test@naver.com');
+  await f.service.mailbox(gmail, 'all', null, 20);
+  await f.service.mailbox(naver, 'folder:INBOX', null, 20);
+  const all = await f.service.search({ q: 'Original subject', sender: 'TEACHER', attachments: 'true' }, null, null, 2);
+  assert.equal(all.coverage, 'observed_workspace');
+  assert.ok(all.total > 2);
+  assert.equal(all.messages.length, 2);
+  assert.ok(all.messages.every(message => message.stale));
+  const next = await f.service.search({ q: 'Original subject', sender: 'TEACHER', attachments: 'true' }, null, all.nextCursor, 2);
+  assert.ok(next.messages.every(message => !all.messages.some(item => item.id === message.id)));
+  assert.throws(() => f.service.search({ q: 'different' }, null, all.nextCursor, 2), { code: 'MAIL_CLIENT_CURSOR_INVALID' });
+  const unread = await f.service.search({ q: 'Teacher', accountId: String(naver), mailbox: 'folder:INBOX', read: 'unread' }, naver, null, 10);
+  assert.equal(unread.total, 1);
+  assert.equal(unread.messages[0].accountId, naver);
+  assert.equal(unread.messages[0].read, false);
+  assert.throws(() => f.service.search({ from: '2026-02-31' }, naver, null, 10), { code: 'MAIL_CLIENT_SEARCH_INVALID' });
+});
+
+test('Workspace downloads only the selected verified non-inline attachment', async t => {
+  const f = fixture(t);
+  const account = f.addAccount('naver', 'test@naver.com');
+  const observed = await f.service.mailbox(account, 'folder:INBOX', null, 1);
+  const id = observed.messages[0].id;
+  const file = await f.service.attachment(id, 0);
+  assert.equal(file.filename, 'office.txt');
+  assert.equal(file.bytes.toString(), FILE_CONTENT + '\n');
+  await assert.rejects(f.service.attachment(id, 1), { code: 'MAIL_CLIENT_ATTACHMENT_NOT_FOUND' });
 });

@@ -104,15 +104,20 @@ async function mockApp(t) {
   const now = Math.floor(Date.now() / 1000);
   const fixture = process.env.MAIL_INBOX_FIXTURE;
   const messages = fixture ? JSON.parse(await fs.readFile(fixture, 'utf8')) : [
-    { id: 1, accountId: 1, provider: 'gmail', subject: '논문 피드백 전달', from: [{ name: '최유진 교수' }],
+    { id: 1, accountId: 1, provider: 'gmail', labelIds: ['INBOX'], subject: '논문 피드백 전달', from: [{ name: '최유진 교수' }],
       receivedAt: now, read: false, important: true, starred: true, hasAttachments: true },
-    { id: 2, accountId: 3, provider: 'works', subject: '재료공학 과제 안내', from: [{ name: '김민수 교수' }],
+    { id: 2, accountId: 3, provider: 'works', folderPath: 'INBOX', subject: '재료공학 과제 안내', from: [{ name: '김민수 교수' }],
       receivedAt: now - 1, read: false, starred: false, hasAttachments: true },
     { id: 3, accountId: 2, provider: 'naver', subject: '신소재 실험 결과 공유', from: [{ name: '이서연 연구원' }],
       receivedAt: now - 2, read: true, starred: false },
   ];
   const calls = [];
-  const state = { enabled: true, outcome: 'confirmed', incomplete: false, authExpired: false, inboxError: false, holdInbox: null };
+  const state = { enabled: true, outcome: 'confirmed', incomplete: false, authExpired: false, inboxError: false,
+    holdInbox: null, holdDetail: null, missingDetail: false, contactsUnavailable: false, submission: 'saved', send: 'sent' };
+  const contacts = [{ id: 1, name: '최유진 교수', email: 'sender@example.com', organization: '연구실', source: 'csv' }];
+  let draft = { id: 'draft-1', version: 'a'.repeat(64), subject: 'Re: 논문 피드백 전달', text: '', to: ['sender@example.com'],
+    cc: [], bcc: [], attachments: [] };
+  let mailSettings = { notificationsEnabled: true, quietHours: { enabled: true, start: '23:00', end: '07:00' } };
   const routes = process.env.MAIL_INBOX_EXPORTS ? JSON.parse(process.env.MAIL_INBOX_EXPORTS) : [];
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
   const server = http.createServer(async (req, res) => {
@@ -141,23 +146,33 @@ async function mockApp(t) {
       return;
     }
     let payload;
-    if (req.method === 'POST') {
+    if (['POST', 'PUT'].includes(req.method)) {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
-      payload = JSON.parse(Buffer.concat(chunks).toString());
+      const raw = Buffer.concat(chunks);
+      payload = req.headers['content-type'] === 'application/octet-stream' ? { bytes: raw.length } : raw.length ? JSON.parse(raw.toString()) : {};
+
     }
     calls.push({ method: req.method, endpoint, query: Object.fromEntries(url.searchParams), payload });
     if (endpoint === '/api/config') return json({ requiresApiToken: false, gptChatBootstrapModel: 'mock' });
     if (endpoint === '/api/models/chat') return json({ selection: 'auto', options: [], resolvedModelId: null });
-    if (endpoint === '/api/mail/status') return json({ accounts });
+    if (endpoint === '/api/mail/status') return json({ accounts, analysis: { pending: 1, analyzing: 0, done: 2, failed: 1 } });
+    if (endpoint === '/api/mail/settings') {
+      if (req.method === 'PUT') mailSettings = { ...mailSettings, ...payload };
+      return json({ success: true, settings: mailSettings });
+    }
+    if (endpoint === '/api/mail/preferences') return json({ success: true, preferences: [{
+      id: 1, preferenceType: 'sender', target: 'old@example.com', action: 'suppress_notification',
+    }] });
     if (!endpoint.startsWith('/api/mail-client/')) return json({ messages: [], notes: [], models: [], notifications: [], ddays: [], chat: [] });
     if (endpoint.endsWith('/accounts')) return state.enabled ? json({ success: true, accounts })
       : json({ success: false, code: 'MAIL_CLIENT_DISABLED' }, 503);
     if (endpoint.endsWith('/mailboxes')) {
       const id = Number(endpoint.split('/').at(-2));
       const mailboxes = [{ id: 'inbox', inbox: true, selectable: true, name: '받은편지함' }];
+      if (id > 1) mailboxes.push({ id: 'folder:Project', kind: 'folder', name: '프로젝트', path: 'Project', selectable: true });
       if (id === 1) {
-        mailboxes.push(...['연구실', '지원서'].map(name => ({ id: name, name, kind: 'label', type: 'user', selectable: true })));
+        mailboxes.push(...['연구실', '지원서'].map(name => ({ id: name, name, kind: 'label', type: 'user', providerId: name, selectable: true })));
         mailboxes.push(
           { id: 'drafts', name: '임시보관함', kind: 'label', type: 'system', providerId: 'DRAFT', selectable: true },
           { id: 'trash', name: '휴지통', kind: 'label', type: 'system', providerId: 'TRASH', selectable: true },
@@ -177,6 +192,55 @@ async function mockApp(t) {
           failure: state.authExpired && account.id === 3 ? { code: 'MAIL_CLIENT_AUTH_REQUIRED' } : undefined,
         })), nextCursor: '00000000-0000-4000-8000-000000000001' });
     }
+    if (endpoint.endsWith('/search')) {
+      const query = url.searchParams.get('q')?.toLowerCase();
+      const found = messages.filter(message => (!query || message.subject.toLowerCase().includes(query) || query === 'sender@example.com')
+        && (url.searchParams.get('read') !== 'unread' || !message.read));
+      return json({ success: true, messages: found, total: found.length, nextCursor: null });
+    }
+    if (endpoint.endsWith('/smart/messages')) return json({ success: true, messages: [messages[0]], nextCursor: null });
+    if (endpoint.endsWith('/smart/calendar')) return json({ success: true, events: [{
+      id: 7, messageId: 1, accountId: 1, kind: 'personal', title: '연구실 면담',
+      startDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
+    }], nextCursor: null });
+    if (endpoint.endsWith('/smart/calendar/7')) return json({ success: true, event: { id: 7, messageId: 1 } });
+    if (endpoint.endsWith('/contacts')) {
+      if (state.contactsUnavailable) return json({ success: false, code: 'MOCK_NOT_FOUND' }, 404);
+      const from = url.searchParams.get('source');
+      const q = url.searchParams.get('q');
+      const entries = contacts.filter(item => (!from || from === item.source) && (!q || item.name.includes(q) || item.email.includes(q)));
+      return json({ success: true, contacts: entries, total: entries.length });
+    }
+    if (endpoint.endsWith('/contacts/import')) {
+      const found = payload.entries.filter(item => !contacts.some(contact => contact.email === item.email));
+      if (!payload.preview) contacts.push(...found.map((entry, index) => ({ id: contacts.length + index + 1, source: 'csv', ...entry })));
+      return json({ success: true, created: found.length, skipped: payload.entries.length - found.length });
+    }
+    if (/\/mail-client\/messages\/\d+$/.test(endpoint)) {
+      if (state.holdDetail) await state.holdDetail;
+      if (state.missingDetail) return json({ success: false, code: 'MAIL_CLIENT_MESSAGE_GONE' }, 404);
+      const source = messages.find(item => item.id === Number(endpoint.split('/').at(-1)));
+      if (!source) return json({ success: false, code: 'MAIL_CLIENT_MESSAGE_GONE' }, 404);
+      return json({ success: true, message: { ...source, accountId: source.accountId || 1,
+        from: [{ name: '최유진 교수', address: 'sender@example.com' }], to: [{ address: 'sample@gmail.com' }],
+        body: { format: 'text', text: '<img src="https://example.invalid/track">안녕하세요.\n\n> 앞선 답장입니다.', blockedRemoteImages: 1 },
+        thread: { messages: source.id === 1 ? [{ id: 2, from: [{ name: '최유진 교수' }], subject: '앞선 답장', receivedAt: now - 800 }] : [] },
+        attachments: [{ filename: '실험.pdf', size: 208, downloadable: true }],
+      } });
+    }
+    if (/\/mail-client\/messages\/\d+\/attachments\/\d+$/.test(endpoint)) return json({ success: false, code: 'MAIL_CLIENT_ATTACHMENT_NOT_FOUND' }, 404);
+    if (endpoint.endsWith('/messages/1/draft')) return json({ success: true, draft });
+    if (endpoint.endsWith('/drafts/draft-1') && req.method === 'GET') return json({ success: true, draft });
+    if (endpoint.endsWith('/drafts') || endpoint.endsWith('/drafts/draft-1')) {
+      if (state.submission === 'saved') {
+        draft = { ...draft, text: payload.compose.text, subject: payload.compose.subject || draft.subject };
+        return json({ success: true, state: 'saved', draftId: draft.id });
+      }
+      return json({ success: false, state: state.submission }, state.submission === 'conflict' ? 409 : 502);
+    }
+    if (endpoint.endsWith('/send')) return json({ success: state.send === 'sent', state: state.send, delivery: 'full',
+      requestId: payload.requestId }, state.send === 'sent' ? 200 : 202);
+    if (endpoint.endsWith('/uploads')) return json({ success: true, attachment: { id: 'upload' } });
     if (endpoint.endsWith('/messages')) {
       const id = Number(endpoint.split('/').at(-2));
       const mailbox = url.searchParams.get('mailbox');
@@ -262,6 +326,7 @@ test('desktop inbox renders base and selected exports, preserves explicit action
   await ui.waitFor('document.querySelector("[data-message-id=\\"1\\"] .mw-row-star")?.getAttribute("aria-pressed") === "false"');
   assert.deepEqual(actions()[1].payload.operations, [{ messageId: 1, action: 'set_starred', value: false }]);
   assert.equal(app.messages[0].important, fixtureImportance);
+  await ui.waitFor('!document.querySelector(".mw-square[aria-label=새로고침]").disabled');
   await ui.click('[data-message-id="1"] .mw-row-select');
   app.state.outcome = 'unknown';
   await ui.press('휴지통', '.mw-toolbar button');
@@ -446,4 +511,228 @@ test('list variants keep the designed actions and surface only verified failures
   await ui.waitFor('!document.querySelector(".mw-row[data-message-id=\\"1\\"][data-state=Unread]")');
   assert.deepEqual(writes().map(call => call.payload.operations), Array.from({ length: 2 },
     () => [{ messageId: 1, action: 'set_read', value: true }]));
+});
+
+test('folder moves require a verified source, same provider target, and explicit confirmation', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  const writes = () => app.calls.filter(call => call.endpoint.endsWith('/messages/actions'));
+  await ui.click('[data-message-id="1"] .mw-row-select');
+  await ui.click('[data-message-id="2"] .mw-row-select');
+  await ui.press('이동', '.mw-toolbar button');
+  await ui.waitFor(ui.text('같은 제공처의 메일만 한 번에'));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-popover-primary").disabled'), true);
+  await ui.press('취소', 'dialog button');
+  await ui.click('[data-message-id="2"] .mw-row-select');
+  await ui.press('이동', '.mw-toolbar button');
+  await ui.waitFor(ui.shown('dialog[open]'));
+  await ui.click('dialog [data-account-id="3"]');
+  assert.equal(await ui.evaluate('document.querySelector("dialog [data-account-id=\\"3\\"] + button").disabled'), true);
+  await ui.press('연구실', 'dialog button');
+  assert.equal(writes().length, 0);
+  await ui.press('이동', 'dialog button');
+  await ui.waitFor('!document.querySelector(".mw-square[aria-label=새로고침]").disabled');
+  assert.deepEqual(writes()[0].payload.operations, [
+    { messageId: 1, action: 'move', sourceMailbox: 'label:INBOX', targetMailbox: { accountId: 1, id: '연구실' } },
+  ]);
+  await ui.click('[data-message-id="2"] .mw-row-select');
+  await ui.press('이동', '.mw-toolbar button');
+  await ui.press('프로젝트', 'dialog button');
+  await ui.press('이동', 'dialog button');
+  await ui.waitFor('!document.querySelector(".mw-square[aria-label=새로고침]").disabled');
+  assert.deepEqual(writes()[1].payload.operations, [
+    { messageId: 2, action: 'move', targetMailbox: { accountId: 3, id: 'folder:Project' } },
+  ]);
+});
+
+test('detail and reply preserve text boundaries, expose draft conflicts and issue one explicit send', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ui = await browser(t);
+  await ui.metrics(1440, 1000);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  await ui.click('[data-message-id="1"] .mw-subject');
+  await ui.waitFor(ui.shown('.mw-detail-body'));
+  assert.equal(await ui.evaluate('document.querySelector(".mw-detail-body img") === null'), true);
+  assert.ok(await ui.evaluate(ui.text('외부 이미지 1개')));
+  await ui.capture('mail-detail.png');
+  await ui.press('실험.pdf 다운로드');
+  await ui.waitFor(ui.text('첨부파일을 다운로드하지 못했어.'));
+  await ui.capture('mail-attachment-failed.png');
+  await ui.press('답장', '.mw-detail-toolbar button');
+  await ui.waitFor(ui.shown('.mw-compose-body'));
+  app.state.submission = 'failed';
+  await ui.evaluate('document.querySelector(".mw-compose-body").textContent = "답장 본문"; document.querySelector(".mw-compose-body").dispatchEvent(new Event("input", { bubbles: true }))');
+  await ui.press('임시 저장');
+  await ui.waitFor(ui.text('초안을 저장하지 못했어.'));
+  await ui.capture('mail-draft-failed.png');
+  app.state.submission = 'saved';
+  await ui.press('임시 저장');
+  await ui.waitFor(ui.text('임시보관함에 저장됨'));
+  await ui.capture('mail-compose.png');
+  app.state.submission = 'conflict';
+  await ui.evaluate('document.querySelector(".mw-compose-body").textContent = "수정한 본문"; document.querySelector(".mw-compose-body").dispatchEvent(new Event("input", { bubbles: true }))');
+  await ui.press('임시 저장');
+  await ui.waitFor(ui.text('다른 기기에서 수정됨'));
+  await ui.capture('mail-draft-conflict.png');
+  await ui.press('최신 버전 불러오기');
+  await ui.waitFor(ui.text('답장 본문'));
+  await ui.press('보내기', '.mw-compose-bottom button');
+  await ui.waitFor(ui.text('메일을 보냈어'));
+  assert.equal(app.calls.filter(call => call.endpoint.endsWith('/send')).length, 1);
+  await ui.capture('mail-reply-sent.png');
+  await ui.press('답장', '.mw-detail-toolbar button');
+  app.state.send = 'unknown';
+  await ui.press('보내기', '.mw-compose-bottom button');
+  await ui.waitFor(ui.text('발송 결과를 확인하지 못했어.'));
+  assert.equal(app.calls.filter(call => call.endpoint.endsWith('/send')).length, 2);
+  await ui.capture('mail-send-unknown.png');
+});
+
+test('filter, search results, smart lists, calendar and contact import use Workspace APIs', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  await ui.press('필터');
+  await ui.waitFor(ui.shown('.mw-filter-form'));
+  await ui.press('안 읽음', 'dialog button');
+  await ui.capture('mail-filter.png');
+  await ui.press('적용', 'dialog button');
+  await ui.waitFor('!document.querySelector(".mw-square[aria-label=새로고침]").disabled');
+  assert.ok(app.calls.some(call => call.endpoint.endsWith('/search') && call.query.read === 'unread'));
+  await ui.evaluate('document.querySelector(".mw-search input").value="논문";document.querySelector(".mw-search").requestSubmit()');
+  await ui.waitFor(ui.text('검색 결과'));
+  await ui.waitFor(ui.shown('.mw-row'));
+  await ui.capture('mail-search-results.png');
+  await ui.evaluate('document.querySelector(".mw-search input").value="없는 제목";document.querySelector(".mw-search").requestSubmit()');
+  await ui.waitFor(ui.text('검색 결과가 없어'));
+  await ui.capture('mail-search-empty.png');
+  for (const [label, filter] of [['중요', 'important'], ['조치 필요', 'action_required'], ['마감', 'deadline'], ['무시', 'ignore'], ['미분류', 'unclassified']]) {
+    await ui.press(label, '.mw-sidebar button');
+    await ui.waitFor('!document.querySelector(".mw-square[aria-label=새로고침]").disabled');
+    assert.ok(app.calls.some(call => call.endpoint.endsWith('/smart/messages') && call.query.filter === filter));
+    await ui.capture('mail-smart-' + filter + '.png');
+  }
+  await ui.press('일정', '.mw-sidebar button');
+  await ui.waitFor(ui.text('연구실 면담'));
+  await ui.capture('mail-calendar.png');
+  await ui.press('원본 메일 열기');
+  await ui.waitFor(ui.shown('.mw-detail-body'));
+  await ui.press('연락처', '.mw-sidebar button');
+  await ui.waitFor(ui.text('sender@example.com'));
+  await ui.capture('mail-contacts.png');
+  await ui.click('button.mw-contact-row');
+  await ui.waitFor(ui.shown('.mw-contact-attributes'));
+  await ui.capture('mail-contact-detail.png');
+  app.state.contactsUnavailable = true;
+  await ui.press('메일 설정', '.mw-sidebar button');
+  await ui.waitFor(ui.text('자동 분류 규칙'));
+  await ui.capture('mail-settings-base.png');
+  app.state.contactsUnavailable = false;
+  await ui.press('메일 설정', '.mw-sidebar button');
+  await ui.waitFor(ui.text('CSV에서 가져옴'));
+  await ui.capture('mail-settings.png');
+  const csv = path.join(os.tmpdir(), 'galpi-mail-contacts-fixture-' + process.pid + '.csv');
+  await fs.writeFile(csv, 'Name,E-mail,Organization\n최유진,sender@example.com,연구실\n안지원,other@example.com,소속\n');
+  t.after(() => fs.rm(csv, { force: true }));
+  await ui.press('CSV 가져오기', '.mw-settings button');
+  const root = await ui.call('DOM.getDocument');
+  const input = await ui.call('DOM.querySelector', { nodeId: root.root.nodeId, selector: '#mail-workspace input[type=file]' });
+  await ui.call('DOM.setFileInputFiles', { nodeId: input.nodeId, files: [csv] });
+  await ui.waitFor(ui.text('새 연락처 1명'));
+  await ui.capture('mail-contacts-csv.png');
+  await ui.press('1명 가져오기', 'dialog button');
+  await ui.waitFor('!document.querySelector(".mw-csv-dialog")');
+  assert.equal(app.calls.filter(call => call.endpoint.endsWith('/contacts/import') && !call.payload.preview).length, 1);
+});
+
+test('tablet and phone detail and composer follow their visible actions and preserve the loading and missing states', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ui = await browser(t);
+  await ui.metrics(820, 1180);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  let release;
+  app.state.holdDetail = new Promise(resolve => { release = resolve; });
+  t.after(release);
+  await ui.click('[data-message-id="1"] .mw-subject');
+  await ui.waitFor(ui.shown('.mw-detail-placeholder'));
+  await ui.metrics(1440, 1000);
+  await ui.capture('mail-detail-loading.png');
+  await ui.metrics(820, 1180);
+  release();
+  await ui.waitFor(ui.shown('.mw-detail-body'));
+  await ui.capture('tablet-detail.png');
+  await ui.press('답장', '.mw-detail-toolbar button');
+  await ui.waitFor(ui.shown('.mw-compose-body'));
+  await ui.capture('tablet-compose.png');
+  await ui.press('작성 취소');
+  await ui.waitFor(ui.shown('.mw-detail-body'));
+  await ui.metrics(390, 844);
+  await ui.waitFor(ui.shown('.mw-detail-compact'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-detail-toolbar')), false);
+  assert.ok(await ui.evaluate(ui.text('이전 메시지 1개 보기')));
+  await ui.capture('phone-detail.png');
+  await ui.press('답장', '.mw-detail-actions button');
+  await ui.waitFor(ui.shown('.mw-compose-head .mw-popover-primary'));
+  assert.equal(await ui.evaluate(ui.shown('.mw-compose-bottom')), false);
+  await ui.capture('phone-compose.png');
+  await ui.press('보내기', '.mw-compose-head button');
+  await ui.waitFor(ui.text('메일을 보냈어'));
+  await ui.capture('phone-sent.png');
+  await ui.press('받은편지함', '.mw-detail-compact button');
+  await ui.waitFor(ui.shown('.mw-row'));
+  app.state.missingDetail = true;
+  await ui.click('[data-message-id="1"] .mw-subject');
+  await ui.waitFor(ui.text('이 메일을 찾을 수 없어'));
+  await ui.metrics(1440, 1000);
+  await ui.capture('mail-detail-gone.png');
+  assert.equal(app.calls.filter(call => call.endpoint.endsWith('/send')).length, 1);
+});
+
+test('contact lookup and move failure retain the designed controls', { skip: !chrome }, async t => {
+  const app = await mockApp(t);
+  const ui = await browser(t);
+  await ui.metrics(1440, 900);
+  await ui.call('Page.navigate', { url: app.url });
+  await ui.waitFor(ui.shown('.home-card-mail'));
+  await enterFromAgents(ui);
+  await ui.waitFor(ui.shown('.mw-row'));
+  app.state.outcome = 'failed';
+  await ui.click('[data-message-id="1"] .mw-row-select');
+  await ui.press('이동', '.mw-toolbar button');
+  await ui.press('연구실', 'dialog button');
+  await ui.capture('mail-move-picker.png');
+  await ui.press('이동', 'dialog button');
+  await ui.waitFor(ui.text('‘연구실’로 옮기지 못했어'));
+  await ui.capture('mail-move-failed.png');
+  await ui.press('연락처', '.mw-sidebar button');
+  await ui.waitFor(ui.shown('button.mw-contact-row'));
+  await ui.metrics(390, 844);
+  await ui.capture('phone-contacts.png');
+  await ui.click('button.mw-contact-row');
+  await ui.waitFor(ui.shown('.mw-contact-attributes'));
+  await ui.capture('phone-contact-detail.png');
+  await ui.press('메일 쓰기', '.mw-contact-profile button');
+  await ui.waitFor(ui.shown('.mw-compose-body'));
+  await ui.metrics(1440, 1000);
+  await ui.evaluate('const field = document.querySelector("[aria-label=\\"받는 사람\\"]"); field.focus(); field.value="최유진"; field.dispatchEvent(new Event("input", {bubbles:true}));');
+  await ui.waitFor(ui.shown('.mw-recipient-choice'));
+  await ui.capture('mail-contact-autocomplete.png');
+  await ui.click('.mw-recipient-choice');
+  assert.match(await ui.evaluate('document.querySelector("[aria-label=\\"받는 사람\\"]").value'), /sender@example\.com/);
+  assert.equal(app.calls.filter(call => call.endpoint.endsWith('/send')).length, 0);
 });

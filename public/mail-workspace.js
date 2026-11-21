@@ -7,14 +7,21 @@
     ['drafts', '임시보관함', 'draft'], ['archive', '보관함', 'archive'], ['junk', '스팸함', 'spam'], ['trash', '휴지통', 'trash'],
   ];
   const smart = [
-    ['중요', 'star'], ['조치 필요', 'action'], ['일정', 'calendar'],
-    ['마감', 'deadline'], ['무시', 'muted'], ['미분류', 'unsorted'],
+    ['중요', 'star', 'important'], ['조치 필요', 'action', 'action_required'], ['일정', 'calendar', 'schedule'],
+    ['마감', 'deadline', 'deadline'], ['무시', 'muted', 'ignore'], ['미분류', 'unsorted', 'unclassified'],
   ];
   const actions = [
     ['읽음', 'read', 'set_read', true], ['안 읽음', 'unread', 'set_read', false],
     ['중요', 'star', 'set_starred', true], ['보관', 'archive', 'archive'], ['휴지통', 'trash', 'trash'],
-    ['이동', 'move', null],
+    ['이동', 'move', 'move'],
   ];
+  const smartTabs = {
+    important: [['전체', 'all'], ['시온 분류', ''], ['내가 표시', 'starred']],
+    action_required: [['전체', ''], ['답장', null], ['확인', null], ['제출', null]],
+    deadline: [['다가오는 마감', 'upcoming'], ['지난 마감', 'past']],
+    ignore: [['전체', 'all'], ['시온 판정', ''], ['분석 제외 규칙', 'rules']],
+    unclassified: [['전체', ''], ['분석 대기', 'pending'], ['분석 실패', 'failed']],
+  };
   const limit = 13;
   const zone = { timeZone: 'Asia/Seoul' };
   const day = new Intl.DateTimeFormat('en-CA', { ...zone, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -84,8 +91,13 @@
     let loading = false;
     let writeDenied = false;
     let listError = null;
-    let readError = null;
+    let actionError = null;
     let inboxUnread = null;
+    let screen = null;
+    let searchTerm = '';
+    let appliedFilters = {};
+    let searchEditing = false;
+    let smartVariant = 0;
     const narrow = global.matchMedia('(max-width: 1100px)');
 
     const sidebar = node('aside', 'mw-sidebar');
@@ -101,9 +113,11 @@
     rows.setAttribute('aria-label', '메일 목록');
     const footer = node('footer', 'mw-pagination');
     const notices = node('div', 'mw-list-notices');
-    const compose = button('mw-compose mw-compose-fab', '메일 쓰기', null, { glyph: 'compose' });
+    const compose = button('mw-compose mw-compose-fab', '메일 쓰기', () => messageViews.openCompose({ kind: 'new' }), { glyph: 'compose' });
     const operationNotice = node('div', 'mw-operation-notices');
-    main.append(header, notices, toolbar, rows, footer, compose);
+    const extra = node('div', 'mw-extra');
+    extra.hidden = true;
+    main.append(header, notices, toolbar, rows, footer, compose, extra);
     mount.replaceChildren(sidebar, main, shade, operationNotice);
 
     function toggleMailboxes(open, restoreFocus = true) {
@@ -126,13 +140,69 @@
       }
     });
 
-    async function get(endpoint, params = {}) {
-      const query = new URLSearchParams(params).toString();
-      const response = await apiFetch('/api/mail-client' + endpoint + (query ? '?' + query : ''), { cache: 'no-store' });
-      const data = await response.json();
-      if (!response.ok || !data.success) throw Object.assign(new Error(data.code), { code: data.code });
+    async function request(endpoint, options = {}, { binary = false } = {}) {
+      const { json, ...init } = options;
+      const response = await apiFetch((endpoint.startsWith('/api/') ? '' : '/api/mail-client') + endpoint, {
+        cache: 'no-store', ...init,
+        ...(json ? { body: JSON.stringify(json), headers: { 'Content-Type': 'application/json' } } : {}),
+      });
+      if (binary && response.ok) return response.blob();
+      const data = await response.json().catch(() => ({}));
+      if ((!response.ok || data.success === false) && !data.state) {
+        throw Object.assign(new Error(data.code || '메일 요청을 완료하지 못했어.'), { code: data.code, status: response.status });
+      }
       return data;
     }
+
+    function get(endpoint, params = {}) {
+      const query = new URLSearchParams(params).toString();
+      return request(endpoint + (query ? '?' + query : ''));
+    }
+
+    function requestId() {
+      return global.crypto.randomUUID?.()
+        || Array.from(global.crypto.getRandomValues(new Uint32Array(4)), value => value.toString(36)).join('-');
+    }
+
+    function show(screenName, content) {
+      screen = screenName;
+      mount.dataset.screen = screenName;
+      extra.hidden = false;
+      extra.replaceChildren(content);
+      toggleMailboxes(false, false);
+      renderSidebar(history[page]?.messages.filter(message => message.read === false).length);
+      main.scrollTop = 0;
+    }
+
+    function close() {
+      screen = null;
+      delete mount.dataset.screen;
+      extra.hidden = true;
+      extra.replaceChildren();
+      renderPage();
+    }
+
+    function openSent(id) {
+      const account = accounts.find(item => item.id === id);
+      const target = account && mailboxFor('sent', account);
+      if (target) changeScope({ ...target, role: 'sent', title: '보낸편지함' });
+      else showToast('이 계정의 보낸편지함을 찾을 수 없어.');
+    }
+
+    const viewApi = {
+      node, button, icon, providers, timeOf, get, request, show, close, accounts: () => accounts,
+      openMove, mutate, openSent, requestId, notify: showToast, popover,
+      openMessage: message => messageViews.detail(message, [], 0, { title: '메일', role: 'other' }),
+      searchHistory: value => {
+        searchTerm = value;
+        changeScope({ role: 'inbox', title: '검색 결과', search: true });
+      },
+      toggleMailboxes,
+      compose: options => messageViews.openCompose(options),
+      makeRow: row,
+    };
+    const messageViews = global.MailWorkspaceMessage.create(viewApi);
+    const auxiliary = global.MailWorkspaceSecondary?.create(viewApi);
 
     function messages() {
       return history[page]?.messages || [];
@@ -156,9 +226,13 @@
 
     function changeScope(next) {
       if (loading || writing) return;
+      if (screen) close();
       scope = next;
+      if (!next.search) searchTerm = '';
+      if (!next.keepFilters) appliedFilters = {};
+      smartVariant = 0;
       listError = null;
-      readError = null;
+      actionError = null;
       toggleMailboxes(false, false);
       history = [];
       page = 0;
@@ -189,12 +263,108 @@
       return (current?.sources || [current?.source]).filter(source => source && source.status !== 'fresh');
     }
 
+    function accountRow(account, expanded, toggle) {
+      const label = button('mw-account', providers[account.provider], toggle,
+        { glyph: expanded ? 'chevron-down' : 'chevron-right', size: 16 });
+      label.dataset.accountId = account.id;
+      if (toggle) label.setAttribute('aria-expanded', String(expanded));
+      const address = node('span', 'mw-address', account.address);
+      address.title = account.address;
+      label.append(address);
+      return label;
+    }
+
+    function popover(anchor, title) {
+      const panel = node('dialog', 'mw-popover');
+      panel.setAttribute('aria-label', title);
+      panel.append(node('h2', '', title));
+      const rect = anchor.getBoundingClientRect();
+      panel.style.setProperty('--mw-popover-right', Math.max(12, global.innerWidth - rect.right) + 'px');
+      panel.style.setProperty('--mw-popover-top', rect.bottom + 8 + 'px');
+      panel.addEventListener('close', () => panel.remove(), { once: true });
+      panel.addEventListener('click', event => {
+        if (event.target !== panel) return;
+        const bounds = panel.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right
+          || event.clientY < bounds.top || event.clientY > bounds.bottom) panel.close();
+      });
+      mount.append(panel);
+      return panel;
+    }
+
+    function gmailMoveSource(message, folderScope = scope) {
+      if (message.provider !== 'gmail') return undefined;
+      if (folderScope.search) return null;
+      if (folderScope.role === 'all' && folderScope.box?.kind === 'all') return 'all';
+      if (folderScope.role === 'inbox' && message.labelIds?.includes('INBOX')) return 'label:INBOX';
+      if (folderScope.account?.id === message.accountId && folderScope.box?.type === 'user'
+        && message.labelIds?.includes(folderScope.box.providerId)) return folderScope.box.id;
+      return null;
+    }
+
+    function openMove(anchor, items, folderScope = scope) {
+      const accountId = items[0]?.accountId;
+      const sameAccount = accountId && items.every(message => message.accountId === accountId);
+      const canMove = sameAccount && items.every(message => gmailMoveSource(message, folderScope) !== null);
+      const panel = popover(anchor, '이동할 폴더');
+      const expandedAccounts = new Set(accountId && sameAccount ? [accountId] : []);
+      const list = node('div', 'mw-popover-folders');
+      const footer = node('footer', 'mw-popover-footer');
+      let destination = null;
+      const confirm = button('mw-popover-primary', '이동', () => {
+        if (!destination || !canMove) return;
+        panel.close();
+        void mutate(items, 'move', destination, folderScope);
+      });
+      confirm.disabled = true;
+      if (!sameAccount) panel.append(node('p', '', '같은 제공처의 메일만 한 번에 이동할 수 있어.'));
+      else if (!canMove) panel.append(node('p', '', '메일이 속한 폴더에서 이동할 수 있어.'));
+      panel.append(list, footer);
+      footer.append(button('mw-popover-secondary', '취소', () => panel.close()), confirm);
+      function renderFolders(keepFocus) {
+        list.replaceChildren();
+        for (const account of accounts) {
+          const isExpanded = expandedAccounts.has(account.id);
+          const itemsForAccount = (boxes.get(account.id) || []).filter(box => box.selectable && (account.provider === 'gmail'
+            ? box.kind === 'label' && box.type === 'user' : box.kind === 'folder'));
+          const heading = accountRow(account, isExpanded, itemsForAccount.length ? () => {
+            if (isExpanded) expandedAccounts.delete(account.id);
+            else expandedAccounts.add(account.id);
+            renderFolders(account.id);
+          } : null);
+          list.append(heading);
+          if (!isExpanded) continue;
+          for (const box of itemsForAccount) {
+            const sourceIsTarget = items.some(message => account.provider === 'gmail'
+              ? gmailMoveSource(message, folderScope) === box.id : message.folderPath === box.path);
+            const eligible = canMove && account.id === accountId && !sourceIsTarget;
+            const isSelected = destination?.accountId === account.id && destination.id === box.id;
+            const glyph = folders.find(([role]) => role === roleOf(box))?.[2] || 'folder';
+            const control = navRow(box.name, glyph, eligible ? () => {
+              destination = { accountId: account.id, id: box.id };
+              confirm.disabled = false;
+              renderFolders();
+              list.querySelector('[aria-pressed="true"]')?.focus();
+            } : null, isSelected);
+            control.removeAttribute('aria-current');
+            control.setAttribute('aria-pressed', String(isSelected));
+            control.classList.add('mw-account-folder');
+            list.append(control);
+          }
+        }
+        if (keepFocus) list.querySelector('[data-account-id="' + keepFocus + '"]')?.focus();
+      }
+      renderFolders();
+      panel.showModal();
+    }
+
     function renderSidebar(unread) {
       const top = node('div', 'mw-sidebar-head');
       const compactHead = node('div', 'mw-mailbox-head');
       compactHead.append(node('h2', '', '메일함'), button('mw-close', '메일함 메뉴 닫기', () => toggleMailboxes(false),
         { glyph: 'close', size: 22, iconOnly: true }));
-      top.append(node('h2', 'mw-sidebar-title', '메일'), button('mw-compose', '메일 쓰기', null, { glyph: 'compose' }));
+      top.append(node('h2', 'mw-sidebar-title', '메일'), button('mw-compose', '메일 쓰기',
+        () => messageViews.openCompose({ kind: 'new' }), { glyph: 'compose' }));
       const standard = node('nav', 'mw-nav');
       standard.setAttribute('aria-label', '기본 메일함');
       for (const [role, title, glyph] of folders) {
@@ -202,7 +372,7 @@
         const handler = role === 'inbox' ? () => inbox()
           : target && (() => changeScope({ ...target, role, title }));
         const count = role === 'inbox' ? inboxUnread : role === 'drafts' && scope.role === role && unread != null ? messages().length : null;
-        const control = navRow(title, glyph, handler, scope.role === role, count);
+        const control = navRow(title, glyph, handler, (!screen || screen === 'detail' || screen === 'compose') && scope.role === role, count);
         control.dataset.mailboxRole = role;
         standard.append(control);
       }
@@ -210,7 +380,11 @@
       const smartNav = node('nav', 'mw-nav');
       smartNav.setAttribute('aria-label', '스마트 메일함');
       smartNav.append(node('h3', 'mw-nav-title', '스마트 메일함'));
-      for (const [label, glyph] of smart) smartNav.append(navRow(label, glyph, null));
+      for (const [label, glyph, filter] of smart) {
+        const run = filter === 'schedule' ? auxiliary?.calendar : () => changeScope({ filter, title: label });
+        smartNav.append(navRow(label, glyph, run,
+          (filter === 'schedule' && screen === 'calendar') || (!screen && scope.filter === filter)));
+      }
 
       const accountNav = node('nav', 'mw-nav');
       accountNav.setAttribute('aria-label', '계정');
@@ -220,17 +394,12 @@
         const custom = (boxes.get(account.id) || []).filter(box => box.selectable && (
           (box.kind === 'label' && box.type === 'user') || (box.kind === 'folder' && !roleOf(box))
         ));
-        const label = button('mw-account', providers[account.provider], custom.length ? () => {
+        const label = accountRow(account, expanded.has(account.id), custom.length ? () => {
           if (expanded.has(account.id)) expanded.delete(account.id);
           else expanded.add(account.id);
           renderSidebar(unread);
           sidebar.querySelector('[data-account-id="' + account.id + '"]')?.focus();
-        } : null, { glyph: expanded.has(account.id) && custom.length ? 'chevron-down' : 'chevron-right', size: 16 });
-        label.dataset.accountId = account.id;
-        if (custom.length) label.setAttribute('aria-expanded', String(expanded.has(account.id)));
-        const address = node('span', 'mw-address', account.address);
-        address.title = account.address;
-        label.append(address);
+        } : null);
         if (problems.some(source => source.accountId === account.id)) label.append(icon('account-alert-dot', 6));
         accountNav.append(label);
         if (!expanded.has(account.id)) continue;
@@ -242,7 +411,8 @@
         }
       }
       const bottom = node('div', 'mw-sidebar-bottom');
-      bottom.append(navRow('연락처', 'contacts', null), navRow('메일 설정', 'settings', null));
+      bottom.append(navRow('연락처', 'contacts', auxiliary?.contacts, screen === 'contacts'),
+        navRow('메일 설정', 'settings', auxiliary?.settings, screen === 'settings'));
       sidebar.replaceChildren(compactHead, top, standard, smartNav, accountNav, bottom);
     }
 
@@ -256,7 +426,9 @@
       const prefix = !scope.role ? providers[scope.account?.provider] + ' · ' : '';
       let caption = '';
       if (unread != null) {
-        if (scope.role === 'drafts') caption = '초안 ' + labels.format(messages().length) + '개';
+        if (scope.search) caption = '‘' + searchTerm + '’ · ' + (scope.account ? providers[scope.account.provider] : '전체 계정')
+          + ' · ' + labels.format(history[page]?.total ?? messages().length) + '건';
+        else if (scope.role === 'drafts') caption = '초안 ' + labels.format(messages().length) + '개';
         else if (scope.role === 'trash' && !messages().length) caption = '0개';
         else caption = prefix + '안 읽음 ' + labels.format(unread);
       }
@@ -272,24 +444,134 @@
           const target = account ? mailboxFor(scope.role, account) : null;
           const canOpen = (scope.role === 'inbox' && !provider) || target;
           const active = !provider ? !scope.account : account != null && scope.account?.id === account.id;
-          const chip = button('mw-chip', name, canOpen && !writing && !loading ? () => {
-            if (scope.role === 'inbox') inbox(account);
+          const chip = button('mw-chip', name, (scope.search ? (!provider || account) : canOpen) && !writing && !loading ? () => {
+            if (scope.search) searchFor(searchTerm, account);
+            else if (scope.role === 'inbox') inbox(account);
             else changeScope({ ...target, role: scope.role, title: scope.title });
           } : null);
           chip.setAttribute('aria-pressed', String(active));
           chips.append(chip);
         }
       }
-      const search = node('div', 'mw-search');
+      if (scope.filter) {
+        for (const [index, [label, key]] of (smartTabs[scope.filter] || []).entries()) {
+          const control = button('mw-chip', label, key !== null && !loading && !writing ? () => {
+            smartVariant = index;
+            void loadPage(null, true);
+          } : null);
+          control.setAttribute('aria-pressed', String(smartVariant === index));
+          chips.append(control);
+        }
+      }
+      const search = node('form', 'mw-search');
       const input = node('input');
       input.type = 'search';
-      input.disabled = true;
       input.placeholder = '메일 검색';
+      input.value = searchTerm;
       input.setAttribute('aria-label', '메일 검색');
-      search.append(icon('search', 18), input,
-        button('mw-search-scope', '전체 계정', null, { glyph: 'chevron-down', size: 14 }));
-      const compactSearch = button('mw-compact-search', '메일 검색', null, { glyph: 'search', size: 22, iconOnly: true });
-      header.replaceChildren(menu, title, node('span', 'mw-spacer'), ...(scope.role ? [chips] : []), search, compactSearch);
+      input.maxLength = 160;
+      function searchFor(value, account = scope.account) {
+        searchTerm = value.trim();
+        if (searchTerm) changeScope({ title: '검색 결과', role: 'inbox', account, search: true, keepFilters: true });
+        else inbox(account);
+      }
+      search.addEventListener('submit', event => {
+        event.preventDefault();
+        searchFor(input.value);
+      });
+      const searchScope = button('mw-search-scope', scope.account ? providers[scope.account.provider] : '전체 계정', () => {
+        const dialog = popover(searchScope, '검색 범위');
+        const group = node('div', 'mw-popover-folders');
+        for (const account of [null, ...accounts.filter(item => item.status !== 'disabled')]) {
+          group.append(navRow(account ? providers[account.provider] : '전체 계정', undefined, () => {
+            dialog.close();
+            if (input.value.trim()) searchFor(input.value, account);
+            else inbox(account);
+          }, (scope.account?.id ?? null) === (account?.id ?? null)));
+        }
+        dialog.append(group);
+        dialog.showModal();
+      }, { glyph: 'chevron-down', size: 14 });
+      search.append(icon('search', 18), input);
+      if (searchTerm) search.append(button('mw-clear-search', '검색어 지우기', () => searchFor(''),
+        { glyph: 'close', size: 14, iconOnly: true }));
+      search.append(searchScope);
+      const compactSearch = button('mw-compact-search', '메일 검색', () => {
+        searchEditing = !searchEditing;
+        renderHeader(unread);
+        if (searchEditing) header.querySelector('input')?.focus();
+      }, { glyph: 'search', size: 22, iconOnly: true });
+      header.classList.toggle('mw-search-editing', searchEditing);
+      header.replaceChildren(menu, title, node('span', 'mw-spacer'), ...(scope.role || scope.filter ? [chips] : []), search, compactSearch);
+    }
+
+    function openFilters(anchor) {
+      const panel = popover(anchor, '필터');
+      const form = node('form', 'mw-filter-form');
+      form.addEventListener('submit', event => event.preventDefault());
+      const values = { ...appliedFilters };
+      function group(label, field, choices, multiple = false) {
+        const section = node('fieldset');
+        const options = node('div', 'mw-filter-options');
+        section.append(node('legend', '', label), options);
+        for (const [caption, value] of choices) {
+          const option = button('mw-pill', caption, () => {
+            if (multiple) values[value] = !values[value];
+            else values[field] = value;
+            paint();
+          });
+          function paint() {
+            for (const item of options.children) {
+              const pressed = multiple ? Boolean(values[item.dataset.value]) : (values[field] || '') === item.dataset.value;
+              item.setAttribute('aria-pressed', String(pressed));
+            }
+            dates.hidden = values.period !== 'custom';
+          }
+          option.dataset.value = value;
+          option.setAttribute('aria-pressed', String(multiple ? Boolean(values[value]) : (values[field] || '') === value));
+          options.append(option);
+        }
+        return section;
+      }
+      const dates = node('div', 'mw-filter-options');
+      const fromDay = node('input');
+      const toDay = node('input');
+      fromDay.type = toDay.type = 'date';
+      fromDay.setAttribute('aria-label', '시작 날짜');
+      toDay.setAttribute('aria-label', '종료 날짜');
+      fromDay.value = values.from || '';
+      toDay.value = values.until || '';
+      dates.hidden = values.period !== 'custom';
+      dates.append(fromDay, toDay);
+      form.append(group('읽음 상태', 'read', [['전체', ''], ['안 읽음', 'unread'], ['읽음', 'read']]),
+        group('표시', null, [['중요표시', 'starred'], ['첨부 있음', 'attachments']], true),
+        group('기간', 'period', [['전체', ''], ['1주', 'week'], ['1개월', 'month'], ['직접 지정', 'custom']]), dates);
+      const sender = node('input');
+      sender.placeholder = '이름 또는 이메일 주소';
+      sender.setAttribute('aria-label', '보낸 사람');
+      sender.value = values.sender || '';
+      const senderGroup = node('label', 'mw-filter-sender');
+      senderGroup.append(node('span', '', '보낸 사람'), sender);
+      form.append(senderGroup);
+      const footer = node('footer', 'mw-popover-footer');
+      footer.append(button('mw-popover-secondary', '초기화', () => {
+        appliedFilters = {};
+        panel.close();
+        changeScope({ ...scope });
+      }), button('mw-popover-primary', '적용', () => {
+        if (values.period === 'custom' && fromDay.value && toDay.value && fromDay.value > toDay.value) {
+          toDay.setCustomValidity('종료 날짜는 시작 날짜 다음이어야 해.');
+          toDay.reportValidity();
+          toDay.setCustomValidity('');
+          return;
+        }
+        const dates = values.period === 'custom' ? { from: fromDay.value, until: toDay.value } : {};
+        appliedFilters = Object.fromEntries(Object.entries({ ...values, ...dates, sender: sender.value.trim() }).filter(([, value]) => value));
+        panel.close();
+        changeScope({ ...scope, keepFilters: true });
+      }));
+      panel.append(form, footer);
+      panel.showModal();
     }
 
     function renderToolbar() {
@@ -301,23 +583,26 @@
         if (!all) available.forEach(message => selected.add(message.id));
         renderPage();
         toolbar.querySelector('.mw-select-page').focus();
-      } : null, { glyph: count && !readError ? 'checkbox-on' : 'checkbox-off', size: 20, iconOnly: true });
+      } : null, { glyph: count && !actionError ? 'checkbox-on' : 'checkbox-off', size: 20, iconOnly: true });
       toggle.setAttribute('aria-pressed', String(all));
       const group = node('div', 'mw-actions');
       toolbar.classList.toggle('mw-muted-controls', (loading && !history[page]) || (scope.role === 'trash' && !messages().length));
       for (const [label, glyph, action, value] of actions) {
         if (scope.role === 'drafts' && action !== 'trash') continue;
         const control = button('mw-action', label, count && action && !writeDenied && !writing && !loading ? () => {
-          void mutate(available.filter(message => selected.has(message.id)), action, value);
+          const items = available.filter(message => selected.has(message.id));
+          if (action === 'move') openMove(control, items);
+          else void mutate(items, action, value);
         } : null, { glyph, size: 16 });
         if (action === 'set_starred') control.title = '선택한 메일에 별표 표시';
         group.append(control);
       }
       const selection = [toggle];
       toggle.append(icon('chevron-down', 14));
-      if (count > 0 && !readError) selection.push(node('span', 'mw-selection', labels.format(count) + '개 선택'));
-      toolbar.replaceChildren(...selection, node('span', 'mw-rule'), group, node('span', 'mw-spacer'),
-        button('mw-action', '필터', null, { glyph: 'filter', size: 16 }),
+      if (count > 0 && !actionError) selection.push(node('span', 'mw-selection', labels.format(count) + '개 선택'));
+      const filter = button('mw-action', '필터', scope.filter ? null : () => openFilters(filter), { glyph: 'filter', size: 16 });
+      if (Object.keys(appliedFilters).length) filter.setAttribute('aria-pressed', 'true');
+      toolbar.replaceChildren(...selection, node('span', 'mw-rule'), group, node('span', 'mw-spacer'), filter,
         button('mw-square', '새로고침', !loading && !writing ? () => void loadPage(null, true) : null,
           { glyph: 'refresh', iconOnly: true }));
     }
@@ -350,7 +635,10 @@
       const name = address?.name || address?.address || '';
       const from = node('span', 'mw-sender', isDraft && name ? '받는 사람 · ' + name : name);
       const content = node('span', 'mw-content');
-      content.append(node('span', 'mw-subject', subject));
+      const open = scope.role === 'drafts' && !scope.search && Number.isSafeInteger(message.id) ? () => void openDraft(message)
+        : Number.isSafeInteger(message.id) ? () => messageViews.detail(message, messages(), messages().indexOf(message), scope) : null;
+      const subjectControl = button('mw-subject', subject, open);
+      content.append(subjectControl);
       el.append(select, star, node('span', 'mw-unread-dot'), from, content);
       if (message.hasAttachments === true) {
         const attachment = icon('paperclip', 16);
@@ -390,7 +678,8 @@
       const items = messages();
       const skeleton = loading && !history[page];
       const emptyTrash = !loading && !listError && scope.role === 'trash' && history[page] && !history[page].incomplete && !items.length;
-      rows.classList.toggle('mw-empty-trash', Boolean(emptyTrash));
+      const emptySearch = !loading && !listError && scope.search && history[page] && !items.length;
+      rows.classList.toggle('mw-empty-trash', Boolean(emptyTrash || emptySearch));
       if (skeleton) {
         rows.replaceChildren(...Array.from({ length: 10 }, () => {
           const line = node('div', 'mw-skeleton');
@@ -399,6 +688,7 @@
           return line;
         }));
       } else if (emptyTrash) rows.replaceChildren(icon('trash', 24), node('p', '', '휴지통이 비어 있어'));
+      else if (emptySearch) rows.replaceChildren(icon('search', 24), node('p', '', '검색 결과가 없어'));
       else rows.replaceChildren(...items.map(row));
     }
 
@@ -427,18 +717,21 @@
         notice(text, '지금 다시 시도', loading || writing ? null : () => void loadPage(null, true));
       }
       operationNotice.replaceChildren();
-      if (readError) {
-        const { items, value } = readError;
+      if (actionError) {
+        const { items, value, action = 'set_read', folderScope = scope } = actionError;
         const box = node('div', 'mw-operation-notice');
         box.setAttribute('role', 'status');
         const unchanged = messages().filter(message => items.includes(message.id)).every(message => message.read === !value);
-        const text = !unchanged ? '읽음 상태를 바꾸지 못했어.' : value
-          ? '읽음으로 바꾸지 못했어. 메일은 그대로 안 읽음이야.'
-          : '안 읽음으로 바꾸지 못했어. 메일은 그대로 읽음이야.';
+        const destination = action === 'move' ? (boxes.get(value.accountId) || []).find(box => box.id === value.id)?.name : null;
+        const text = action === 'move'
+          ? (destination ? '‘' + destination + '’로 옮기지 못했어. 메일은 원래 자리에 있어.' : '메일을 옮기지 못했어.')
+          : !unchanged ? '읽음 상태를 바꾸지 못했어.' : value
+            ? '읽음으로 바꾸지 못했어. 메일은 그대로 안 읽음이야.'
+            : '안 읽음으로 바꾸지 못했어. 메일은 그대로 읽음이야.';
         box.append(icon('alert', 18), node('span', '', text),
         button('mw-notice-action', '다시 시도', loading || writing ? null : () => {
           const targets = messages().filter(message => items.includes(message.id) && actionable(message));
-          if (targets.length) void mutate(targets, 'set_read', value);
+          if (targets.length) void mutate(targets, action, value, folderScope);
         }));
         operationNotice.append(box);
       }
@@ -460,15 +753,31 @@
       if (loading || writing) return;
       loading = true;
       listError = null;
-      readError = null;
+      actionError = null;
       renderPage();
       try {
         const params = { limit };
         if (cursor) params.cursor = cursor;
         let endpoint = '/inbox';
-        if (scope.account) {
+        if (scope.account && scope.box) {
           endpoint = '/accounts/' + scope.account.id + '/messages';
           params.mailbox = scope.box.id;
+        }
+        if (scope.search || Object.keys(appliedFilters).length) {
+          endpoint = '/search';
+          delete params.mailbox;
+          if (!scope.search) {
+            if (scope.box?.id) params.mailbox = scope.box.id;
+            else if (scope.role === 'inbox') params.inbox = '1';
+          }
+          if (scope.account) params.accountId = scope.account.id;
+          if (scope.search) params.q = searchTerm;
+          Object.assign(params, appliedFilters);
+        } else if (scope.filter) {
+          endpoint = '/smart/messages';
+          params.filter = scope.filter;
+          const variant = smartTabs[scope.filter]?.[smartVariant]?.[1];
+          if (variant) params.variant = variant;
         }
         const result = await get(endpoint, params);
         if (!cursor) history = [];
@@ -496,7 +805,7 @@
       if (history[index]) {
         selected.clear();
         listError = null;
-        readError = null;
+        actionError = null;
         page = index;
         renderPage();
       } else if (history[page]?.nextCursor) {
@@ -504,21 +813,26 @@
       }
     }
 
-    async function mutate(items, action, value) {
+    async function mutate(items, action, value, folderScope = scope) {
       if (writing || loading || writeDenied || !items.length || items.some(message => !actionable(message))) return;
       writing = true;
-      readError = null;
+      actionError = null;
       renderPage();
       let refresh = false;
       try {
-        const operations = items.map(message => ({
-          messageId: message.id, action, ...(value === undefined ? {} : { value }),
-        }));
+        const operations = items.map(message => {
+          const operation = { messageId: message.id, action };
+          if (action === 'move') {
+            operation.targetMailbox = value;
+            const source = gmailMoveSource(message, folderScope);
+            if (source) operation.sourceMailbox = source;
+          } else if (value !== undefined) operation.value = value;
+          return operation;
+        });
         const response = await apiFetch('/api/mail-client/messages/actions', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            requestId: global.crypto.randomUUID?.()
-              || Array.from(global.crypto.getRandomValues(new Uint32Array(4)), value => value.toString(36)).join('-'),
+            requestId: requestId(),
             operations,
           }),
         });
@@ -540,11 +854,14 @@
             refresh = true;
           } else if (result?.state === 'failed') failures.push(message.id);
           else unknown.add(message.id);
-          if (!failures.includes(message.id) || action !== 'set_read') selected.delete(message.id);
+          if (!failures.includes(message.id) || !['set_read', 'move'].includes(action)) selected.delete(message.id);
         }
         if (items.some(message => unknown.has(message.id))) showToast('결과를 확인할 수 없는 메일이 있어. 새로고침으로 확인해 줘.');
-        else if (failures.length && action === 'set_read' && !refresh) readError = { items: failures, value };
-        else if (failures.length) showToast('일부 메일을 변경하지 못했어.');
+        else if (failures.length && ['set_read', 'move'].includes(action) && !refresh) {
+          actionError = { items: failures, action, value, folderScope };
+        }
+        else if (failures.length) showToast(action === 'move' ? '선택한 메일을 모두 옮기지 못했어.' : '일부 메일을 변경하지 못했어.');
+        return data.results;
       } catch {
         items.forEach(message => unknown.add(message.id));
         selected.clear();
@@ -554,6 +871,13 @@
         if (refresh) void loadPage();
         else renderPage();
       }
+    }
+
+    async function openDraft(message) {
+      try {
+        const data = await get('/accounts/' + message.accountId + '/messages/' + message.id + '/draft');
+        messageViews.openCompose({ kind: 'new', draft: { ...data.draft, accountId: message.accountId } });
+      } catch { showToast('이 초안을 열지 못했어.'); }
     }
 
     async function open() {
@@ -576,7 +900,10 @@
           // A folder lookup can fail independently of the unified inbox.
         }
       }));
+      if (screen) close();
       scope = { role: 'inbox', title: '받은편지함' };
+      searchTerm = '';
+      appliedFilters = {};
       inboxUnread = null;
       toggleMailboxes(false, false);
       selected.clear();

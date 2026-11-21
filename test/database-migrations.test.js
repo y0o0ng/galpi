@@ -367,6 +367,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 46, name: 'mail_client_action_receipts' },
     { version: 47, name: 'mail_client_compose_receipts' },
     { version: 48, name: 'mail_workspace_smart' },
+    { version: 49, name: 'mail_client_contacts' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -386,7 +387,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN (
       'ddays', 'mail_reply_attempts', 'mail_client_cache', 'mail_client_messages',
       'mail_client_action_receipts', 'mail_client_read_overrides',
-      'mail_client_compose_receipts', 'mail_workspace_sources', 'mail_workspace_analysis_jobs', 'mail_workspace_calendar_events',
+      'mail_client_compose_receipts', 'mail_client_contacts', 'mail_workspace_sources', 'mail_workspace_analysis_jobs', 'mail_workspace_calendar_events',
       'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
       'memory_general_fact_transitions', 'memory_general_fact_transition_evidence', 'memory_general_fact_reviews'
     ) AND name NOT LIKE 'lecture_%' AND name NOT LIKE 'reels_%' AND name NOT LIKE 'cards_%' ORDER BY name`).all(),
@@ -1109,6 +1110,7 @@ test('schema v42 adds the reels candidate everyday_door column and keeps existin
     { version: 46, name: 'mail_client_action_receipts' },
     { version: 47, name: 'mail_client_compose_receipts' },
     { version: 48, name: 'mail_workspace_smart' },
+    { version: 49, name: 'mail_client_contacts' },
   ]);
   assert.deepEqual(runDatabaseMigrations(db).applied, []);
   assert.deepEqual(
@@ -1132,6 +1134,7 @@ test('schema v47 preserves existing mail receipts and reserves a draft version o
   assert.deepEqual(runDatabaseMigrations(db).applied, [
     { version: 47, name: 'mail_client_compose_receipts' },
     { version: 48, name: 'mail_workspace_smart' },
+    { version: 49, name: 'mail_client_contacts' },
   ]);
   assert.equal(db.prepare('SELECT state FROM mail_reply_attempts').get().state, 'sent');
   assert.equal(db.prepare('SELECT state FROM mail_client_action_receipts').get().state, 'confirmed');
@@ -1155,7 +1158,9 @@ test('schema v48 adds an empty smart queue while preserving old receipts and tas
       VALUES ('prior-compose', 1, 'send', 'hash', 'existing-draft', 'prior-version', 'sent');
   `);
   const priorTasks = db.prepare('SELECT * FROM assistant_tasks').all();
-  assert.deepEqual(runDatabaseMigrations(db).applied, [{ version: 48, name: 'mail_workspace_smart' }]);
+  assert.deepEqual(runDatabaseMigrations(db).applied, [
+    { version: 48, name: 'mail_workspace_smart' }, { version: 49, name: 'mail_client_contacts' },
+  ]);
   assert.equal(db.prepare('SELECT state FROM mail_client_compose_receipts WHERE request_id=?').get('prior-compose').state, 'sent');
   assert.deepEqual(db.prepare('SELECT * FROM assistant_tasks').all(), priorTasks);
   for (const table of ['mail_workspace_sources', 'mail_workspace_analysis_jobs', 'mail_workspace_calendar_events']) {

@@ -55,6 +55,7 @@ const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailClient } = require('./lib/mail/client');
+const { createMailClientContacts } = require('./lib/mail/client-contacts');
 const { createGmailMailClient } = require('./lib/mail/client-gmail');
 const { createImapMailClient } = require('./lib/mail/client-imap');
 const {
@@ -4990,7 +4991,7 @@ registerMailRoutes({
   // 되돌린 즉시 한 바퀴 돌린다. 다음 주기를 기다리면 눌러놓고 아무 일도 안 일어난다.
   onRequeued: () => { void mailAgent?.tick(); },
 });
-registerMailClientRoutes({ app, service: mailClient });
+registerMailClientRoutes({ app, service: mailClient, contacts: createMailClientContacts(db) });
 registerMailClientActionRoutes({ app, service: mailClientActions });
 registerMailClientComposeRoutes({ app, service: mailClientCompose });
 registerMailClientSmartRoutes({ app, service: mailSmart });
