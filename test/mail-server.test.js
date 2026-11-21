@@ -47,7 +47,7 @@ async function stopServer(child) {
   });
 }
 
-async function startServer(t, mailEnabled, clientEnabled = false, writesEnabled = false) {
+async function startServer(t, mailEnabled, clientEnabled = false, writesEnabled = false, smartEnabled = false) {
   const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'mail-server-'));
   const vaultPath = path.join(appRoot, 'vault');
   await fs.mkdir(vaultPath);
@@ -74,6 +74,7 @@ async function startServer(t, mailEnabled, clientEnabled = false, writesEnabled 
       MAIL_CLIENT_ENABLED: clientEnabled ? 'true' : 'false',
       MAIL_CLIENT_WRITE_ENABLED: writesEnabled ? 'true' : 'false',
       MAIL_CLIENT_SEND_ENABLED: 'false',
+      MAIL_CLIENT_SMART_ENABLED: smartEnabled ? 'true' : 'false',
       // 자격증명은 넣지 않는다. 계정이 하나도 없으므로 provider는 호출되지 않는다.
       MAIL_GMAIL_CLIENT_ID: '',
       MAIL_GMAIL_CLIENT_SECRET: '',
@@ -120,6 +121,7 @@ test('the schema lands even while the mail agent stays off', async t => {
     'mail_client_compose_receipts', 'mail_client_messages', 'mail_client_read_overrides', 'mail_messages',
     'mail_notification_batches', 'mail_preferences',
     'mail_push_deliveries', 'mail_reply_attempts', 'mail_sync_state',
+    'mail_workspace_analysis_jobs', 'mail_workspace_calendar_events', 'mail_workspace_sources',
   ]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_accounts').get().n, 0);
   db.close();
@@ -200,4 +202,40 @@ test('turning the flag on starts the worker and opens the status route', async t
 
   // 계정이 없어도 worker는 돈다. 첫 tick이 아무 계정도 집지 않을 뿐이다.
   assert.equal(logs.join('').includes('Provider 동기화 worker 실행 중'), true);
+});
+
+test('Workspace smart endpoints default off, require read enablement and authenticate independently of writes', async t => {
+  const defaultOff = await startServer(t, false, true);
+  const parentOff = await startServer(t, false, false, false, true);
+  const enabled = await startServer(t, false, true, false, true);
+  const smartPath = '/api/mail-client/smart';
+  for (const server of [defaultOff, parentOff]) {
+    const { body, response } = await api(server.url, smartPath + '/messages?filter=unclassified');
+    assert.equal(response.status, 503);
+    assert.equal(body.code, 'MAIL_CLIENT_SMART_DISABLED');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  }
+  const unauthorized = await fetch(enabled.url + smartPath + '/results?messageIds=1');
+  assert.equal(unauthorized.status, 401);
+  assert.equal(unauthorized.headers.get('cache-control'), 'no-store');
+  const page = await api(enabled.url, smartPath + '/messages?filter=unclassified');
+  assert.equal(page.response.status, 200);
+  assert.equal(page.body.coverage.scope, 'observed_workspace');
+  const post = await fetch(enabled.url + smartPath + '/analyze', {
+    method: 'POST', headers: { 'X-API-Token': API_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messageIds: [99], kind: 'both' }),
+  });
+  assert.equal(post.status, 202);
+  assert.equal(post.headers.get('cache-control'), 'no-store');
+  const { results } = await post.json();
+  assert.deepEqual(results[0].error, { code: 'MAIL_CLIENT_MESSAGE_NOT_FOUND', statusCode: 404 });
+  const missing = await api(enabled.url, smartPath + '/calendar/99');
+  assert.equal(missing.response.status, 404);
+  assert.equal(missing.body.code, 'MAIL_CLIENT_SMART_EVENT_NOT_FOUND');
+  const db = new Database(path.join(enabled.appRoot, 'galpi.db'), { readonly: true });
+  try {
+    for (const table of ['mail_workspace_analysis_jobs', 'mail_messages', 'assistant_tasks', 'assistant_reminders']) {
+      assert.equal(db.prepare('SELECT count(*) AS n FROM ' + table).get().n, 0);
+    }
+  } finally { db.close(); }
 });
