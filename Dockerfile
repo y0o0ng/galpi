@@ -16,8 +16,13 @@ RUN npm ci \
 
 FROM dependencies AS test
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl perl python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --chown=node:node . .
 USER node
+RUN bash scripts/setup-reels-tests.sh
 RUN npm test
 
 FROM base AS runtime

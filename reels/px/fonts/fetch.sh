@@ -51,7 +51,6 @@ import sys
 with ZipFile(sys.argv[1]) as archive:
     for name in ("Pretendard-Medium.otf", "Pretendard-Bold.otf"):
         Path(name).write_bytes(archive.read("public/static/" + name))
-    Path("LICENSE-pretendard.txt").write_bytes(archive.read("LICENSE"))
 PYTHON
 fi
 DNF_SUM=ffa93fec1e4407156b04a1eb2aad3018746d4eb3ef3000c0720e49f068dda622

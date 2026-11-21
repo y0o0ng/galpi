@@ -216,7 +216,7 @@ test('push permission is requested only by explicit enable after canonical-origi
 test('runtime flag hides task entry points and foreground refresh stays separate from chat polling', () => {
   const app = read('public/app.js');
 
-  assert.match(app, /meta\[name="theme-color"\][\s\S]*dark \? '#151A18' : '#F3F5F2'/);
+  assert.match(app, /meta\[name="theme-color"\][\s\S]*dark \? '#1B211E' : '#F3F5F2'/);
   assert.match(app, /tasksEnabled = config\.tasksEnabled === true/);
   assert.match(app, /command\.feature !== 'tasks' \|\| tasksEnabled/);
   assert.match(app, /window\.HomeDashboard\?\.openTasks/);
@@ -309,7 +309,7 @@ test('schedule layout keeps native week navigation and minimal task controls', (
   assert.match(css, /\.notification-tabs\s*{[^}]*repeat\(5, 1fr\)/s);
   assert.match(css, /\.task-view-tabs\s*{[^}]*display: flex[^}]*border-bottom:/s);
   assert.match(css, /:root\s*{[^}]*--bg:\s*#F3F5F2[^}]*--brand:\s*#2F6B57[^}]*--brand-ink:\s*#2F6B57/s);
-  assert.match(css, /\[data-theme="dark"\]\s*{[^}]*--bg:\s*#151A18[^}]*--brand-ink:\s*#7FB99F/s);
+  assert.match(css, /\[data-theme="dark"\]\s*{[^}]*--bg:\s*#1B211E[^}]*--brand-ink:\s*#8CC4AA/s);
   assert.match(css, /\.task-view-tab\.active\s*{[^}]*border-bottom-color: var\(--brand-ink\)/s);
   assert.doesNotMatch(css, /217, 119, 87|var\(--claude-color\)/);
   assert.match(css, /\.task-card\s*{[^}]*border-bottom: 1px solid var\(--border\)[^}]*background: transparent/s);

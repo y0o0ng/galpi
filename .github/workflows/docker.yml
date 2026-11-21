@@ -22,6 +22,7 @@ jobs:
           node-version: 24.16.0
           cache: npm
       - run: npm ci
+      - run: bash scripts/setup-reels-tests.sh
       - run: npm test
 
   container-test:

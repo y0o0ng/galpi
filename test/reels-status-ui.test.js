@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../public/agent-panel.js'),'utf8');
 const labels=source.match(/const REELS_STATUS = [^;]+;/)[0]+'\n'+source.match(/const EPISODE_STATUS = \{[\s\S]*?\};/)[0];
-const status=source.slice(source.indexOf('    const reelsStatus ='),source.indexOf('    content.append(makeAgentRow'));
+const status=source.match(/const reelsStatus = [^;]+;/)[0];
 function label(episode,batch={status:'selected'}){return vm.runInNewContext(labels+'\n'+status+'\nreelsStatus',{state:{reels:{}},episode,batch});}
 test('릴스 알약은 주제 선택 이후 제작·검토 상태를 표시한다',()=>{
  assert.equal(label(null),'제작 대기');assert.equal(label({status:'producing'}),'만드는 중');assert.equal(label({status:'revising'}),'고치는 중');assert.equal(label({status:'ready'}),'검토 대기');assert.equal(label({status:'failed'}),'실패');

@@ -19,5 +19,6 @@ deploy-backups
 fixtures/assistant-retrieval-private*.json
 galpi-vault
 node_modules
+reels/.venv/
 reference
 skills-lock.json
