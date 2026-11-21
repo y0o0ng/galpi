@@ -344,3 +344,80 @@ test('short model date quotes cannot discard explicit source years or adjacent t
   assert.equal(event.startAt, epoch('2027-01-16T01:00:00+09:00'));
   assert.equal(resolveDate('1월 15일 2시', NOW, 'future').reason, 'ambiguous_meridiem');
 });
+
+test('calendar year direction comes from the source tense, independently of a deadline', async t => {
+  const cases = [
+    {
+      name: 'completed submission uses the past despite the model citing the cutoff as future',
+      evidence: '11월 18일까지 제출했습니다', dateText: '11월 18일', title: '제출',
+      direction: 'future', directionEvidence: '까지',
+      expected: ['2026-11-18', 'inferred', 'nearest_past'],
+    },
+    {
+      name: 'Korean deadline wording without tense keeps the nearest date',
+      evidence: '마감일은 11월 18일까지', dateText: '11월 18일', title: '마감',
+      direction: 'future', directionEvidence: '마감일은',
+      expected: ['2026-11-18', 'inferred', 'nearest_date'],
+    },
+    {
+      name: 'English due wording without tense keeps the nearest date',
+      evidence: 'Application due 11/18', dateText: '11/18', title: 'Application',
+      direction: 'future', directionEvidence: 'due',
+      expected: ['2026-11-18', 'inferred', 'nearest_date'],
+    },
+    {
+      name: 'a request to submit establishes a future direction',
+      evidence: '11월 25일까지 제출해 주세요', dateText: '11월 25일', title: '제출',
+      direction: 'future', directionEvidence: '제출해 주세요',
+      expected: ['2026-11-25', 'inferred', 'nearest_future'],
+    },
+    {
+      name: 'the submission request keeps its direction across the year boundary',
+      receivedDate: '2026-12-31', evidence: '1월 1일까지 제출해 주세요', dateText: '1월 1일', title: '제출',
+      direction: 'unspecified', directionEvidence: null,
+      expected: ['2027-01-01', 'inferred', 'nearest_future'],
+    },
+    {
+      name: 'a past event is placed in the prior year when the same month and day are still ahead',
+      receivedDate: '2026-01-02', evidence: '지난 1월 6일에 설명회가 열렸습니다', dateText: '1월 6일', title: '설명회',
+      direction: 'past', directionEvidence: '지난',
+      expected: ['2025-01-06', 'inferred', 'nearest_past'],
+    },
+    {
+      name: 'a past December event stays on the prior side of the January boundary',
+      receivedDate: '2026-01-02', evidence: '지난 12월 31일에 설명회가 열렸습니다', dateText: '12월 31일', title: '설명회',
+      direction: 'past', directionEvidence: '지난',
+      expected: ['2025-12-31', 'inferred', 'nearest_past'],
+    },
+    {
+      name: 'supported future and past cues remain unresolved together',
+      evidence: '지난 11월 25일 설명회가 열렸고 앞으로 진행 예정입니다', dateText: '11월 25일', title: '설명회',
+      direction: 'future', directionEvidence: '앞으로',
+      expected: [null, 'unresolved', 'conflicting_direction'],
+    },
+    {
+      name: 'an explicit source year stays unchanged',
+      evidence: '2025년 11월 18일에 설명회가 열렸습니다', dateText: '2025년 11월 18일', title: '설명회',
+      direction: 'past', directionEvidence: '열렸습니다',
+      expected: ['2025-11-18', 'explicit', 'year_in_source'],
+    },
+  ];
+  for (const { name, receivedDate = '2026-11-21', evidence, dateText, title, direction, directionEvidence, expected } of cases) {
+    await t.test(name, async () => {
+      const output = { ...CALENDAR, events: [{
+        ...CALENDAR.events[1], evidence, dateText, title, direction, directionEvidence,
+      }] };
+      const { events } = await extractCalendar({
+        callModel: () => output, model: 'mock', receivedAt: epoch(receivedDate + 'T12:00:00+09:00'),
+        normalized: { body: evidence },
+      });
+      assert.equal(events.length, 1);
+      const [event] = events;
+      assert.deepEqual([event.startDate, event.dateProvenance, event.inferenceReason], expected);
+      assert.equal(event.referenceKstDate, receivedDate);
+      assert.equal(event.originalDateText, dateText);
+      assert.equal(event.startKind, expected[0] === null ? null : 'date');
+      assert.equal(event.startAt, null);
+    });
+  }
+});
