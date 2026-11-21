@@ -3039,6 +3039,31 @@ html, body {
   box-shadow: 0 0 0 3px var(--brand-ring);
 }
 
+#mail-reply-target:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 12px;
+  font-size: 13px;
+}
+
+#mail-reply-target-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#mail-reply-clear {
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.mail-reply-draft {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* 도구 줄의 가로 padding은 위 입력줄의 글자선에 맞춘 값이다. 왼쪽은 `+` 글리프가,
    오른쪽은 주 액션 원이 입력 텍스트와 같은 세로선에서 시작하고 끝나야 한다.
    버튼 안에서 글리프는 10px, 원은 2px 들어가 있으므로 좌우 값이 다르다. */

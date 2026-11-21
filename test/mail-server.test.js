@@ -114,7 +114,7 @@ test('the schema lands even while the mail agent stays off', async t => {
   assert.deepEqual(tables, [
     'mail_accounts', 'mail_attention', 'mail_messages',
     'mail_notification_batches', 'mail_preferences',
-    'mail_push_deliveries', 'mail_sync_state',
+    'mail_push_deliveries', 'mail_reply_attempts', 'mail_sync_state',
   ]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_accounts').get().n, 0);
   db.close();

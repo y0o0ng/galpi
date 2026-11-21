@@ -107,6 +107,7 @@
     "express-rate-limit": "^8.5.2",
     "imapflow": "^1.7.1",
     "marked": "^18.0.4",
+    "nodemailer": "^10.6.0",
     "openai": "^4.77.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "5.4.296",

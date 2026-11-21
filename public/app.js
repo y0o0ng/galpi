@@ -18,6 +18,7 @@ const PROGRESS_STAGE_LABELS = Object.freeze({
   attachment_read: '첨부 문서 읽는 중…',
   schedule_prepare: '일정 확인 중…',
   mail_search: '메일 찾는 중…',
+  mail_reply_send: '메일 답장 보내는 중…',
   mail_preference: '알림 규칙 바꾸는 중…',
   news_interest: '관심사 챙기는 중…',
   news_search: '뉴스 찾는 중…',
@@ -29,6 +30,9 @@ let isRestoringHistory = false;
 let tasksEnabled = false;
 let weatherEnabled = false;
 let taskSeriesEnabled = false;
+let mailReplyEnabled = false;
+let mailReplyTarget = null;
+const pendingMailReplyRequests = new Map();
 let taskRefreshTimer = null;
 const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 필요한 항목을 선택' },
@@ -193,6 +197,8 @@ async function init() {
     tasksEnabled = config.tasksEnabled === true;
     weatherEnabled = config.weatherEnabled === true;
     taskSeriesEnabled = config.taskSeriesEnabled === true;
+    mailReplyEnabled = config.mailReplyEnabled === true;
+    document.getElementById('mail-reply-clear').onclick = () => setMailReplyTarget(null);
     initPaperPanel();
     window.HomeDashboard?.init({ apiFetch, showToast, weatherEnabled });
     // 옆의 XION 칩이 비서 이름을 말하므로 라벨은 모델만 남긴다.
@@ -950,6 +956,48 @@ function hideCommandPalette() {
 
 // ─── 단일 모드 ────────────────────────────────────────────────────────────────
 
+function setMailReplyTarget(item) {
+  mailReplyTarget = item;
+  document.getElementById('mail-reply-target').hidden = !item;
+  document.getElementById('mail-reply-target-title').textContent = item ? '답장 대상 · ' + item.title : '';
+}
+
+async function mailReplyRequest(text, target) {
+  const value = JSON.stringify([target?.mailMessageId ?? null, text]);
+  let storageKey;
+  if (crypto.subtle) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    storageKey = 'galpi.mailReply:' + Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+  const key = storageKey || value;
+  let id = pendingMailReplyRequests.get(key);
+  try {
+    if (!id && storageKey) id = sessionStorage.getItem(storageKey);
+  } catch (_) {
+    // 세션 저장을 막는 브라우저에서도 현재 화면의 재시도는 같은 ID를 쓴다.
+  }
+  if (!id) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    id = [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
+  }
+  pendingMailReplyRequests.set(key, id);
+  try {
+    if (storageKey) sessionStorage.setItem(storageKey, id);
+  } catch (_) {}
+  return {
+    id,
+    complete() {
+      pendingMailReplyRequests.delete(key);
+      try {
+        if (storageKey) sessionStorage.removeItem(storageKey);
+      } catch (_) {}
+    },
+  };
+}
+
 // 음성처럼 UI 밖에서 부르는 호출자를 위해 결과를 돌려준다. 거절 사유를 구분해야
 // 음성 루프가 "잠깐만"과 "못 만들었어"를 다르게 복구할 수 있다.
 async function sendSingleMessage(options = {}) {
@@ -964,6 +1012,14 @@ async function sendSingleMessage(options = {}) {
   const draftAttachments = usesComposerDraft
     ? window.AttachmentUi?.getReadyAttachments() || []
     : [];
+  const replyTarget = usesComposerDraft && !options.webSearch && !options.source ? mailReplyTarget : null;
+  const possibleMailReply = mailReplyEnabled && usesComposerDraft && !options.webSearch && !options.source
+    && (replyTarget || (/메일/u.test(text) && /답장|회신/u.test(text)));
+  function restoreMailRequest() {
+    if (!possibleMailReply || inputEl.value || mailReplyTarget !== replyTarget) return;
+    inputEl.value = text;
+    inputEl.dispatchEvent(new Event('input'));
+  }
 
   if (usesComposerDraft) inputEl.value = '';
   inputEl.style.height = 'auto';
@@ -980,6 +1036,7 @@ async function sendSingleMessage(options = {}) {
   document.dispatchEvent(new Event('pet:thinking'));
 
   try {
+    const replyRequest = possibleMailReply ? await mailReplyRequest(text, replyTarget) : null;
     document.dispatchEvent(new Event('pet:building'));
     const res = await apiFetch('/api/chat', {
       method:  'POST',
@@ -992,6 +1049,8 @@ async function sendSingleMessage(options = {}) {
         webSearch: !!options.webSearch,
         source: options.source,
         progress: true,
+        ...(replyRequest ? { chatRequestId: replyRequest.id } : {}),
+        ...(replyTarget ? { mailReplyMessageId: replyTarget.mailMessageId } : {}),
         ...(draftAttachments.length > 0
           ? { attachmentIds: draftAttachments.map(attachment => attachment.attachmentId) }
           : {}),
@@ -1008,8 +1067,11 @@ async function sendSingleMessage(options = {}) {
         window.AttachmentUi?.renderMessageAttachments(userGroup, draftAttachments, { transientStatus: 'error' });
       }
       appendError(data.error);
+      restoreMailRequest();
       return { ok: false, reason: 'error' };
     }
+    if (data.mailReplyState !== 'unknown') replyRequest?.complete();
+    if (data.mailReplyState === 'sent' && mailReplyTarget === replyTarget) setMailReplyTarget(null);
     let linkedAttachments = [];
     if (draftAttachments.length > 0) {
       linkedAttachments = Array.isArray(data.attachments) && data.attachments.length > 0
@@ -1047,6 +1109,7 @@ async function sendSingleMessage(options = {}) {
       window.AttachmentUi?.renderMessageAttachments(userGroup, draftAttachments, { transientStatus: 'error' });
     }
     appendError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+    restoreMailRequest();
     return { ok: false, reason: 'error' };
   } finally {
     isLoading = false;
@@ -1213,6 +1276,11 @@ function initPaperPanel() {
         window.NotePanel?.open(note);
       },
       onResolved: id => window.HomeDashboard?.notificationResolved?.(id),
+      onReply: mailReplyEnabled ? item => {
+        setMailReplyTarget(item);
+        window.HomeDashboard?.setRoute('chat');
+        document.getElementById('input').focus();
+      } : null,
     });
     window.AgentPanel.init({
       apiFetch,
@@ -2823,6 +2891,18 @@ function appendAssistantBubble(data) {
     : null;
 
   group.append(label, bubble);
+  if (data.mailReplyTurn) {
+    if (data.mailReplyDraft) {
+      const draft = document.createElement('p');
+      draft.className = 'mail-reply-draft';
+      draft.textContent = data.mailReplyDraft;
+      bubble.appendChild(draft);
+    }
+    getMessages().appendChild(group);
+    saveUiMessage('assistant', data.reply, actualModel);
+    scrollDown();
+    return;
+  }
   if (candidateCard) {
     group.appendChild(candidateCard);
     getMessages().appendChild(group);

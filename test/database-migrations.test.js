@@ -362,6 +362,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 41, name: 'reels_uploads' },
     { version: 42, name: 'reels_candidate_everyday_door' },
     { version: 43, name: 'card_news_pipeline' },
+    { version: 44, name: 'mail_reply_attempts' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -379,7 +380,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
   );
   assert.deepEqual(
     db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN (
-      'ddays', 'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
+      'ddays', 'mail_reply_attempts', 'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
       'memory_general_fact_transitions', 'memory_general_fact_transition_evidence', 'memory_general_fact_reviews'
     ) AND name NOT LIKE 'lecture_%' AND name NOT LIKE 'reels_%' AND name NOT LIKE 'cards_%' ORDER BY name`).all(),
     tablesBefore,
@@ -1093,7 +1094,11 @@ test('schema v42 adds the reels candidate everyday_door column and keeps existin
       template, hook_paradox, hook_term, hook_subtitle, risk, created_at)
     VALUES ('2026-10-03', 1, 't', 'https://e.com', '2026-10-01', 1, 'w', 'c', 'b', '단계', 'p', 'h', 's', 'r', 1)
   `).run();
-  assert.deepEqual(runDatabaseMigrations(db).applied, [{ version: 42, name: 'reels_candidate_everyday_door' }, { version: 43, name: 'card_news_pipeline' }]);
+  assert.deepEqual(runDatabaseMigrations(db).applied, [
+    { version: 42, name: 'reels_candidate_everyday_door' },
+    { version: 43, name: 'card_news_pipeline' },
+    { version: 44, name: 'mail_reply_attempts' },
+  ]);
   assert.deepEqual(runDatabaseMigrations(db).applied, []);
   assert.deepEqual(
     db.prepare('SELECT everyday_door AS a FROM reels_candidates').get(),

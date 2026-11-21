@@ -57,6 +57,9 @@ const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailBodyReader } = require('./lib/mail/body');
 const { createMailSearchSession } = require('./lib/mail/search-tool');
 const { createMailPreferenceSession } = require('./lib/mail/preference-tool');
+const { parseMailReplyRequest } = require('./lib/mail/reply-intent');
+const { createMailReplyService } = require('./lib/mail/reply');
+const { createMailReplyTransport } = require('./lib/mail/reply-transport');
 const {
   NOTE_FILENAME: NEWS_NOTE_FILENAME,
   NOTE_TITLE: NEWS_NOTE_TITLE,
@@ -243,6 +246,7 @@ const VOICE_TTS_SPEED = process.env.VOICE_TTS_SPEED;
 const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 // MAIL-1 Provider 동기화. 실계정 인수 전까지 false 유지.
 const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
+const MAIL_REPLY_ENABLED = MAIL_AGENT_ENABLED && process.env.MAIL_REPLY_ENABLED === 'true';
 // News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
 const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
@@ -922,6 +926,33 @@ const MAIL_CREDENTIALS_BY_PROVIDER = {
   works: MAIL_WORKS_CREDENTIALS,
 };
 const mailCredentialsFor = account => MAIL_CREDENTIALS_BY_PROVIDER[account.provider] || {};
+const mailBodyReader = MAIL_AGENT_ENABLED
+  ? createMailBodyReader({ store: mailStore, providers: mailProviders, credentials: mailCredentialsFor })
+  : null;
+const gmailReplyRefreshToken = process.env.MAIL_GMAIL_REPLY_REFRESH_TOKEN;
+const mailReplyService = MAIL_REPLY_ENABLED && HAS_GPT && GPT_RESPONSES_ENABLED ? createMailReplyService({
+  db,
+  store: mailStore,
+  bodyReader: mailBodyReader,
+  transmit: createMailReplyTransport({
+    smtpCredentials: mailCredentialsFor,
+    gmailTokens: gmailReplyRefreshToken ? createGoogleTokenSource({
+      credentials: { ...MAIL_GMAIL_CREDENTIALS, refreshToken: gmailReplyRefreshToken },
+      fetch: (url, init) => fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(15_000) }),
+    }) : null,
+  }),
+  async callModel({ model, system, input, schema, schemaName }) {
+    const response = await openai.responses.create({
+      model,
+      instructions: system,
+      input: JSON.stringify(input),
+      store: false,
+      text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } },
+    }, { timeout: 30_000, maxRetries: 0 });
+    if (response.status !== 'completed') throw new Error('MAIL_REPLY_MODEL_INCOMPLETE');
+    return JSON.parse(extractSmallResponseText(response));
+  },
+}) : null;
 // 분석은 모델이 있어야 돈다. 키가 없으면 동기화만 하고 메일은 pending으로 쌓인다 —
 // 판단 없이 알림을 내보내는 것보다 낫고, 키가 생기면 쌓인 것부터 그대로 처리된다.
 const mailAnalyzer = MAIL_AGENT_ENABLED && HAS_GPT
@@ -4429,8 +4460,52 @@ async function runSingleChatTurnBody({
     };
 }
 
+async function runMailReplyChatTurn({ message, sessionId, progress, attachmentIds, mailReply }) {
+  const history = hydrateSessionFromDb(sessionId);
+  const modelSnapshot = resolveChatModelSelection({
+    selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
+    catalogRow: modelCatalogs.get('openai_api'),
+    bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
+    reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+  });
+  const { modelId } = modelSnapshot;
+  const result = !mailReplyService
+    ? { reply: '지금은 갈피에서 메일 답장 기능을 사용할 수 없어.' }
+    : attachmentIds?.length
+      ? { reply: '메일 답장은 텍스트만 지원해. 갈피 첨부를 빼고 다시 요청해 줘.' }
+      : await mailReplyService.run({
+        ...mailReply,
+        sessionId,
+        message,
+        model: modelId,
+        history,
+        onStage: progress.stage,
+      });
+  // 원문과 초안은 대화 replay, embedding, 자동 저장 경로에 들어가지 않는다.
+  const { userMessageId, assistantMessageId } = dbSaveChatExchange({
+    sessionId, question: message, answer: result.reply, assistantModel: modelId, modelSnapshot,
+  });
+  const createdAt = Math.floor(Date.now() / 1000);
+  sessions[sessionId] = [
+    ...history,
+    { role: 'user', content: message, createdAt },
+    { role: 'assistant', content: result.reply, model: modelId, createdAt },
+  ].slice(-HISTORY_CONTEXT_MESSAGES);
+  return {
+    reply: result.reply,
+    userMessageId,
+    messageId: assistantMessageId,
+    model: 'GPT',
+    modelId,
+    mailReplyTurn: true,
+    ...(result.state ? { mailReplyState: result.state } : {}),
+    ...(result.draft ? { mailReplyDraft: result.draft } : {}),
+  };
+}
+
 async function runSingleChatTurn(input) {
   return withSessionChatLock(input.sessionId, async () => {
+    if (input.mailReply) return runMailReplyChatTurn(input);
     // 새 첨부의 파싱은 이 요청 안에서 끝나야 해서, 큰 파일은 여기서만 수 초가 걸린다.
     const parsesAttachment = Array.isArray(input.attachmentIds) && input.attachmentIds.length > 0;
     if (parsesAttachment) input.progress?.stage('attachment_parse');
@@ -4466,7 +4541,7 @@ async function runSingleChatTurn(input) {
 app.post('/api/chat', async (req, res) => {
   const {
     message, model, sessionId, activeNotes, webSearch, progress: wantsProgress, source,
-    attachmentIds,
+    attachmentIds, mailReplyMessageId, chatRequestId,
   } = req.body;
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
@@ -4492,6 +4567,14 @@ app.post('/api/chat', async (req, res) => {
   if (message.length > 10000) {
     return res.status(400).json({ error: '메시지가 너무 깁니다 (최대 10,000자).' });
   }
+  if (mailReplyMessageId != null && (!Number.isSafeInteger(mailReplyMessageId) || mailReplyMessageId < 1)) {
+    return res.status(400).json({ error: '올바른 답장 대상 메일이 필요해.' });
+  }
+  const selectedId = mailReplyMessageId ?? null;
+  const replyIntent = model === 'gpt' && source == null && webSearch !== true
+    ? parseMailReplyRequest(message, selectedId)
+    : null;
+  if (replyIntent?.kind === 'draft') res.set('Cache-Control', 'no-store, no-transform');
 
   const progress = createProgressStream(res, { enabled: wantsProgress === true });
   progress.stage('context');
@@ -4517,6 +4600,7 @@ app.post('/api/chat', async (req, res) => {
       // 대화 자체는 기존 경로로 저장하고 명시적 저장만 허용한다.
       allowAutoTopic: source !== 'voice',
       attachmentIds,
+      mailReply: replyIntent ? { intent: replyIntent, selectedId, requestId: chatRequestId } : null,
     });
     if (!progress.result(payload)) res.json(payload);
   } catch (err) {
@@ -4658,6 +4742,7 @@ app.get('/api/config', (req, res) => {
     codexJobBatchSize: CODEX_JOB_BATCH_SIZE,
     tasksEnabled: ASSISTANT_TASKS_ENABLED,
     taskSeriesEnabled: ASSISTANT_TASK_SERIES_ENABLED,
+    mailReplyEnabled: Boolean(mailReplyService),
     halfDuplexVoice: voiceTts.publicConfig(),
     shortcutVoice: voiceShortcut.publicConfig(),
     attachments: attachmentUploads.publicConfig(),
@@ -4832,13 +4917,7 @@ registerMailRoutes({
   store: mailStore,
   config: { enabled: MAIL_AGENT_ENABLED },
   // 본문은 저장하지 않으므로 화면이 열 때마다 Provider에서 읽는다(설계 23).
-  bodyReader: MAIL_AGENT_ENABLED
-    ? createMailBodyReader({
-      store: mailStore,
-      providers: mailProviders,
-      credentials: mailCredentialsFor,
-    })
-    : null,
+  bodyReader: mailBodyReader,
   // 되돌린 즉시 한 바퀴 돌린다. 다음 주기를 기다리면 눌러놓고 아무 일도 안 일어난다.
   onRequeued: () => { void mailAgent?.tick(); },
 });

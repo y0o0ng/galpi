@@ -12,6 +12,7 @@
     onSplit: null,
     openNote: null,
     onResolved: null,
+    onReply: null,
   };
 
   function elements() {
@@ -233,6 +234,9 @@
     // 눌러도 실패할 버튼을 만들지 않는다(설계 15).
     if (scheduleCandidateFrom(item)) {
       actions.appendChild(makeMailAction('일정 등록', () => openScheduleCandidate(item, card, actions)));
+    }
+    if (state.onReply && Number.isSafeInteger(item.mailMessageId)) {
+      actions.appendChild(makeMailAction('시온에게 답장 요청', () => state.onReply(item)));
     }
     // 규칙 편집기를 사용자에게 관리시키지 않는다(설계 11). 사용자가 "이건 알림
     // 필요 없다"고 느끼는 자리가 여기라서, 가장 좁은 범위(발신자 하나)를 그 자리에서
@@ -593,7 +597,7 @@
     refresh();
   }
 
-  function init({ apiFetch, showToast, onSplit, openNote, onResolved }) {
+  function init({ apiFetch, showToast, onSplit, openNote, onResolved, onReply }) {
     if (state.initialized) return;
     const el = elements();
     if (
@@ -611,6 +615,7 @@
     state.onSplit = onSplit;
     state.openNote = openNote;
     state.onResolved = onResolved;
+    state.onReply = onReply;
     el.refresh.addEventListener('click', refresh);
     el.tabs.forEach(tab => tab.addEventListener('click', () => selectFilter(tab.dataset.notificationFilter)));
     state.initialized = true;

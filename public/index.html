@@ -137,6 +137,10 @@
 
         <div id="input-area">
           <input id="attachment-input" type="file" accept=".pdf,.md,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/plain,text/markdown,image/jpeg,image/png,image/webp" hidden>
+          <div id="mail-reply-target" hidden>
+            <span id="mail-reply-target-title" aria-live="polite"></span>
+            <button id="mail-reply-clear" class="notification-action" type="button">선택 해제</button>
+          </div>
           <div id="composer-shell">
             <textarea id="input" placeholder="시온에게 물어보세요" rows="1"></textarea>
             <div id="composer-toolbar">
