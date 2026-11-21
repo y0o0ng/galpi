@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -12,9 +13,12 @@ test('runtime paths keep the native layout when no path environment is configure
   const homeDir = path.join(path.sep, 'home', 'operator');
   const paths = resolveRuntimePaths({ env: {}, appRoot, homeDir });
 
+  const dbPath = path.join(appRoot, 'galpi.db');
+  const secretName = createHash('sha256').update(dbPath).digest('hex') + '.json';
   assert.deepEqual(paths, {
     dataDir: appRoot,
-    dbPath: path.join(appRoot, 'galpi.db'),
+    dbPath,
+    mailSecretsPath: path.join(homeDir, '.config', 'galpi', 'mail', secretName),
     attachmentsTmpDir: path.join(appRoot, 'attachments', 'tmp'),
     vaultPath: path.join(appRoot, 'galpi-vault'),
     backupDir: path.join(homeDir, 'backups', 'galpi'),
@@ -27,6 +31,7 @@ test('runtime paths separate database, vault, and backups using configured roots
       GALPI_DATA_DIR: '/var/lib/galpi',
       VAULT_PATH: '/vault',
       BACKUP_DIR: '/backups',
+      MAIL_ACCOUNT_SECRET_FILE: '/private/mail/account.json',
     },
     appRoot: '/app',
     homeDir: '/home/node',
@@ -39,6 +44,7 @@ test('runtime paths separate database, vault, and backups using configured roots
   assert.equal(paths.attachmentsTmpDir, '/var/lib/galpi/attachments/tmp');
   assert.equal(paths.vaultPath, '/vault');
   assert.equal(paths.backupDir, '/backups');
+  assert.equal(paths.mailSecretsPath, '/private/mail/account.json');
 });
 
 test('ensureDataDirectory creates the configured database directory', (t) => {
