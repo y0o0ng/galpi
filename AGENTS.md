@@ -180,6 +180,7 @@
 - **지식 패널의 첫 화면은 `XION` 홈이다**(탭 줄 맨 왼쪽, 기본 선택). `확인할 것` → `오늘` → 에이전트 상태 순서이고 기존 정본만 읽는 projection이라 서버 상태가 없다. 계약은 `docs/xion-home-design.md`다. **탭 키는 `agents`로 남겨둔다** — 설치된 Service Worker와 지난 알림이 `/?panel=agents` 링크를 들고 있다. 기본 탭은 `index.html`의 `active`·`hidden`과 `paper-panel.js`의 `state.activeTab` **두 곳**이 함께 정한다. 지식 패널이 데스크톱에서 350px 고정 폭이라(`grid-template-columns: minmax(0, 1fr) 350px`) 2열은 물리적으로 안 들어가고 모바일과 같은 1열을 쓴다.
 - **대시보드는 채팅과 분리된 별도 창이고 아직 착수하지 않는다.** 착수 조건은 상시 확인 대상이 늘어나는 것인데 지금은 없다(V5-B가 `server.js`에 안 붙는 것이 계약이다). **그때까지 홈은 350px 안에 남고, "홈이 허전하다"를 패널 확장이나 카드 추가로 읽지 않는다.** 계약은 `docs/roadmap.md`의 V6 절이다.
 - **홈 날씨는 2026-08-22 Pi 배포·실기기 인수로 닫혔다.** 정본은 `docs/xion-weather-design.md`이고(구현 기록 29절·관측 30절) 코드는 `lib/weather.js`·`lib/weather-routes.js`, 계약은 `test/weather*.test.js`다. 홈 쪽 파장은 `docs/xion-home-design.md` 12절이다.
+- **대화 속 약속의 일정 후보화는 열린 작업이다(미착수).** 지금 일정은 명시적 요청만 후보로 만들고, 장기기억은 §47.7에 따라 일정을 NO_WRITE로 두므로 요청 없이 말한 약속은 어디에도 남지 않는다. 메울 곳은 일정 쪽(휘발 후보 카드 → `등록`)이고 사용자가 요청하지 않은 상태를 먼저 만드는 경로라 메일 관측 뒤에 연다. 정본은 `docs/task-reminder-design.md` 14.1절이다.
 - 상시 관찰: `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 표시, 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 
 ### 릴스 (XION Reels, `시온의 원리노트`)
