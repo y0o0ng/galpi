@@ -1017,6 +1017,18 @@ a project claim; a second label's claim, which had copied the assistant's questi
 as the user's statement with its source row kept. Both reviews came after the untuned baseline was
 seen, and no other eval label reopens.
 
+**Extractor train labels complete (owner, 2026-11-25).** All 223 train items are labelled; eval
+(21/21) and eval Durability (12/12) were already done. The relabel queue closed at 21/21, all moved: 15
+to `preference` and 6 to `possession`. Final train gold, last row per item with relabel rows winning:
+project 90, `preference` 48, `possession` 10, `primary_phone` 3, `academic_major` 1, `residence_area` 1,
+DEFERRED 39, NO_STORE 31. DEFERRED notes are free text in 26 spellings: an opinion or stance on one
+topic appears under five (7 labels), instructions or handoff quotes in 10 labels, some with a second
+tag, and routines or daily patterns in 5. Notes are not gold, so they are counted only after a fixed
+tag map. The train Durability queue stands at 51/142 of Luna's NO_WRITE results, so Durability gold is
+not complete. Training hardware has arrived (RTX 5060 Ti 16 GB, 32 GB RAM; private `train-env` with
+torch 2.14.1+cu130, transformers 5.23.0, peft 0.21.3). Before tuning: finish the Durability queue,
+fix the note tags, and review the labels once.
+
 **Laya feasibility check for Durability — preregistration (owner direction, 2026-11-05).** The
 owner prefers Laya over Qwen for Durability and Ambiguity, since both are decisions and Laya
 (`convaiinnovations/laya`, Apache-2.0) answers typed questions with probabilities and never generates
