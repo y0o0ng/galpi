@@ -1179,11 +1179,114 @@ with the per-family breakdown. It does not reject local tuning.
   "verbatim", the Durability-reason line is dropped, and the review rules and DEFERRED categories are stated. The
   untuned base gets the same instructions. The Luna drafts being compared were written under the old prompt.
 
+**Cross-validation run (2026-11-25–26).** Run-time changes, none of which touch the preregistered values:
+- `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` after 4B fold 1 ran out of memory with the desktop holding
+  about 1.4 GB; the fold was rerun unchanged.
+- `--checkpoint-every N` saves the adapter, optimizer, scheduler and RNG state, and a rerun resumes from it. A
+  4-step run stopped at step 2 and resumed differed from an uninterrupted run by 0.00070 in weights and 0.0068 in
+  loss; two uninterrupted runs differed by 0.00069 and 0.0046. Resume is equivalent within GPU non-determinism.
+  The 1%-of-largest-weight bar set before the check was tighter than that non-determinism, so both pairs failed it.
+- 9B training ran out of memory at the start of fold 0: the probe had no optimizer state. `--offload-activations`
+  keeps autograd's saved tensors in pinned CPU memory. On the 4B probe the loss is identical (0.7061) and the
+  peak drops from 12.9 to 11.9 GB; the 9B probe peaks at 12.3 GB. It was used for 9B training only. 9B fold 3 was
+  stopped at the owner's request and resumed from step 50.
+- A `causal-conv1d` kernel built for sm_120 ran about 3% faster and was not installed.
+
+Cross-validated primary score on the 197 train items (each item scored by the fold model that did not see it):
+
+| System | All | project | preference | possession | DEFERRED |
+| --- | --- | --- | --- | --- | --- |
+| 4B tuned | **116** | 45/92 | 36/51 | 6/10 | 26/39 |
+| 9B tuned | 74 | 28/92 | 29/51 | 9/10 | 5/39 |
+| 4B untuned | 34 | 0 | 0 | 0 | 34/39 |
+| 9B untuned | 36 | 0 | 0 | 0 | 36/39 |
+| Luna drafts | 88 | 46/92 | 0/51 | 0/10 | 39/39 |
+
+4B is chosen; it leads on every fold (36/26/16/18/20 against 33/12/9/10/10). Its cross-validation conditions
+hold against both references. Limits: on `project` it only matches Luna, so most of the lead over Luna is in the
+families Luna could not use; per-fold scores range from 16 to 36. Why 9B almost never defers is not known.
+
+Post-hoc reference, added after the 4B results were seen and not a pass condition: the untuned bases wrote
+schema-invalid payloads for every EXTRACTED answer, because the instructions name the outer keys but not the
+payload keys that Luna received from its structured-output schema. With the payload keys stated, both untuned
+bases score 50/197 (project 3 and 2). The tuned lead is therefore not only schema learning.
+
+**Extractor tuning — FAIL, returned to the owner (2026-11-26).** 4B was trained once on all 197 items (75
+steps) and scored once on eval: tuned 5/11, untuned base 0/11, Luna drafts 6/11. The eval condition against Luna
+fails, so the preregistration fails. By structure only (no eval text was read): four of the six misses are
+`STATUS` where the gold is `CLAIM` (two `DONE`, two `PLANNED`); one is DEFERRED where the gold extracts, and one
+is a `general_fact` with no attribute (schema-invalid). Luna's misses are different items. The eval labels
+predate review rules P2 and P6, which turn goals into `STATUS:PLANNED` and finished features into
+`STATUS:DONE`, so some of these misses may be a rule gap between train and eval rather than model error;
+deciding that needs the owner to read those items. One miss in 11 separates the two systems, which the
+preregistration already said eval cannot rank.
+
 **Open for step 3: the path from a project to source-only detail (owner, 2026-11-04).** "Source-only"
 assumes detail can be reached later, but a NO_WRITE anchor leaves no EvidenceRef, so a project links
 only to the turns behind its stored states. Detail in other turns, or spread across sessions, is
 reachable only by search. Step 3 must define that boundary and routing, measured on questions whose
 answer is source-only, before the source-only standard counts as safe.
+
+### Durability tuning — preregistration (owner-approved, 2026-11-26)
+
+**Train Durability label review applied (owner, 2026-11-26).** The 142 train Durability labels (the anchors
+Luna dropped) were checked against the Durability baseline, §47.7 and review rules P1–P8. Nine were changed
+through the label store, each memo ending `[review-durability-2026-11-26]`; the private report is
+`reports/durability-label-review-2026-11-26.md`. Two rules were settled:
+- **Settings owned by another system stay NO_WRITE**, like schedules: mail alert rules and news interest
+  removal. This marks the boundary with P5, which keeps standing instructions to the assistant as DEFERRED.
+- **Purchase plans are projects**, as on the Extractor side: a camera or phone purchase anchor that states the
+  plan, its stage or a fact about it is WRITE (`STATUS:PLANNED`, `STATUS:PAUSED` or `CLAIM`).
+
+Changes: five purchase anchors became WRITE, the first mention of the lecture-note project became
+`STATUS:PLANNED`, a subscription intent became DEFERRED, a pure-pointer `IDENTIFIED` became `CLAIM` (P2), and
+the two novel-ending candidates became NO_WRITE as artifact content. Train Durability is now 133 NO_STORE and 9
+WRITE. Eval was not reopened.
+
+**Question.** Does a fully fine-tuned Laya decide WRITE / NO_WRITE on the owner's labels well enough to replace
+Luna's Durability call? The frozen-backbone check of 2026-11-05 failed and said the full fine-tune is Laya's
+real test. This picks nothing for production and does not change Ambiguity, the Extractor or the Bundle Builder.
+
+**Gold and data.** Every labelled anchor from both queues: the Extractor queue (anchors Luna kept) and the
+Durability queue (anchors Luna dropped). `NO_STORE` is NO_WRITE; anything else, DEFERRED included, is WRITE.
+- Train: 365 anchors, 206 WRITE and 159 NO_WRITE. Eval: 33 anchors, 11 WRITE and 22 NO_WRITE, the same set the
+  frozen check used.
+- Luna's own split on the same labels, for reference: train 26/159 false WRITE and 9/206 missed; eval 10/22
+  false WRITE and 0/11 missed.
+- The input is the anchor-marked bundle, built as in the frozen check but with a 7,936-token state budget
+  (`max_len` 8,192 minus the 256-token question budget), so bundles are not cut except where one exceeds it;
+  the cut count is reported.
+- `scripts/memory-durability-tuning-data.js` builds the private data; `scripts/memory-durability-tune.py` trains
+  and scores.
+
+**Model and training, fixed up front.** `laya-multilingual` (mmBERT-base, 322M, Apache-2.0) at the commit pinned
+on 2026-11-05 (`1720e3e3…`), on the RTX 5060 Ti. Full fine-tune with the package defaults: 4 epochs, encoder
+learning rate 2.5e-5, head 1e-4, RLCD loss, seed 0, effective batch 8 with an update per micro-batch of 8. If a
+memory probe on the longest states cannot fit 8 per micro-batch, it is split by gradient accumulation with the
+same effective batch, and the split is recorded before any cross-validation. The question is one yes/no:
+whether the marked utterance holds durable information about the user, with the current baseline's examples
+(goals, plans including purchases, decisions, stages, blockers, affiliation, major, preferences, possessions,
+traits, standing instructions) and counterexamples (dated schedules and their requests, other systems'
+settings, passing reactions, artifact detail, reason- or feeling-only remarks).
+
+**Threshold, inside train only.** Episode-grouped 5-fold cross-validation over the 365 anchors gives every
+anchor a held-out score. The threshold is the lowest false-WRITE rate with misses at or below 30%, as before.
+The final model is then trained once on all train anchors.
+
+**Eval, once.** The final model is scored once on the 33 eval anchors at that threshold. The untuned base is
+also scored once, at its own train threshold, as a reference. Only aggregates are read.
+
+**Pass.** Both must hold on eval: false WRITE at or below 5/22, and misses at or below 3/11 (the bars of the
+frozen check). Brier score, calibration error and the cross-validated train rates are reported, not gated.
+PASS means a tuned Laya goes forward into the integrated formation run. FAIL returns to the owner with the
+breakdown; it does not reject Laya or local tuning.
+
+**Known limits.**
+- 33 eval anchors are coarse, and this is the second candidate scored on them.
+- The labels were drawn up by reviewing Luna's two piles, so Luna's errors that the owner did not notice are in
+  the gold on both sides.
+- The question text states the label rules, so the model is told the baseline as well as shown it.
+- Eval has no session over 18 messages, so long-session behaviour is not tested there.
 
 ## Storage topology and authority
 

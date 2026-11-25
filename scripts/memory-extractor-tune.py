@@ -89,11 +89,14 @@ def load_model(name, adapter=None, trainable=False):
     return tok, model
 
 
-def step_loss(model, ids, n_comp, device):
+def step_loss(model, ids, n_comp, device, offload=False):
+    import contextlib
     import torch
     import torch.nn.functional as F
     x = torch.tensor([ids], device=device)
-    out = model(input_ids=x, logits_to_keep=n_comp + 1, use_cache=False)
+    # offload keeps the tensors autograd saves in pinned CPU memory: same math, lower GPU peak (9B on 16 GB)
+    with torch.autograd.graph.save_on_cpu(pin_memory=True) if offload else contextlib.nullcontext():
+        out = model(input_ids=x, logits_to_keep=n_comp + 1, use_cache=False)
     logits = out.logits[0, :-1].float()
     target = x[0, -n_comp:]
     return F.cross_entropy(logits, target)
@@ -111,7 +114,7 @@ def cmd_probe(a):
     res = {"model": a.model, "maxTokens": len(ids), "completionTokens": nc, "itemId": item}
     try:
         model.train()
-        loss = step_loss(model, ids, nc, "cuda:0")
+        loss = step_loss(model, ids, nc, "cuda:0", a.offload_activations)
         loss.backward()
         torch.cuda.synchronize()
         res.update(status="OK", loss=round(float(loss), 4))
@@ -123,6 +126,21 @@ def cmd_probe(a):
 
 
 # --------------------------------------------------------------------------- train
+def _save_ckpt(a, model, opt, sched, step, log, torch):
+    """Atomic mid-fold checkpoint: LoRA weights, optimizer, scheduler, step, log, torch RNG."""
+    from peft import get_peft_model_state_dict
+    tmp, final = f"{a.out}/ckpt.tmp", f"{a.out}/ckpt"
+    os.makedirs(tmp, exist_ok=True)
+    torch.save({"adapter": get_peft_model_state_dict(model), "opt": opt.state_dict(), "sched": sched.state_dict(),
+                "step": step, "log": log, "cpu_rng": torch.get_rng_state(), "cuda_rng": torch.cuda.get_rng_state_all()},
+               f"{tmp}/state.pt")
+    if os.path.isdir(final):
+        os.rename(final, f"{a.out}/ckpt.old")
+    os.rename(tmp, final)
+    if os.path.isdir(f"{a.out}/ckpt.old"):
+        import shutil; shutil.rmtree(f"{a.out}/ckpt.old")
+
+
 def cmd_train(a):
     import torch
     from transformers import get_cosine_schedule_with_warmup
@@ -138,29 +156,41 @@ def cmd_train(a):
     steps_per_epoch = math.ceil(len(data) / ACCUM)
     total = steps_per_epoch * EPOCHS
     sched = get_cosine_schedule_with_warmup(opt, 0, total)
+    # Epoch orders are drawn up front from the same Random(SEED) sequence the per-epoch shuffle used,
+    # so the order is identical and a resumed run can skip groups already done.
     rng = random.Random(SEED)
-    model.train()
-    log, step, t0 = [], 0, time.time()
+    plan = []
     for ep in range(EPOCHS):
         order = list(range(len(data)))
         rng.shuffle(order)
-        for g in range(0, len(order), ACCUM):
-            group = order[g:g + ACCUM]
-            tot = 0.0
-            for i in group:
-                ids, nc = data[i]
-                loss = step_loss(model, ids, nc, "cuda:0") / len(group)
-                loss.backward()
-                tot += float(loss)
-            torch.nn.utils.clip_grad_norm_(params, 1.0)
-            opt.step()
-            sched.step()
-            opt.zero_grad(set_to_none=True)
-            step += 1
-            log.append({"step": step, "epoch": ep + 1, "loss": round(tot, 4), "lr": sched.get_last_lr()[0]})
-            print(json.dumps(log[-1]), flush=True)
-            if a.max_steps and step >= a.max_steps:
-                break
+        plan += [(ep, order[g:g + ACCUM]) for g in range(0, len(order), ACCUM)]
+    log, step, t0 = [], 0, time.time()
+    every = getattr(a, "checkpoint_every", 0) or 0
+    if every and os.path.isfile(f"{a.out}/ckpt/state.pt"):
+        from peft import set_peft_model_state_dict
+        st = torch.load(f"{a.out}/ckpt/state.pt", weights_only=False)
+        set_peft_model_state_dict(model, st["adapter"])
+        opt.load_state_dict(st["opt"]); sched.load_state_dict(st["sched"])
+        step, log = st["step"], st["log"]
+        torch.set_rng_state(st["cpu_rng"]); torch.cuda.set_rng_state_all(st["cuda_rng"])
+        print(json.dumps({"resumedFromStep": step}), flush=True)
+    model.train()
+    for ep, group in plan[step:]:
+        tot = 0.0
+        for i in group:
+            ids, nc = data[i]
+            loss = step_loss(model, ids, nc, "cuda:0", a.offload_activations) / len(group)
+            loss.backward()
+            tot += float(loss)
+        torch.nn.utils.clip_grad_norm_(params, 1.0)
+        opt.step()
+        sched.step()
+        opt.zero_grad(set_to_none=True)
+        step += 1
+        log.append({"step": step, "epoch": ep + 1, "loss": round(tot, 4), "lr": sched.get_last_lr()[0]})
+        print(json.dumps(log[-1]), flush=True)
+        if every and step % every == 0 and step < total:
+            _save_ckpt(a, model, opt, sched, step, log, torch)
         if a.max_steps and step >= a.max_steps:
             break
     model.save_pretrained(a.out)
@@ -181,6 +211,14 @@ def parse_output(raw):
     return isinstance(obj, dict), (obj if isinstance(obj, dict) else None)
 
 
+# Post-hoc reference only (owner, 2026-11-25, after the 4B CV was seen): the untuned base never learns the payload
+# keys that Luna got from its structured-output schema, so this hint states them. Not a pass condition.
+SCHEMA_HINT = ('semanticFamily는 general_fact 또는 project다. payload 형식: general_fact면 '
+               '{"attributeKey": 등록 속성 키, "subject": "USER", "value": 문자열 또는 null}, project면 '
+               '{"kind": "STATUS"|"CLAIM"|"IDENTIFIED", "subject": "USER", "status": 단계 또는 null, '
+               '"claimText": 문자열 또는 null, "projectMention": 문자열 또는 null}.')
+
+
 def cmd_predict(a):
     import torch
     fold = parse_fold(a.fold)
@@ -192,7 +230,10 @@ def cmd_predict(a):
     n_ok = 0
     with open(a.out, "w", encoding="utf-8") as f:
         for r in rows:
-            prompt = chat_ids(tok, r["messages"][:2], True)
+            msgs = r["messages"][:2]
+            if a.schema_hint:
+                msgs = [{"role": "system", "content": msgs[0]["content"] + "\n" + SCHEMA_HINT}, msgs[1]]
+            prompt = chat_ids(tok, msgs, True)
             x = tok(prompt, add_special_tokens=False, return_tensors="pt").input_ids.to("cuda:0")
             with torch.no_grad():
                 out = model.generate(input_ids=x, max_new_tokens=MAX_NEW, do_sample=False,
@@ -407,13 +448,18 @@ def main():
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest="cmd", required=True)
     p = sp.add_parser("probe"); p.add_argument("--model", choices=MODELS, required=True); p.set_defaults(f=cmd_probe)
+    p.add_argument("--offload-activations", action="store_true", help="keep saved activations on CPU (memory only)")
     p = sp.add_parser("train"); p.add_argument("--model", choices=MODELS, required=True)
     p.add_argument("--fold", required=True, help="0..4 or all"); p.add_argument("--out", required=True)
-    p.add_argument("--max-steps", type=int, default=0, help="debug only"); p.set_defaults(f=cmd_train)
+    p.add_argument("--max-steps", type=int, default=0, help="debug only")
+    p.add_argument("--checkpoint-every", type=int, default=0, help="save a resumable checkpoint every N optimizer steps; reruns resume from it")
+    p.add_argument("--offload-activations", action="store_true", help="keep saved activations on CPU (memory only)")
+    p.set_defaults(f=cmd_train)
     p = sp.add_parser("predict"); p.add_argument("--model", choices=MODELS, required=True)
     p.add_argument("--adapter", default="none"); p.add_argument("--split", choices=["train", "eval"], required=True)
     p.add_argument("--fold"); p.add_argument("--out", required=True)
     p.add_argument("--limit", type=int, default=0, help="debug only: first N items"); p.set_defaults(f=cmd_predict)
+    p.add_argument("--schema-hint", action="store_true", help="post-hoc reference: state the payload keys in the instructions")
     p = sp.add_parser("score"); p.add_argument("--pred", required=True); p.add_argument("--split", choices=["train", "eval"], required=True)
     p.add_argument("--fold"); p.add_argument("--out", required=True); p.set_defaults(f=cmd_score)
     p = sp.add_parser("selftest"); p.set_defaults(f=cmd_selftest)
