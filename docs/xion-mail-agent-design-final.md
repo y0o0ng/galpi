@@ -2725,3 +2725,9 @@ agent까지 올라가면 일시적 장애 한 번이 계정을 영구히 세운�
 
 **남은 구멍.** 정규화되지 않은 새 오류가 또 나오면 여전히 조용히 멈춘다. `status='error'`에도
 `auth_required`처럼 알림을 붙이는 것은 푸시 경로를 건드리는 별도 범위라 열지 않았다.
+
+### Decisions API 오프라인 비교 도구 (2026-11-20)
+
+`npm run eval:mail-decisions -- --runs 5`는 기존 18개 fixture와 고정 시각으로 요청 수를 표시한다. 실제 호출은 `--live`를 명시할 때만 실행하며 `--only fixture-id`로 범위를 고를 수 있다. 요청 상한은 180건이다. `gpt-6-luna` Decisions에 메일당 일곱 질문을 묶고, 거절이나 불완전한 응답은 실패로 기록한다. 결과는 fixture별 최빈 category·알림과 전 회차 안전 진단, predicate 확률, 지연, 토큰과 표준 단기 캐시 요금 추정치를 포함한다. 비용은 누락된 사용량이 있으면 불완전하다. Decisions 실측은 18개 × 5회, 성공 90/90이다. category 최빈 12/18, mode 최빈 14/17, 중요 메일 ignore 0/90, 불필요 immediate 0/90, 알림 누락 15/90(구독 갱신·OTP·확정 일정 각 5회), 행동 필요 predicate 누락 5/90(OTP, 0.5 기준), category·mode 반복 일치 18/18이다. p50/p95는 309/444ms, 입력 221,200 tokens(캐시 읽기 42,900·쓰기 0 포함), 추정 비용 $0.018259이다. injection category·mode 승격은 0/5다. Responses와 안전 지표의 정의는 완전히 같지 않다. 기존 Responses 경로는 `gpt-5.6-luna`이므로 모델과 API 차이가 함께 존재한다. Decisions는 날짜·시각 추출, 요약, 자유형식 action 및 기존 deadline gate를 평가하지 않는다. predicate 임계값은 진단용이며 운영 정책이 아니다. 운영 경로 연결은 별도 설계가 필요하다.
+
+같은 시점의 Responses 18개 × 5회는 category 15/18, mode 17/17, 기존 전체 hard 필드 일관성 13/18, 알림 누락 0/90, Attention 행동 누락 0/90, hard gate PASS였다. 중앙 지연은 3,313ms이고 p95·토큰·비용과 중요 메일 ignore 횟수는 기존 평가 출력에서 얻지 못했다. Decisions의 predicate 행동 누락 및 category·mode만의 일관성은 Responses의 Attention 누락 및 전체 hard 필드 일관성과 의미가 다르다. 두 모델과 API가 달라 원인을 API 형태 하나로 귀속할 수 없다. 현재 표본에서 Decisions는 알림 누락이 있어 운영 적용 판단은 INCONCLUSIVE다. 입력 힌트 수정 전 90회와 단일 연결 확인 1회도 별도로 호출됐다.

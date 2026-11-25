@@ -94,7 +94,8 @@
     "check:codex-runner": "node scripts/check-codex-runner.js",
     "smoke:openai-responses": "node scripts/smoke-openai-responses.js",
     "smoke:github-mcp": "node scripts/smoke-github-mcp.js",
-    "mcp:obsidian": "node scripts/galpi-mcp.mjs"
+    "mcp:obsidian": "node scripts/galpi-mcp.mjs",
+    "eval:mail-decisions": "node scripts/evaluate-mail-decisions.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
