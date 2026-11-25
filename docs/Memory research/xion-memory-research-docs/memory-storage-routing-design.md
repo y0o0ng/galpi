@@ -1031,7 +1031,7 @@ fix the note tags, and review the labels once.
 
 **Train label review applied (owner, 2026-11-25).** One review pass over all 223 train labels found few
 plain errors but the same kind of state labelled several ways, which teaches the Extractor two answers. The
-owner adopted every proposal; 72 corrections were appended through the label store, so the earlier rows stay
+owner adopted every proposal; 73 corrections were appended through the label store, so the earlier rows stay
 in the log. The rules fixed by the review:
 values keep the user's words but are whole sentences, without trailing connectives or a third-person
 "사용자가"; a goal is `STATUS:PLANNED` on the goal's own expression, and `IDENTIFIED` only points at an
@@ -1040,8 +1040,8 @@ DEFERRED routine; judging a work in a taste domain is `preference`, a stance on 
 opinion, an outburst is NO_STORE; an instruction to the assistant is DEFERRED; a finished feature is
 `STATUS:DONE` on that feature, with its implementation detail left to the source; obvious transcription errors
 are corrected in values and claims but never in `projectMention`; when one state recurs, an anchor that states
-it keeps it, while an anchor that only gives a reason or a feeling is NO_STORE. Final train gold: project 93
-(CLAIM 54, STATUS 39), `preference` 51, DEFERRED 39, NO_STORE 25, `possession` 10, other attributes 5.
+it keeps it, while an anchor that only gives a reason or a feeling is NO_STORE. Final train gold: project 92
+(CLAIM 53, STATUS 39), `preference` 51, DEFERRED 39, NO_STORE 26, `possession` 10, other attributes 5.
 DEFERRED notes now map to one tag each in a private `note-tags.json` bound to the label file's hash:
 instruction 11, opinion 9, routine 5, environment 4, trait 3, user state 3, about the assistant 2, problem 1,
 subscription 1. Eval labels got only the mechanical checks, which passed; their meaning was not reopened.
