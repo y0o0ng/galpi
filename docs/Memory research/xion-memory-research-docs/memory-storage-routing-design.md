@@ -1034,7 +1034,12 @@ plain errors but the same kind of state labelled several ways, which teaches the
 owner adopted every proposal; 73 corrections were appended through the label store, so the earlier rows stay
 in the log. The rules fixed by the review:
 values keep the user's words but are whole sentences, without trailing connectives or a third-person
-"사용자가"; a goal is `STATUS:PLANNED` on the goal's own expression, and `IDENTIFIED` only points at an
+"사용자가". This settles open item 3 of run 4 (claim wording) and extends it to `general_fact` values: the owner had already
+moved to it while labelling, because a value often does not show its target on its own (`반도체` alone became
+`주식에서 반도체 관련 분야를 관심있게 보고 있음`), so a value names its target when the anchor leaves it to the
+bundle, and the source stays beside it at review. Verbatim was a development rule of step 2b, not a canonical
+one (SI-1/SI-3 rest on the preserved source). The Luna Extractor prompt still says verbatim; it changes only if
+that path is used again; a goal is `STATUS:PLANNED` on the goal's own expression, and `IDENTIFIED` only points at an
 undertaking; a hobby or activity with no time attached is `preference`, a timed daily schedule or diet is a
 DEFERRED routine; judging a work in a taste domain is `preference`, a stance on an argument is a DEFERRED
 opinion, an outburst is NO_STORE; an instruction to the assistant is DEFERRED; a finished feature is
@@ -1086,6 +1091,69 @@ and calibration fit on 15 items hit the temperature clamp. Setup departures from
 transformers 4.48.3, numpy below 2 and torch 2.2.2, the newest torch for this Intel Mac; 8 epochs with an update per
 micro-batch, fixed before eval; temperature from the package's 10% slice. Only aggregates were read from eval.
 Each later candidate scores on it once. The full fine-tune waits for the hardware. Scripts: `scripts/memory-laya-durability.py`.
+
+### Extractor tuning — preregistration (owner-approved, 2026-11-25)
+
+**Question.** Does a LoRA-tuned local Qwen Extractor reproduce the owner's train labels at least as well as
+the Luna drafts the owner labelled from? This picks a tuned Extractor to carry forward. It does not adopt a
+production model, connect storage, or change Durability, Ambiguity or the Bundle Builder.
+
+**Data.** The input is the train labels as of `note-tags.json`'s bound hash (`40d996ed…`); the eval labels are
+used as they stand.
+- NO_STORE rows are left out. The Extractor's contract has no "not worth storing" output: that is Durability's
+  judgement, and those rows feed Durability gold instead. This leaves train 197 items in 31 episodes and eval 11
+  items in 7 episodes.
+- Targets use the Extractor output schema unchanged. A DEFERRED target gives its `note-tags.json` category as
+  the reason; DEFERRED rows with no category fail closed.
+- The input is the anchor-marked bundle in the shape the Luna Extractor receives. It has no Durability reason,
+  because the owner's Durability path (Laya) cannot write one (see the Laya preregistration).
+- Bundles are never truncated: the longest train bundle is 16,543 characters. A configuration that cannot fit
+  the longest bundle in memory fails closed and is reported; it is not shortened.
+
+**Candidates.** Two Qwen-family instruction checkpoints, about 4B and about 8B. The exact checkpoints, licences
+and commits are pinned on download and recorded here before any training. Weights, data and outputs stay
+under `~/projects/galpi-private/` and runs use `HF_HUB_OFFLINE=1` after the download.
+- 4B is trained as bf16 LoRA. 8B is trained as 4-bit QLoRA. Both run on the RTX 5060 Ti 16 GB with the private
+  `train-env`.
+- Hyperparameters are fixed up front: LoRA rank 16, alpha 32, dropout 0.05 on the attention and MLP
+  projections; learning rate 1e-4 with cosine decay; 3 epochs; effective batch 8; loss on the output tokens
+  only; one fixed seed.
+
+**Selection, inside train only.** Episode-grouped 5-fold cross-validation over the 197 items.
+- Each candidate is scored on held-out folds.
+- The Luna drafts on the same items are scored with the same metrics, with no new API calls.
+- The candidate with the higher primary score is chosen. A tie goes to 4B.
+- The chosen configuration is then trained once on all 197 items.
+
+**Metrics, per item.**
+- **Primary, structured exact:** disposition, family, `attributeKey` or project kind, and status all equal the
+  gold.
+- **Mechanical checks:** `evidenceTurnIds` include the anchor turn and only bundle turns, and `projectMention`
+  appears verbatim in the bundle.
+- **Owner-judged (secondary):** for EXTRACTED items whose structure is correct, does the value or claimText
+  say the gold's meaning as a whole sentence (P1), and does the mention point at the same undertaking? Judged
+  blind to which system wrote it.
+- String equality is not used. Values follow the self-contained wording rule (`Train label review applied`), so
+  the same meaning has many correct strings; the Luna drafts were written under the older verbatim prompt.
+- Invalid JSON or schema output counts as wrong. There are no retries and no JSON repair.
+
+**Eval, once.** The final model and the untuned base of the same checkpoint are each scored once on the
+11 eval items. That untuned score is the reference §"Owner direction after the rerun" calls for, not a gate.
+Only aggregates and the owner-judged pairs are read.
+
+**Pass.** Both conditions must hold:
+- the chosen candidate's cross-validated primary score is at least the Luna drafts' score on the same folds;
+- on eval, its primary score is at least the Luna drafts' on the same 11 items.
+
+PASS means this tuned Extractor goes forward into the integrated formation run. FAIL returns to the owner
+with the per-family breakdown. It does not reject local tuning.
+
+**Known limits.**
+- 11 eval items can only catch a collapse; they cannot rank close systems.
+- The owner labelled from Luna drafts, which favours Luna on the train comparison.
+- Train is music-heavy: one episode supplies most of the `preference` rows.
+- `possession` and four attributes have 1–10 examples, so per-attribute results are anecdotes.
+- Some eval values predate the wording rule; only meaning is scored, so this does not change a score.
 
 **Open for step 3: the path from a project to source-only detail (owner, 2026-11-04).** "Source-only"
 assumes detail can be reached later, but a NO_WRITE anchor leaves no EvidenceRef, so a project links
