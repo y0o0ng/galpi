@@ -10,6 +10,40 @@ const ROOT = path.resolve(__dirname, '..');
 const css = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8');
 const app = fs.readFileSync(path.join(ROOT, 'public/app.js'), 'utf8');
 
+test('token gate opens above Home and retries missing or invalid credentials', () => {
+  let token = '';
+  let dialog;
+  let reloads = 0;
+  const events = {};
+  const input = { value: '', focus() {} };
+  const form = { addEventListener: (name, fn) => { events[name] = fn; } };
+  const document = {
+    createElement: () => ({
+      setAttribute() {}, addEventListener() {}, showModal() { this.open = true; },
+    }),
+    body: { appendChild: element => { dialog = element; } },
+    getElementById: id => ({ 'token-gate': dialog, 'token-input': input, 'token-form': form })[id],
+  };
+  const localStorage = { removeItem: () => { token = ''; } };
+  const source = app.slice(app.indexOf('function ensureApiToken('), app.indexOf('// ─── 초기화'));
+  const context = { document, localStorage, apiTokenKey: 'token', getApiToken: () => token,
+    setApiToken: value => { token = value; }, location: { reload: () => { reloads += 1; } } };
+  vm.runInNewContext(source, context);
+  assert.equal(context.ensureApiToken({ requiresApiToken: true }), true);
+  assert.equal(dialog.open, true);
+  assert.match(dialog.innerHTML, /id="token-error" role="alert" hidden/);
+  input.value = ' valid ';
+  events.submit({ preventDefault() {} });
+  assert.equal(token, 'valid');
+  assert.equal(reloads, 1);
+  dialog = undefined;
+  assert.equal(context.ensureApiToken({ requiresApiToken: true, gptChatBootstrapModel: 'model' }), false);
+  assert.equal(context.ensureApiToken({ requiresApiToken: true }), true);
+  assert.equal(token, '');
+  assert.match(dialog.innerHTML, /id="token-error" role="alert"\s*>/);
+  assert.equal(context.ensureApiToken({ requiresApiToken: false }), false);
+});
+
 test('model picker formats unknown and known GPT families without tier-specific names', () => {
   const source = fs.readFileSync(path.join(ROOT, 'public/model-picker.js'), 'utf8');
   const helper = source.slice(source.indexOf('function displayModelName('), source.indexOf('function close('));

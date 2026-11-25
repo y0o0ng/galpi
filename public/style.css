@@ -68,6 +68,40 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+#token-gate {
+  margin: auto;
+  width: min(340px, calc(100% - 32px));
+  padding: 24px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--ai-bubble);
+  color: var(--ai-text);
+}
+#token-gate::backdrop { background: rgba(0, 0, 0, 0.4); }
+#token-form { display: grid; gap: 12px; }
+#token-form h2 { font-size: 17px; }
+#token-form p { font-size: 14px; }
+#token-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ai-text);
+  font-size: 16px;
+}
+#token-form button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand);
+  color: var(--brand-on);
+  font: inherit;
+  cursor: pointer;
+}
+#token-error { color: var(--danger); }
+
 #app {
   display: flex;
   flex-direction: column;
