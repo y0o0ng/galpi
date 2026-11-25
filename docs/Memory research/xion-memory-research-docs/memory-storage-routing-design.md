@@ -1101,8 +1101,8 @@ production model, connect storage, or change Durability, Ambiguity or the Bundle
 **Data.** The input is the train labels as of `note-tags.json`'s bound hash (`40d996ed…`); the eval labels are
 used as they stand.
 - NO_STORE rows are left out. The Extractor's contract has no "not worth storing" output: that is Durability's
-  judgement, and those rows feed Durability gold instead. This leaves train 197 items in 31 episodes and eval 11
-  items in 7 episodes.
+  judgement, and those rows feed Durability gold instead. This leaves train 197 items in 30 episodes and eval 11
+  items in 5 episodes (corrected when the data was built; episodes holding only NO_STORE rows drop out).
 - Targets use the Extractor output schema unchanged. A DEFERRED target gives its `note-tags.json` category as
   the reason; DEFERRED rows with no category fail closed.
 - The input is the anchor-marked bundle in the shape the Luna Extractor receives. It has no Durability reason,
@@ -1141,9 +1141,16 @@ under `~/projects/galpi-private/` and runs use `HF_HUB_OFFLINE=1` after the down
 11 eval items. That untuned score is the reference §"Owner direction after the rerun" calls for, not a gate.
 Only aggregates and the owner-judged pairs are read.
 
-**Pass.** Both conditions must hold:
-- the chosen candidate's cross-validated primary score is at least the Luna drafts' score on the same folds;
-- on eval, its primary score is at least the Luna drafts' on the same 11 items.
+**Pass (amended by the owner before any cross-validation run, 2026-11-25).** All conditions must hold:
+- the chosen candidate's cross-validated primary score is at least that of the untuned base of the same
+  checkpoint, run with the same instructions and attribute list on the same held-out folds;
+- on eval, its primary score is at least the untuned base's on the same 11 items;
+- both are also at least the Luna drafts' scores.
+
+The Luna drafts are a weak reference. They were written before `preference` and `possession` were registered,
+so they score 0/51 and 0/10 on those families: 88/197 overall, 39/39 DEFERRED, 46/92 project. Clearing them
+alone would show nothing, which is why the untuned-base condition was added. The untuned base needs only
+prediction, with no training and no API calls.
 
 PASS means this tuned Extractor goes forward into the integrated formation run. FAIL returns to the owner
 with the per-family breakdown. It does not reject local tuning.
@@ -1154,6 +1161,23 @@ with the per-family breakdown. It does not reject local tuning.
 - Train is music-heavy: one episode supplies most of the `preference` rows.
 - `possession` and four attributes have 1–10 examples, so per-attribute results are anecdotes.
 - Some eval values predate the wording rule; only meaning is scored, so this does not change a score.
+
+**Setup record (2026-11-25).** Pinned before any training. Both checkpoints are Apache-2.0.
+- **Checkpoints.** `Qwen/Qwen3.5-4B` at `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` and `Qwen/Qwen3.5-9B` at
+  `c202236235762e1c871ad0ccb60c8ee5ba337b9a`. Per the Hugging Face Qwen listing, these are the newest Qwen models
+  at about 4B and 8B; later Qwen releases (3.6, 3.8) are 27B and up. The larger candidate is 9B, not 8B.
+  Qwen3.5 mixes linear-attention and full-attention layers and carries a vision tower that is not used.
+- **Environment.** `bitsandbytes` 0.50.2 and `flash-linear-attention` 0.6.0 were added to the private
+  `train-env`.
+- **Data.** `scripts/memory-extractor-tuning-data.js` builds the private chat-format data with episode-grouped
+  folds. Train fold sizes are 54/36/36/36/35; the 54 is the single music episode.
+- **Training details the preregistration left open** (fixed by the script before any run): AdamW with weight
+  decay 0, gradient clipping at 1.0, no warmup, and loss on the assistant JSON plus its end token.
+- **Memory probe on the longest train item** (8,536 tokens, no truncation): 4B bf16 peaks at 12.9 GB and 9B
+  QLoRA at 14.0 GB.
+- **Instructions.** The Luna Extractor instructions with three changes: the self-contained wording rule replaces
+  "verbatim", the Durability-reason line is dropped, and the review rules and DEFERRED categories are stated. The
+  untuned base gets the same instructions. The Luna drafts being compared were written under the old prompt.
 
 **Open for step 3: the path from a project to source-only detail (owner, 2026-11-04).** "Source-only"
 assumes detail can be reached later, but a NO_WRITE anchor leaves no EvidenceRef, so a project links
