@@ -70,7 +70,13 @@ def write_training(rows, states, data):
 
 
 def fit(rows, states, out, batch, epochs=EPOCHS):
+    import functools
+    import laya.train as lt
     from laya.train import finetune
+    # Calibration scores 16 states per fp32 forward with no fused attention, which needs ~16 GB at 7k tokens.
+    # One state per forward gives the same per-item logits (padding is masked) within memory.
+    if not isinstance(lt.calibration_records, functools.partial):
+        lt.calibration_records = functools.partial(lt.calibration_records, batch_size=1)
     data = out + ".jsonl"
     write_training(rows, states, data)
     try:

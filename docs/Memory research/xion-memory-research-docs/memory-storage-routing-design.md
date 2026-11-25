@@ -1288,6 +1288,26 @@ breakdown; it does not reject Laya or local tuning.
 - The question text states the label rules, so the model is told the baseline as well as shown it.
 - Eval has no session over 18 messages, so long-session behaviour is not tested there.
 
+**Durability tuning — FAIL, returned to the owner (2026-11-26).** Eval: tuned 14/22 false WRITE (bar 5) and
+0/11 missed (bar 3), 19/33 correct, at the cross-validated threshold 0.5183. Untuned base at its own train
+threshold 0.9419: 19/22, 1/11, 13/33. Luna: 10/22, 0/11, 23/33. The frozen check also had 14/22 false WRITE.
+- Cross-validated train: 127/159 false WRITE and 52/206 missed (base on the same anchors 132/159 and 61/206);
+  Brier 0.296, calibration error 0.209; 2 of 365 states cut. Training loss fell each epoch (0.85 → 0.44 → 0.27
+  in the final fit), so the model fit train without learning a split that holds out of fold.
+- Pooled out-of-fold AUC is 0.38, below chance, and per fold it ranges 0.36–0.79. The folds' WRITE shares differ
+  (held-out 0.30–0.85), and each fold's mean score moves opposite to its held-out share, as a model that mostly
+  learned the training prior would. The pooled threshold therefore mixes fold offsets.
+- Eval AUC is 0.76 (base 0.55) on 33 anchors. Read only as a diagnostic after the gate: even the best threshold
+  picked on eval itself reaches 9/22 false WRITE at 3/11 missed, so the failure is the ranking, not the
+  threshold.
+- Setup deviation, recorded before scoring: Laya's pre-training calibration pass scores 16 states per fp32
+  forward and needed about 16 GB at 7k tokens; the memory probe had used 8 rows and never reached it. It now
+  scores one state per forward (`calibration_records` with `batch_size=1`); padding is masked, so per-anchor
+  logits are the same, and training settings are unchanged.
+- This does not reject Laya or local tuning. Open for the owner: whether 365 anchors with this split carry a
+  learnable WRITE signal for a 322M encoder, and whether Durability should stay with Luna while the Extractor
+  question is settled.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
