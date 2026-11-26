@@ -1472,6 +1472,46 @@ drop that quote; the family is fixed either way. Script: `scripts/memory-step3a.
 under `galpi-private/step3a/`. The owner observed that most different values trace to the evidence bundle; that
 is open.
 
+### Evidence belongs to the bundle — contract restored (owner, 2026-11-26)
+
+The owner's contract: the Evidence Bundle Builder refines evidence around the anchor (Phase 10: the anchor is
+fixed by code and the model returns only evidence IDs), and the Extractor receives that finished bundle and only
+extracts. Formation loop step 1 replaced this with a fixed window ("the model finds anchors only and code attaches
+evidence … this path does not call them") as a shortcut for a thin cloud loop, and every later step — the Luna
+Extractor, the train labels' `evidenceTurnIds`, the Qwen Extractor, the reader and step 3a — inherited it: the
+Extractor chose evidence. That was never the contract and was not flagged when the Extractor became a tuning
+target. In structure v2 evidence selection belongs to the bundle; the reader and the family extractors do not
+select evidence. The owner's evidence choices in the train labels stand in for refined bundles until the Bundle
+Builder is run in the loop. After the step 3a FAIL the owner rejected narrowing the design further before it has
+been measured as designed.
+
+### Step 3a-R — general_fact path on refined bundles — preregistration (owner-approved, 2026-11-26)
+
+**Question.** With the evidence contract restored, does the general_fact path stay at or below 20% wrong
+proposals?
+
+**Refined bundle.** Anchor plus the owner's gold `evidenceTurnIds`, in turn order, in the same input shape as the
+fixed window. Every general_fact and project gold set contains the anchor (158/158). DEFERRED gold sets are empty
+(39), so a DEFERRED bundle is the anchor alone.
+
+**Arms, both on the 50 step 3a proposals (the reader's out-of-fold general_fact reads, unchanged).**
+- **R1, primary:** the Extractor retrained on refined bundles — same recipe, seed, 4B base and folds as the
+  Extractor tuning; the target JSON is unchanged. Each proposal runs on the adapter that did not train on it,
+  with the step 3a prefill.
+- **R2, secondary:** the existing fold adapters with refined bundles as input (trained on windows, so the input
+  is unfamiliar).
+
+**Scoring and pass.** As step 3a: mechanical wrong (gold not general_fact, malformed, unregistered key, key
+mismatch), the owner judges key-matching values with the step 3a rule; a value string identical to one already
+judged keeps that mark. PASS: R1 wrong-proposal rate at or below 20% with at least 20 proposals. No API.
+
+**Known limits.**
+- The reader is not re-measured: its training on refined bundles would leak the label (an empty DEFERRED bundle),
+  and a real Bundle Builder does not know the class. Its 5 errors carry over, so the value and key errors share
+  the other 5 of the 10 allowed. The reader on real bundles waits for the Bundle Builder in the loop.
+- Gold evidence is the owner's choice, an upper bound on what a Bundle Builder would give.
+- The 20% bar and the reader's 5 errors were known before this was written.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
