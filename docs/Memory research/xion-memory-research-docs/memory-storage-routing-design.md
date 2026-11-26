@@ -1368,6 +1368,42 @@ This replaces step 2b's single `status` slot and its write-time SUPERSEDE transi
 replaces `WRONG_TARGET` = 0 once links are reversible is open. The first test is the first-stage reader, which
 the current labels can score; it needs its own preregistration.
 
+### First-stage reader — preregistration (owner-approved, 2026-11-26)
+
+**Question.** Does a tuned Qwen 4B sort WRITE anchors into general_fact, DEFERRED or project better than the
+three-way split the tuned Extractor gives as a by-product?
+
+**No fresh eval.** The owner first chose a new 30–40 anchor eval from unused conversations, but the 2026-11-04
+episode build used all of `shared-main`; only one 12-message session has been added since. Instead nothing is
+selected on cross-validation: model, prompt and settings are fixed here, so every anchor's held-out prediction is
+an honest measurement. A check on fresh conversations runs separately once enough have accumulated.
+
+**Gold and data.** Derived mechanically from the existing final labels: EXTRACTED gives its family
+(general_fact or project), DEFERRED gives DEFERRED. 206 WRITE anchors: the 197 Extractor-queue anchors
+(66 general_fact, 39 DEFERRED, 92 project) and the 9 Durability-queue anchors made WRITE by the 2026-11-26 review.
+No new labels. The input is the Extractor's (anchor, evidence window, registered attributes); the target is one
+word. The instructions restate the project standard, the registered-attribute rule and the DEFERRED categories
+without the payload rules. Folds are reassigned over the 206 anchors with the same episode-grouped rule.
+
+**Model and training, fixed.** Qwen3.5 4B bf16 LoRA with the Extractor recipe: r 16, alpha 32, lr 1e-4 cosine,
+3 epochs, effective batch 8, seed 20261125, checkpoints during training. Episode-grouped 5-fold cross-validation
+is run once; the final model is then trained on all 206 and scored once on the 11 old eval anchors (9 project,
+2 general_fact) as a secondary reference only. The untuned 4B with the same prompt is scored once on train.
+
+**References.** The tuned Extractor's by-product on train: 159/197 (81%); general_fact 48/66 (73%), DEFERRED
+26/39 (67%), project 85/92 (92%), on the earlier folds. Luna drafts 99/197, handicapped by fewer registered
+attributes at the time.
+
+**Pass.** Both on the cross-validated predictions: overall accuracy at or above 85%, and recall at or above 75%
+for each of the three classes. PASS makes it the first stage of structure v2; FAIL returns to the owner with the
+confusion table.
+
+**Known limits.**
+- The general_fact / DEFERRED boundary (P3 activity vs routine, P4 opinion vs taste) is unclear in the labels
+  themselves, so some errors there may not be the model's.
+- DEFERRED has 39 anchors; one anchor is about 2.6 points of its recall.
+- The gold came from the owner reviewing Luna's drafts, so errors both missed remain in it.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
