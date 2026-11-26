@@ -1512,6 +1512,16 @@ judged keeps that mark. PASS: R1 wrong-proposal rate at or below 20% with at lea
 - Gold evidence is the owner's choice, an upper bound on what a Bundle Builder would give.
 - The 20% bar and the reader's 5 errors were known before this was written.
 
+**Step 3a-R — FAIL, decided before owner review (2026-11-26).** R1 (retrained on refined bundles): of 50 train
+proposals, 8 are mechanically wrong (5 reader, 3 attribute key) and 3 values carry over the owner's step 3a
+"different" mark because the predicted string is identical — 11 wrong at least, over the 10 allowed, so the 20
+values left unjudged cannot change the verdict. R2 (existing adapters, refined input): 9 mechanical (5 reader,
+4 key) plus 5 inherited "different". All 53 outputs parsed in both arms; one key per arm was unregistered.
+Training: folds 15 minutes each, all 18 minutes, peak 11.8 GiB, checkpoints every 5 steps (the original Extractor
+CV ran without; resume equivalence was checked there). Of step 3a's 5 different values, 3 came out unchanged with
+the owner's own evidence as the bundle, so for those the missing value detail is not explained by the window.
+Scripts: `scripts/memory-step3a-r-data.py`, `scripts/memory-step3a-r.py`.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
