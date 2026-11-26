@@ -1308,6 +1308,66 @@ threshold 0.9419: 19/22, 1/11, 13/33. Luna: 10/22, 0/11, 23/33. The frozen check
   learnable WRITE signal for a 322M encoder, and whether Durability should stay with Luna while the Extractor
   question is settled.
 
+### Formation structure v2 — owner direction (2026-11-26)
+
+**Why.** After both tuning FAILs the owner read the six Extractor eval misses (table private:
+`extractor-tuning/final/score/eval-miss-table.md`). Owner calls: item 1 (a wished-for game) accepts `CLAIM` or
+`STATUS:PLANNED`, since a long-running wish is a goal and so a project; item 2 is a rule gap, because a project
+name must pick out a separate thing and `@V3` does not; item 3 is `CLAIM`. Rescored after the fact the tuned 4B
+and Luna are both 6/11; the FAIL stands. Item 2 is one of three ways the labels treat an anchor whose project
+is not named in the bundle (NO_STORE in train-064 with owner memos, a parent `CLAIM` in eval-002, `DONE @feature`
+under P6). Dropping such anchors would lose too much, since people rarely say a project's name.
+
+Rescoring the existing cross-validated predictions with no retraining (train, 197):
+
+| | current primary | kind/status ignored | category only (general_fact / DEFERRED / project) |
+| --- | --- | --- | --- |
+| tuned 4B | 116 | 156 | 159 |
+| tuned 9B | 74 | 114 | 115 |
+| Luna drafts | 88 | 99 | 99 |
+
+40 of the tuned 4B's 81 misses differ only in `STATUS` vs `CLAIM`, in both directions (14 `CLAIM` → `PLANNED`,
+17 `STATUS` → `CLAIM`), so the boundary itself is unclear rather than the model leaning one way. 38 misses are
+already wrong at the category level. Luna's 62 general_fact → DEFERRED likely reflects fewer registered
+attributes when its drafts were made (not checked).
+
+**How deployed memory systems handle the same two questions** (vendor docs and secondary write-ups; no
+independent head-to-head comparison was found):
+- Linking to an existing entity: candidates are retrieved and an LLM judges with "no match" as the default
+  (Graphiti dedupe prompts, Mem0's original ADD); a pending-review tier between auto-merge and new (Neo4j agent
+  memory: 0.90 merge, 0.85 pending); no cross-type merges by default (Cognee); merges keep the union of source
+  links so they can be undone. Pronouns are resolved at write time when the context allows, otherwise the text is
+  kept with candidate antecedents (LycheeMemory V2, Redis agent-memory-server, Semantic Anchoring). No system
+  drives wrong links to zero; they make links reversible.
+- Status slot vs accumulated facts: most keep a small structured slot layer next to an append-only record
+  (LangMem profile/collection, Memobase profile/events, Letta core/archival; Zep advises custom attributes only
+  when structured fields are needed). The recent trend is to keep every fact and resolve change by links or at
+  read time: Mem0 v3 (2026-04) dropped the LLM UPDATE/DELETE pass for ADD-only with linked memories, Supermemory
+  marks `updates`/`extends` with `isLatest`, Graphiti invalidates instead of deleting, and DISCERN, CoMMA and
+  APEX-MEM resolve at read time. The cost is stale values sitting beside new ones (mem0 issue #4956).
+  Sources: Mem0 paper arXiv 2504.19413 and docs.mem0.ai/migration/oss-v2-to-v3; Zep arXiv 2501.13956;
+  neo4j.com/labs/agent-memory; supermemory.ai/docs/concepts/graph-memory; help.getzep.com/entity-types;
+  DISCERN arXiv 2611.15729; LycheeMemory V2 arXiv 2608.12990.
+
+**Owner direction.**
+1. After Durability, a first-stage reader sorts WRITE anchors into general_fact, DEFERRED or project, and each
+   goes down its own pipeline.
+2. Project pipeline: the bundle is unchanged (the Bundle Builder contract stands). Existing project candidates
+   (name, aliases, short summary) go in as a separate input. The linker returns an existing project, NEW, or
+   UNRESOLVED with its candidates attached; UNRESOLVED is kept, not dropped, and is attached later when a name
+   appears or the owner confirms. Every link keeps its evidence and can be undone.
+3. The project Extractor writes one self-contained sentence and the mention as it appears (or null). It no longer
+   chooses `STATUS` or `CLAIM`.
+4. Changed facts are not resolved at write time. Sentences accumulate with their time; reconciling them moves to
+   the linker (which may mark that a sentence updates an earlier one), to read time, and to a nightly
+   consolidation pass that rebuilds each project's current stage as a regenerable projection, merges duplicates
+   and flags contradictions without deleting sources.
+5. general_fact keeps its attribute slots.
+
+This replaces step 2b's single `status` slot and its write-time SUPERSEDE transitions for projects. What gate
+replaces `WRONG_TARGET` = 0 once links are reversible is open. The first test is the first-stage reader, which
+the current labels can score; it needs its own preregistration.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
