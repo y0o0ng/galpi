@@ -1461,6 +1461,17 @@ types.
 - The owner wrote the gold and judges the values.
 - No development DB writes and no review UI; scoring is offline.
 
+**Step 3a — FAIL, returned to the owner (2026-11-26).** Train: 12 of 50 proposals wrong (24%, bar 20%) — 5 not
+general_fact in gold (reader errors), 2 attribute-key mismatches, 5 values the owner judged different. 38 values
+matched; 22 gold general_fact anchors never became proposals. All 50 parsed and every key was registered.
+Eval reference: 1 of 3 wrong (a project read as general_fact). Owner's value rule, set during review: the same
+referent with descriptive context dropped is the same; a broader referent (a named model reduced to its
+category) or a dropped part of a listed value is different. One value was marked same with a wording note.
+Deviation: the prefill ends with the opening quote of the next key, because cutting at the comma made the model
+drop that quote; the family is fixed either way. Script: `scripts/memory-step3a.py`; scoring files are private
+under `galpi-private/step3a/`. The owner observed that most different values trace to the evidence bundle; that
+is open.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
