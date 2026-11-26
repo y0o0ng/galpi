@@ -1423,6 +1423,44 @@ confusion table.
 - Setup: `scripts/memory-reader-tuning-data.js` builds the rows, `scripts/memory-reader-tune.py` reuses the
   Extractor's training loop; peak GPU 12.9 GiB, full training 27 minutes.
 
+### Step 3a — general_fact path, zero-API scoring — preregistration (owner-approved, 2026-11-26)
+
+**Question.** Of the proposals made by structure v2's general_fact path (first-stage reader → Extractor with the
+family fixed to general_fact → HUMAN review), how many are wrong? The owner chose to narrow step 3 to
+general_fact after the reader FAIL: proposals that reach review must be right; misses stay recoverable from source.
+
+**Why offline.** `shared-main` had one episode in October and one in November (the owner is not using the paid chat
+for now), and only four unlabeled episodes remain from June–July. So the run reuses labeled episodes and calls no
+API. Two limits follow and are part of the verdict: upstream steps (anchors, Ambiguity, Durability) are not run —
+their gold labels are used, so their errors are outside this score — and it is not an independent check.
+
+**Input, fixed.** The 206 WRITE anchors of the reader preregistration.
+
+**Path, fixed.**
+1. Reader: the existing out-of-fold cross-validated predictions. Only anchors read as general_fact go on (50).
+2. Extractor: the existing tuned 4B. Each anchor runs on the fold adapter (`4b-f0`…`4b-f4`) that did not train on
+   it; the 9 Durability-queue anchors, absent from Extractor training, run on `4b-all`. The output is prefilled
+   with `{"disposition":"EXTRACTED","semanticFamily":"general_fact",` so the family cannot change; the model
+   writes the rest. An attribute outside the seven registered keys or a malformed output counts as wrong.
+   The owner chose fixing the family over training a general_fact-only Extractor: in cross-validation, where the
+   old Extractor kept general_fact on an anchor the reader got right, the attribute matched 38 of 39.
+3. Scoring: mechanical wrong = the gold is not general_fact, or the attribute key differs from gold. The owner
+   judges only key-matching proposals, one question: does the value mean the same as gold? Wording differences
+   count as right.
+
+**Pass.** Wrong-proposal rate (wrong ÷ all proposals the reader passed) at or below 20%, with at least 20
+proposals. Misses (gold general_fact that never became a proposal) are reported, not scored. The 11 old eval
+anchors (2 general_fact) run the same way as a secondary reference. PASS: step 3b (reading approved states into
+the chat `<memory>`) is preregistered when the chat is in use again. FAIL: returns to the owner with the error
+types.
+
+**Known limits.**
+- The reader's 90% precision was seen before this was written, so the open part is mostly whether the Extractor
+  writes the value right.
+- The 20% bar was set after seeing cross-validation numbers; a pass speaks for this data only.
+- The owner wrote the gold and judges the values.
+- No development DB writes and no review UI; scoring is offline.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
