@@ -1404,6 +1404,25 @@ confusion table.
 - DEFERRED has 39 anchors; one anchor is about 2.6 points of its recall.
 - The gold came from the owner reviewing Luna's drafts, so errors both missed remain in it.
 
+**First-stage reader — FAIL, returned to the owner (2026-11-26).** Cross-validated on the 206 anchors: 157/206
+(76.2%); recall general_fact 45/67 (67%), DEFERRED 21/41 (51%), project 91/98 (93%). Both bars are missed
+(85% overall, 75% per class). Rows are gold, columns predicted:
+
+| gold \ predicted | general_fact | DEFERRED | project |
+| --- | --- | --- | --- |
+| general_fact | 45 | 11 | 11 |
+| DEFERRED | 5 | 21 | 15 |
+| project | 0 | 7 | 91 |
+
+- The untuned 4B scored 46/206 (22%), almost everything DEFERRED or unparsed, so the gain is from tuning.
+- The dedicated reader did not beat the tuned Extractor's by-product (general_fact 73%, DEFERRED 67%, project 92%
+  on 197). Dropping the payload rules from the instructions did not make the three-way call easier.
+- Errors sit on two boundaries: DEFERRED read as project (15) and general_fact vs DEFERRED (16 both ways).
+  Project is never read as general_fact.
+- Secondary reference, the final model on the 11 old eval anchors: 10/11 (one project read as general_fact).
+- Setup: `scripts/memory-reader-tuning-data.js` builds the rows, `scripts/memory-reader-tune.py` reuses the
+  Extractor's training loop; peak GPU 12.9 GiB, full training 27 minutes.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
