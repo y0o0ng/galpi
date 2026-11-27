@@ -1639,7 +1639,7 @@ against 18 in gold; 22 of the 66 general_fact train labels are verbatim, some le
 direction: the cause looks like training, but plain supervised training alone will not reach the intended
 behaviour. Next approach open.
 
-### Step 3a-C — general_fact Extractor with a referent field and a self-containment check — preregistration DRAFT (2026-11-27, awaiting owner confirmation)
+### Step 3a-C — general_fact Extractor with a referent field and a self-containment check — preregistration (owner-approved, 2026-11-27)
 
 **Why.** Step 3a-B showed the values fail by leaving out a referent the bundle names. One generation currently has
 to find the referent, put it in the value and make the value read on its own, with a single target sentence as the
@@ -1647,7 +1647,8 @@ only signal, and a third of the targets are anchor spans. Two changes the owner 
 directly: the output names the referent before the value, and a separate stage checks that the value stands alone.
 Making a sentence stand alone is treated as its own task in the literature — Choi et al. 2021, "Decontextualization:
 Making Sentences Stand-Alone" (TACL); Chen et al. 2023, "Dense X Retrieval" (a separately trained propositionizer).
-Per structure v2 (per-family extractors), the owner chose to train a general_fact-only Extractor this time.
+Per structure v2 (per-family extractors), the owner chose to train a general_fact-only Extractor this time. The owner
+confirmed the referent definition, the check seeing only `attributeKey` and `value`, and hold-without-rewrite.
 
 **Labels (before any training).**
 1. The 67 gold general_fact anchors get a `referent` — what the state is about, as words a reader without the
