@@ -1628,6 +1628,17 @@ most 9 allowed), so the 14 new values cannot change the verdict and were not req
   separate "the bundle does not help" from "models trained on windows do not use a bundle". Script
   `scripts/memory-step3a-b.py`.
 
+**Step 3a-B error review with the owner (2026-11-27).** The 8 errors that recur or are new (4 values, 4 keys) were
+read against their bundles. In all 8 the information needed was inside the bundle. Three values copy the anchor
+span and drop the referent the bundle names; one keeps the user's words and drops the identifying detail that only
+the assistant turn states, although the Extractor cites that turn. The owner agreed these four are Extractor
+failures to write a self-contained value, not bundle failures. Two key errors read "what I own" as preference (as
+in step 3a); two flipped key only on the shorter bundle input. The owner holds a phone written as possession where
+primary_phone is registered to be wrong. Count: 25 of the 45 key-matching values are verbatim spans of the anchor
+against 18 in gold; 22 of the 66 general_fact train labels are verbatim, some legitimately (short names). The owner's
+direction: the cause looks like training, but plain supervised training alone will not reach the intended
+behaviour. Next approach open.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
