@@ -1561,8 +1561,57 @@ one per storable state, rather than several extractions from one bundle — work
 
 **Status.** This is the first contract-bundle gold. It is owner-reviewed but assistant-proposed, so it may lean
 toward the assistant's choices; it covers general_fact anchors only. A first apply dropped three of one item's four removals (turn IDs written without the `m` prefix); the
-assistant's cross-check caught it and the counts above are after the fix. No measurement on it has been
-preregistered yet.
+assistant's cross-check caught it and the counts above are after the fix. The owner later
+clarified one target (preference for a sound within a genre, not for the song the turns name); its bundle stands.
+
+### Step 3a-B — general_fact path on contract bundles — preregistration (owner-approved, 2026-11-27)
+
+**Question.** If the fixed window is replaced by the contract bundle and nothing else changes, how many of the
+general_fact path's proposals are wrong? Step 3a measured the path on the window; this run changes only the
+input, so a difference is attributable to the bundle and not to retraining.
+
+**Input, fixed.** The 72 anchors of the contract-bundle gold, with their owner-reviewed bundles: the 67 train
+anchors whose gold is general_fact (45 that became step 3a proposals, 22 that did not) and the 5 train anchors
+the window reader passed as general_fact whose gold is DEFERRED. The 3 eval anchors have no bundle and are not
+run.
+
+**Path, fixed.** Same models, instructions, attribute list and anchor field as step 3a; only the `evidence` list
+changes — from the window turns to the bundle turns, in episode order, with the same fields (`turnId`, `role`,
+`text`, `createdAt` from the source message).
+1. Reader: each anchor runs on the reader fold adapter (`reader-tuning/cv/f0`…`f4`) that did not train on it.
+   Only anchors read as general_fact go on.
+2. Extractor: the step 3a adapter assignment (fold adapter that did not train on the anchor; `4b-all` for the
+   Durability-queue anchors) and the same prefill, so the family cannot change.
+3. Scoring: step 3a's rule. Mechanical wrong = gold not general_fact, malformed, unregistered key, or key
+   mismatch. The owner judges the value of key-matching proposals with the step 3a value rule. A value
+   string-identical to the step 3a value for the same anchor inherits the owner's step 3a mark; only new strings
+   are judged.
+
+**Pass.** Wrong proposals ÷ all proposals at or below 20%, with at least 20 proposals — the step 3a bar.
+
+**Reported, not scored.**
+- Side-by-side with step 3a on the same anchors: proposals, wrong by type (reader / key / value), misses.
+- The reader's reading of all 72 anchors (how many of the 67 gold general_fact are read so, how many of the 5
+  DEFERRED still pass).
+- Evidence: the turns the Extractor cites (`evidenceTurnIds`) against the owner's train-label `evidenceTurnIds` —
+  overlap, and whether each cited turn lies inside the bundle.
+
+**Outcomes.** PASS: the bundle is shown to carry the path on this data; the next step is the Bundle Builder itself
+(producing these bundles from the episode), then bundle gold for the other families, preregistered separately.
+FAIL: returns to the owner with the error types. If the errors look like the models meeting a shorter input than
+they were trained on, retraining on bundles needs bundle gold for every family first; that is the owner's call,
+not an automatic next step.
+
+**Known limits.**
+- Both adapters were trained on windows; bundles are shorter (mean 2.86 turns). A FAIL can be train/test mismatch
+  rather than the contract.
+- The other 134 WRITE anchors have no bundle and are not run. On the window none of them was read as general_fact;
+  on bundles some might be, so the wrong-proposal rate here can be optimistic.
+- The bundles are owner-reviewed gold, not Builder output: this measures the path given correct bundles.
+- The owner wrote the gold, reviewed the bundles and judges the values; not an independent check. Values are
+  judged knowing step 3a's result.
+- No API calls, no development DB writes. Script and outputs private (`galpi-private/step3a-b/`), never printing
+  conversation text or values.
 
 ## Storage topology and authority
 
