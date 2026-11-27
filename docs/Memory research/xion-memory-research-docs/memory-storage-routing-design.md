@@ -1639,6 +1639,59 @@ against 18 in gold; 22 of the 66 general_fact train labels are verbatim, some le
 direction: the cause looks like training, but plain supervised training alone will not reach the intended
 behaviour. Next approach open.
 
+### Step 3a-C — general_fact Extractor with a referent field and a self-containment check — preregistration DRAFT (2026-11-27, awaiting owner confirmation)
+
+**Why.** Step 3a-B showed the values fail by leaving out a referent the bundle names. One generation currently has
+to find the referent, put it in the value and make the value read on its own, with a single target sentence as the
+only signal, and a third of the targets are anchor spans. Two changes the owner chose (1+2) address the cause
+directly: the output names the referent before the value, and a separate stage checks that the value stands alone.
+Making a sentence stand alone is treated as its own task in the literature — Choi et al. 2021, "Decontextualization:
+Making Sentences Stand-Alone" (TACL); Chen et al. 2023, "Dense X Retrieval" (a separately trained propositionizer).
+Per structure v2 (per-family extractors), the owner chose to train a general_fact-only Extractor this time.
+
+**Labels (before any training).**
+1. The 67 gold general_fact anchors get a `referent` — what the state is about, as words a reader without the
+   conversation understands (e.g. a named thing, a genre, a field), or null when the value is the thing itself.
+2. Gold values that do not stand alone are rewritten to include their referent; values that legitimately are short
+   names stay. The assistant drafts both, marking each change; the owner reviews all 67. These become the training
+   and scoring gold; the step 3a marks are not inherited for changed gold.
+3. Self-containment gold for the check: every reviewed gold value is a positive. Negatives are the step 3a / 3a-R /
+   3a-B predicted values the owner marked different for a dropped referent, plus values the owner marks NOT
+   self-contained in a short pass over the remaining predicted strings. Assistant drafts, owner decides.
+
+**Extractor.** Qwen 4B LoRA, general_fact only, input = the reviewed contract bundle (training and scoring use the
+same input kind, which removes step 3a-B's window/bundle mismatch). Output
+`{"payload":{"attributeKey","subject":"USER","referent","value"},"evidenceTurnIds"}`; no family field. 5-fold
+cross-validation using the reader data's existing `fold` per anchor; same hyperparameters as the extractor tuning
+(r16, α32, lr 1e-4 cosine, 3 epochs, effective batch 8, seed 20261125) — not tuned on this data. The 5 gold
+DEFERRED anchors the reader passes run on the fold adapter of their own fold.
+
+**Self-containment check.** Base Qwen 4B (no tuning) sees only `attributeKey` and `value` — no conversation — and
+answers `SELF_CONTAINED` or `NOT`. `NOT` holds the proposal (not proposed, kept, recoverable from source); no
+rewrite loop in this step. Its prompt is fixed before scoring and not changed after seeing results.
+
+**Path.** Reader (step 3a-B's bundle-input fold predictions, reused) → general_fact Extractor → check → proposal.
+
+**Scoring.** As step 3a: mechanical wrong = gold not general_fact, malformed, unregistered key, key mismatch; the
+owner judges values of key-matching proposals against the reviewed gold with the step 3a value rule. A held
+proposal is not a proposal (counted as a miss).
+
+**Pass.** Wrong ÷ proposals at or below 20% with at least 20 proposals (the step 3a bar). Holding cannot pass a run
+by emptying it: below 20 proposals is FAIL.
+
+**Reported, not scored.**
+- The same run without the check (Extractor alone) — separates what the referent field and the check each do.
+- The check against its gold (accepts on positives, rejects on negatives), and how many held proposals the owner
+  would have judged same.
+- Values that are verbatim anchor spans, before and after; misses; side-by-side with step 3a and 3a-B.
+
+**Known limits.**
+- 67 training anchors (about 54 per fold): small; a FAIL can be data size.
+- The owner writes and reviews every gold, the check's gold included, and judges the values; not independent.
+- Only general_fact; the 134 other anchors are not run (as step 3a-B), so the rate can be optimistic.
+- Bundles are owner-reviewed gold, not Builder output.
+- No API calls, no development DB writes; data and outputs private (`galpi-private/step3a-c/`).
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
