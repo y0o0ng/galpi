@@ -1484,10 +1484,17 @@ fixed by code and the model returns only evidence IDs), and the Extractor receiv
 extracts. Formation loop step 1 replaced this with a fixed window ("the model finds anchors only and code attaches
 evidence … this path does not call them") as a shortcut for a thin cloud loop, and every later step — the Luna
 Extractor, the train labels' `evidenceTurnIds`, the Qwen Extractor, the reader and step 3a — inherited it: the
-Extractor chose evidence. That was never the contract and was not flagged when the Extractor became a tuning
-target. In structure v2 evidence selection belongs to the bundle; the reader and the family extractors do not
+Extractor chose its context. That was never the contract and was not flagged when the Extractor became a tuning
+target. ~~In structure v2 evidence selection belongs to the bundle; the reader and the family extractors do not
 select evidence. The owner's evidence choices in the train labels stand in for refined bundles until the Bundle
-Builder is run in the loop. After the step 3a FAIL the owner rejected narrowing the design further before it has
+Builder is run in the loop.~~ (Superseded by the terms below, 2026-11-27.)
+
+**Terms, owner (2026-11-27).** The **bundle** is the set of turns the Bundle Builder selects around one anchor from
+the whole episode, enough to judge that one target alone; it is the input of every later stage, and only the
+Bundle Builder chooses it. **Evidence** is the turns inside the bundle that an extracted item explicitly draws on,
+kept as its reference (EvidenceRef) when there is explicitly extracted material. So the Extractor may cite
+evidence turns from its bundle; it does not choose the bundle. The owner's `evidenceTurnIds` in the train labels
+are valid evidence labels in this sense — the error was using them as the bundle (step 3a-R), not labelling them. After the step 3a FAIL the owner rejected narrowing the design further before it has
 been measured as designed.
 
 ### Step 3a-R — general_fact path on refined bundles — preregistration (owner-approved, 2026-11-26)
