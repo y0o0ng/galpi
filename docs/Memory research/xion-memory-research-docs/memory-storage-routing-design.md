@@ -1542,6 +1542,27 @@ one target's meaning remain its evidence"; anchor contract 4: "enough source tex
 Step 3a-R therefore measured citation-only input, not the designed bundle, and its FAIL does not speak for the
 contract. No gold for contract bundles exists yet.
 
+### Contract-bundle gold — owner-reviewed (2026-11-27)
+
+**Method.** The 72 general_fact anchors of steps 3a/3a-R were given to the assistant with their whole episode
+(not a window) and without the train labels. For each anchor it chose the bundle — the turns needed to judge that
+one target alone — with a one-line reason; the owner chose to have the assistant select rather than author them.
+The owner then reviewed every bundle with the anchor, the bundle text, the reason and the ±2 neighbouring turns
+left out, marking OK or turns to remove/add. Private files: `galpi-private/bundle-gold/` (`bundles-reviewed.jsonl`
+keeps the assistant's selection beside the reviewed one).
+
+**Result.** 54/72 OK unchanged, 18 trimmed (21 turns removed), 0 additions. Mean bundle size 3.19 → 2.90 turns;
+anchor-only bundles 7 → 15. Every correction removed context that did not change the target's meaning (a turn
+about another object, or background the anchor already closes); none found missing context. The owner kept two
+wider bundles on purpose so a later stage can still read them as part of a purchase project instead of being
+forced into general_fact, and noted one bundle where the preceding question is what makes the anchor readable.
+The owner also observed that the Builder's one-anchor-one-bundle shape — several bundles over the same turns,
+one per storable state, rather than several extractions from one bundle — works as designed.
+
+**Status.** This is the first contract-bundle gold. It is owner-reviewed but assistant-proposed, so it may lean
+toward the assistant's choices; it covers general_fact anchors only. No measurement on it has been
+preregistered yet.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
