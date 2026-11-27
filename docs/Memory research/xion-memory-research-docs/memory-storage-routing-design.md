@@ -1551,7 +1551,7 @@ The owner then reviewed every bundle with the anchor, the bundle text, the reaso
 left out, marking OK or turns to remove/add. Private files: `galpi-private/bundle-gold/` (`bundles-reviewed.jsonl`
 keeps the assistant's selection beside the reviewed one).
 
-**Result.** 54/72 OK unchanged, 18 trimmed (21 turns removed), 0 additions. Mean bundle size 3.19 → 2.90 turns;
+**Result.** 54/72 OK unchanged, 18 trimmed (24 turns removed), 0 additions. Mean bundle size 3.19 → 2.86 turns;
 anchor-only bundles 7 → 15. Every correction removed context that did not change the target's meaning (a turn
 about another object, or background the anchor already closes); none found missing context. The owner kept two
 wider bundles on purpose so a later stage can still read them as part of a purchase project instead of being
@@ -1560,7 +1560,8 @@ The owner also observed that the Builder's one-anchor-one-bundle shape — sever
 one per storable state, rather than several extractions from one bundle — works as designed.
 
 **Status.** This is the first contract-bundle gold. It is owner-reviewed but assistant-proposed, so it may lean
-toward the assistant's choices; it covers general_fact anchors only. No measurement on it has been
+toward the assistant's choices; it covers general_fact anchors only. A first apply dropped three of one item's four removals (turn IDs written without the `m` prefix); the
+assistant's cross-check caught it and the counts above are after the fix. No measurement on it has been
 preregistered yet.
 
 ## Storage topology and authority
