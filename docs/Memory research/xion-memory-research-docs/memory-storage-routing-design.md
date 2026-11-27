@@ -1522,6 +1522,14 @@ CV ran without; resume equivalence was checked there). Of step 3a's 5 different 
 the owner's own evidence as the bundle, so for those the missing value detail is not explained by the window.
 Scripts: `scripts/memory-step3a-r-data.py`, `scripts/memory-step3a-r.py`.
 
+**Correction (owner, 2026-11-27): the refined bundles were not contract bundles.** The owner's `evidenceTurnIds`
+were chosen while the whole window was visible: they cite the turns that state the fact, not the context needed to
+judge it (median 1 turn). Under the contract a later stage judges from the bundle alone, so a bundle must carry
+the context that decides the target's meaning (Phase 10: "Conditions, exceptions and corrections that determine
+one target's meaning remain its evidence"; anchor contract 4: "enough source text to distinguish that target").
+Step 3a-R therefore measured citation-only input, not the designed bundle, and its FAIL does not speak for the
+contract. No gold for contract bundles exists yet.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
