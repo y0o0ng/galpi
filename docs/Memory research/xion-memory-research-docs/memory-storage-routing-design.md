@@ -1368,6 +1368,11 @@ This replaces step 2b's single `status` slot and its write-time SUPERSEDE transi
 replaces `WRONG_TARGET` = 0 once links are reversible is open. The first test is the first-stage reader, which
 the current labels can score; it needs its own preregistration.
 
+**Owner note for later (2026-11-27), not opened.** When the DEFERRED and preference stores are built, their
+extractors also output a short genre / category memo. The nightly consolidation then uses it: DEFERRED items that
+pile up under one category are reviewed for promotion to project or general_fact, and preferences are grouped into
+sub-folders by category. Nothing is implemented or preregistered for this yet.
+
 ### First-stage reader — preregistration (owner-approved, 2026-11-26)
 
 **Question.** Does a tuned Qwen 4B sort WRITE anchors into general_fact, DEFERRED or project better than the
