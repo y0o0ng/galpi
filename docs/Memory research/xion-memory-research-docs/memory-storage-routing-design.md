@@ -1613,6 +1613,21 @@ not an automatic next step.
 - No API calls, no development DB writes. Script and outputs private (`galpi-private/step3a-b/`), never printing
   conversation text or values.
 
+**Step 3a-B — FAIL, decided before owner review (2026-11-27).** 49 proposals. Mechanical wrong 8 (reader 4: gold
+DEFERRED read as general_fact; key 4). Of the 41 key-matching values, 27 are string-identical to step 3a and
+inherit its marks — 4 of them marked different — and 14 are new. 8 + 4 = 12 wrong already (24.5%, bar 20%: at
+most 9 allowed), so the 14 new values cannot change the verdict and were not required for it.
+- Reader on bundles: 45/67 gold general_fact read as general_fact (11 DEFERRED, 11 project) and 4/5 gold DEFERRED
+  still passed — the same totals as on the window; 48 of the 49 proposals were step 3a proposals too.
+- Key mismatches 2 → 4; the two step 3a ones recur.
+- Values: 4 of step 3a's 5 different values came back word for word with the reviewed bundle as input.
+- Evidence (report-only): every one of the 66 cited turns lies inside the bundle; 49 of them are in the owner's
+  train-label evidence, which the proposals cover 49 of 54.
+- Reading, with the known limits above: on these anchors the input change did not move the reader and did not
+  repair the values the owner had traced to the bundle; the models were trained on windows, so this does not yet
+  separate "the bundle does not help" from "models trained on windows do not use a bundle". Script
+  `scripts/memory-step3a-b.py`.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
